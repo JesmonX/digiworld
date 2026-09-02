@@ -7,9 +7,13 @@ Windows keyboard heatmap.
 ## Status
 
 This repository contains the desktop shell, plugin protocol and SDK, official
-plugin sources, catalog tooling, tests, and Windows release workflows. Windows
-release artifacts must be Authenticode-signed before they are published as a
-stable release.
+plugin sources, catalog tooling, tests, and Windows release workflows. The
+current zero-cost Preview workflow signs plugin archives and updater bundles,
+but intentionally omits Windows Authenticode; stable releases will add a
+public-trust signer such as SignPath Foundation when approved.
+
+Preview users may see a Windows SmartScreen unknown-publisher warning. Verify
+the published `SHA256SUMS.txt` before running the installer.
 
 ## Development
 
