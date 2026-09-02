@@ -9,7 +9,7 @@ use crate::store::Store;
 use semver::Version;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::io::{Cursor, Read};
+use std::io::Cursor;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::Mutex;
