@@ -1,0 +1,142 @@
+name: Signed Windows release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: SemVer without v prefix
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+  pages: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    environment: production-release
+    env:
+      DIGIWORLD_PLUGIN_SIGNING_KEY_B64: ${{ secrets.DIGIWORLD_PLUGIN_SIGNING_KEY_B64 }}
+      DIGIWORLD_PLUGIN_PUBLIC_KEY_B64: ${{ vars.DIGIWORLD_PLUGIN_PUBLIC_KEY_B64 }}
+      DIGIWORLD_UPDATER_PUBLIC_KEY: ${{ vars.DIGIWORLD_UPDATER_PUBLIC_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.21.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+      - name: Refuse an unsigned release
+        shell: pwsh
+        run: |
+          if (-not $env:DIGIWORLD_PLUGIN_SIGNING_KEY_B64) { throw 'Missing plugin signing key' }
+          if (-not $env:DIGIWORLD_PLUGIN_PUBLIC_KEY_B64) { throw 'Missing plugin public key' }
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) { throw 'Missing Tauri updater signing key' }
+          if (-not $env:DIGIWORLD_UPDATER_PUBLIC_KEY) { throw 'Missing Tauri updater public key' }
+          if (-not '${{ vars.AZURE_SIGNING_ACCOUNT }}') { throw 'Missing Azure Artifact Signing configuration' }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: cargo test --workspace
+      - run: pnpm --filter @digiworld/plugin-keyboard-heatmap-ui build
+      - run: cargo build --release -p digiworld-keyboard-heatmap
+      - name: Sign plugin backend with Azure Artifact Signing
+        uses: azure/trusted-signing-action@v0.5.0
+        with:
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          trusted-signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_SIGNING_PROFILE }}
+          files-folder: target/release
+          files-folder-filter: digiworld-keyboard-heatmap.exe
+          files-folder-recurse: false
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+      - name: Package signed keyboard plugin
+        shell: pwsh
+        env:
+          DIGIWORLD_TARGET: windows-x86_64
+          DIGIWORLD_RELEASE_TAG: v${{ inputs.version }}
+        run: pnpm package:keyboard
+      - name: Build signed plugin catalog
+        env:
+          DIGIWORLD_CATALOG_SEQUENCE: ${{ github.run_number }}
+        run: pnpm catalog:build
+      - name: Build Digiworld installer and updater artifact
+        run: pnpm --filter @digiworld/desktop tauri build
+      - name: Sign NSIS installer with Azure Artifact Signing
+        uses: azure/trusted-signing-action@v0.5.0
+        with:
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          trusted-signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_SIGNING_PROFILE }}
+          files-folder: target/release/bundle/nsis
+          files-folder-filter: exe
+          files-folder-recurse: true
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+      - name: Verify Authenticode signatures
+        shell: pwsh
+        run: |
+          $plugin = Get-AuthenticodeSignature target/release/digiworld-keyboard-heatmap.exe
+          if ($plugin.Status -ne 'Valid') { throw "Invalid plugin signature: $($plugin.Status)" }
+          Get-ChildItem target/release/bundle/nsis/*.exe | ForEach-Object {
+            $sig = Get-AuthenticodeSignature $_.FullName
+            if ($sig.Status -ne 'Valid') { throw "Invalid installer signature: $($sig.Status)" }
+          }
+      - name: Re-sign final updater artifact
+        shell: pwsh
+        run: |
+          Get-ChildItem target/release/bundle/nsis/*.exe | ForEach-Object {
+            pnpm --filter @digiworld/desktop tauri signer sign $_.FullName
+          }
+      - name: Build updater manifest
+        env:
+          DIGIWORLD_RELEASE_VERSION: ${{ inputs.version }}
+        run: node scripts/build-update-manifest.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signed-windows-release
+          path: |
+            dist/plugins/*
+            catalog/v1/*
+            target/release/bundle/nsis/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signed-plugin-catalog
+          path: catalog
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: Digiworld v${{ inputs.version }}
+          generate_release_notes: true
+          files: |
+            dist/plugins/*
+            target/release/bundle/nsis/*
+
+  deploy-catalog:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: signed-plugin-catalog
+          path: site/catalog
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

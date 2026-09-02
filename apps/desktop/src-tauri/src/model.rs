@@ -1,0 +1,125 @@
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+
+pub const MANIFEST_SCHEMA_VERSION: u32 = 1;
+pub const PROTOCOL_VERSION: u32 = 1;
+pub const CORE_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PermissionRequest {
+    pub id: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlatformArtifact {
+    pub backend: String,
+    pub sha256: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginManifest {
+    pub schema_version: u32,
+    pub protocol_version: u32,
+    pub id: String,
+    pub version: String,
+    pub name: String,
+    pub description: String,
+    pub author: String,
+    pub license: String,
+    pub min_core_version: String,
+    pub icon: Option<String>,
+    pub ui: String,
+    pub background: String,
+    pub permissions: Vec<PermissionRequest>,
+    pub platforms: BTreeMap<String, PlatformArtifact>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CatalogArtifact {
+    pub target: String,
+    pub url: String,
+    pub sha256: String,
+    pub signature: String,
+    pub size: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CatalogPlugin {
+    pub id: String,
+    pub version: String,
+    pub name: String,
+    pub description: String,
+    pub author: String,
+    pub icon: Option<String>,
+    pub min_core_version: String,
+    pub permissions: Vec<PermissionRequest>,
+    pub artifacts: Vec<CatalogArtifact>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CatalogIndex {
+    pub schema_version: u32,
+    pub sequence: u64,
+    pub generated_at: String,
+    pub plugins: Vec<CatalogPlugin>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginSummary {
+    pub id: String,
+    pub version: String,
+    pub name: String,
+    pub description: String,
+    pub enabled: bool,
+    pub state: String,
+    pub permissions: Vec<PermissionRequest>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppState {
+    pub version: String,
+    pub platform: String,
+    pub target: String,
+    pub plugins: Vec<PluginSummary>,
+    pub catalog_sequence: u64,
+    pub launch_at_startup: bool,
+    pub update_available: Option<UpdateInfo>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateInfo {
+    pub version: String,
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallResult {
+    pub plugin: PluginSummary,
+    pub permissions_changed: bool,
+}
+
+pub fn target_key() -> String {
+    let os = match std::env::consts::OS {
+        "windows" => "windows",
+        "macos" => "darwin",
+        value => value,
+    };
+    let arch = match std::env::consts::ARCH {
+        "x86_64" => "x86_64",
+        "aarch64" => "aarch64",
+        value => value,
+    };
+    format!("{os}-{arch}")
+}

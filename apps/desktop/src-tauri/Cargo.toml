@@ -1,0 +1,45 @@
+[package]
+name = "digiworld"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "digiworld_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.5", features = [] }
+
+[dependencies]
+anyhow.workspace = true
+base64 = "0.22"
+chrono.workspace = true
+ed25519-dalek = "2.2"
+hex = "0.4"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+rusqlite = { version = "0.37", features = ["bundled"] }
+semver = { version = "1.0", features = ["serde"] }
+serde.workspace = true
+serde_json.workspace = true
+sha2 = "0.10"
+tauri = { version = "2.8", features = ["tray-icon"] }
+tauri-plugin-autostart = "2.5"
+tauri-plugin-dialog = "2.4"
+tauri-plugin-opener = "2.5"
+tauri-plugin-updater = "2.9"
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-appender = "0.2"
+tracing-subscriber.workspace = true
+uuid = { version = "1.18", features = ["v4"] }
+zip = { version = "4.6", default-features = false, features = ["deflate"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+  "Win32_Foundation",
+  "Win32_System_JobObjects",
+  "Win32_System_Threading",
+] }

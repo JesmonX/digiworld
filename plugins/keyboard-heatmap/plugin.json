@@ -1,0 +1,25 @@
+{
+  "id": "io.github.jesmonx.digiworld.keyboard-heatmap",
+  "version": "0.1.0",
+  "name": "键盘热力图",
+  "description": "以精致的 104 键热力图查看实体键位使用频率，只保存每日聚合次数。",
+  "author": "JesmonX",
+  "license": "MIT",
+  "minCoreVersion": "0.1.0",
+  "ui": "ui/index.html",
+  "background": "on-enable",
+  "permissions": [
+    {
+      "id": "global-input",
+      "reason": "在其他应用获得焦点时统计实体键位按下次数。"
+    },
+    {
+      "id": "background",
+      "reason": "关闭 Digiworld 窗口后继续累计键位次数。"
+    },
+    {
+      "id": "plugin-storage",
+      "reason": "在本机保存每日聚合计数和插件设置。"
+    }
+  ]
+}

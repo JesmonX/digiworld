@@ -1,0 +1,21 @@
+{
+  "name": "digiworld",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.21.0",
+  "scripts": {
+    "dev": "pnpm --filter @digiworld/desktop tauri dev",
+    "build": "pnpm -r --if-present build",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "lint": "pnpm -r --if-present lint",
+    "package:keyboard": "node scripts/package-plugin.mjs keyboard-heatmap",
+    "catalog:build": "node scripts/build-catalog.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "fflate": "^0.8.2",
+    "typescript": "^5.9.0"
+  }
+}

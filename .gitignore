@@ -1,0 +1,14 @@
+node_modules/
+dist/
+target/
+.vite/
+*.log
+*.dwpkg
+*.dwpkg.sig
+.env
+.env.*
+!.env.example
+catalog/v1/index.json.sig
+catalog/v1/index.dev.json
+catalog/v1/packages/
+src-tauri/gen/
