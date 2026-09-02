@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::model::{PermissionRequest, PluginManifest, PluginSummary};
+use crate::model::{PluginManifest, PluginSummary};
 use rusqlite::{Connection, OptionalExtension, params};
 use std::path::Path;
 use std::sync::Mutex;
@@ -203,21 +203,6 @@ impl Store {
         transaction.execute("DELETE FROM installed_plugins WHERE id = ?1", [id])?;
         transaction.commit()?;
         Ok(())
-    }
-
-    pub fn permissions(&self, id: &str) -> Result<Vec<PermissionRequest>> {
-        let connection = self.connection.lock().expect("store lock poisoned");
-        let mut statement = connection.prepare(
-            "SELECT permission, reason FROM granted_permissions WHERE plugin_id = ?1 ORDER BY permission",
-        )?;
-        Ok(statement
-            .query_map([id], |row| {
-                Ok(PermissionRequest {
-                    id: row.get(0)?,
-                    reason: row.get(1)?,
-                })
-            })?
-            .collect::<std::result::Result<_, _>>()?)
     }
 
     pub fn has_enabled_background(&self) -> Result<bool> {

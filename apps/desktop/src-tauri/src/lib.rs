@@ -16,7 +16,9 @@ use tauri::{AppHandle, Manager, State, WindowEvent};
 use tauri_plugin_autostart::ManagerExt as AutostartManagerExt;
 use tauri_plugin_updater::UpdaterExt;
 
-struct LogGuard(tracing_appender::non_blocking::WorkerGuard);
+struct LogGuard {
+    _guard: tracing_appender::non_blocking::WorkerGuard,
+}
 
 #[tauri::command]
 async fn get_app_state(app: AppHandle, manager: State<'_, Arc<PluginManager>>) -> Result<AppState> {
@@ -235,7 +237,7 @@ pub fn run() {
                 .args(["--background"])
                 .build(),
         )
-        .manage(LogGuard(guard));
+        .manage(LogGuard { _guard: guard });
     if let Some(public_key) = option_env!("DIGIWORLD_UPDATER_PUBLIC_KEY") {
         builder = builder.plugin(
             tauri_plugin_updater::Builder::new()
@@ -253,10 +255,8 @@ pub fn run() {
             create_tray(app)?;
 
             let background = std::env::args().any(|argument| argument == "--background");
-            if background {
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.hide();
-                }
+            if background && let Some(window) = app.get_webview_window("main") {
+                let _ = window.hide();
             }
             let startup_manager = manager.clone();
             tauri::async_runtime::spawn(async move {

@@ -116,10 +116,6 @@ pub fn target_key() -> String {
         "macos" => "darwin",
         value => value,
     };
-    let arch = match std::env::consts::ARCH {
-        "x86_64" => "x86_64",
-        "aarch64" => "aarch64",
-        value => value,
-    };
+    let arch = std::env::consts::ARCH;
     format!("{os}-{arch}")
 }

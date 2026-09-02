@@ -51,10 +51,8 @@ impl PluginManager {
     }
 
     pub async fn load_catalog(&self, refresh: bool) -> Result<CatalogIndex> {
-        if !refresh {
-            if let Some(catalog) = self.catalog_cache.lock().await.clone() {
-                return Ok(catalog);
-            }
+        if !refresh && let Some(catalog) = self.catalog_cache.lock().await.clone() {
+            return Ok(catalog);
         }
         let accepted = self.store.metadata_u64("catalog_sequence")?;
         let catalog = self.catalog.load(refresh, accepted).await?;

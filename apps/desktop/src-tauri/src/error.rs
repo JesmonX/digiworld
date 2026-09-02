@@ -21,8 +21,6 @@ pub enum DigiworldError {
     Catalog(String),
     #[error("plugin error: {0}")]
     Plugin(String),
-    #[error("permission denied: {0}")]
-    Permission(String),
     #[error("update error: {0}")]
     Update(String),
 }

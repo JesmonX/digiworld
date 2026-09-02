@@ -25,11 +25,11 @@ impl CatalogClient {
     }
 
     pub async fn load(&self, refresh: bool, accepted_sequence: u64) -> Result<CatalogIndex> {
-        if cfg!(debug_assertions) {
-            if let Ok(path) = std::env::var("DIGIWORLD_DEV_CATALOG") {
-                let bytes = tokio::fs::read(path).await?;
-                return Self::parse(&bytes, accepted_sequence, true);
-            }
+        if cfg!(debug_assertions)
+            && let Ok(path) = std::env::var("DIGIWORLD_DEV_CATALOG")
+        {
+            let bytes = tokio::fs::read(path).await?;
+            return Self::parse(&bytes, accepted_sequence, true);
         }
 
         if !refresh && self.cache_path.exists() {
@@ -93,16 +93,16 @@ impl CatalogClient {
                 "plugin exceeds the 128 MiB limit".into(),
             ));
         }
-        if cfg!(debug_assertions) {
-            if let Some(path) = url.strip_prefix("file://") {
-                let bytes = tokio::fs::read(path).await?;
-                if bytes.len() > MAX_PLUGIN_BYTES {
-                    return Err(DigiworldError::Catalog(
-                        "plugin exceeds the 128 MiB limit".into(),
-                    ));
-                }
-                return Ok(bytes);
+        if cfg!(debug_assertions)
+            && let Some(path) = url.strip_prefix("file://")
+        {
+            let bytes = tokio::fs::read(path).await?;
+            if bytes.len() > MAX_PLUGIN_BYTES {
+                return Err(DigiworldError::Catalog(
+                    "plugin exceeds the 128 MiB limit".into(),
+                ));
             }
+            return Ok(bytes);
         }
         if !url.starts_with("https://") {
             return Err(DigiworldError::Catalog(
@@ -110,12 +110,12 @@ impl CatalogClient {
             ));
         }
         let response = self.http.get(url).send().await?.error_for_status()?;
-        if let Some(length) = response.content_length() {
-            if length as usize > MAX_PLUGIN_BYTES {
-                return Err(DigiworldError::Catalog(
-                    "plugin exceeds the 128 MiB limit".into(),
-                ));
-            }
+        if let Some(length) = response.content_length()
+            && length as usize > MAX_PLUGIN_BYTES
+        {
+            return Err(DigiworldError::Catalog(
+                "plugin exceeds the 128 MiB limit".into(),
+            ));
         }
         let bytes = response.bytes().await?;
         if bytes.len() > MAX_PLUGIN_BYTES {
