@@ -1,8 +1,9 @@
-import { createHash, createPrivateKey, sign } from 'node:crypto'
+import { createHash, sign } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { zipSync } from 'fflate'
+import { loadPluginSigningKey } from './plugin-signing-key.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
 const pluginName = process.argv[2]
@@ -45,7 +46,7 @@ await writeFile(outputPath, archive)
 
 let signature = 'development-unsigned'
 if (process.env.DIGIWORLD_PLUGIN_SIGNING_KEY_B64) {
-  const key = createPrivateKey(Buffer.from(process.env.DIGIWORLD_PLUGIN_SIGNING_KEY_B64, 'base64'))
+  const key = loadPluginSigningKey(process.env.DIGIWORLD_PLUGIN_SIGNING_KEY_B64)
   signature = sign(null, archive, key).toString('base64')
   await writeFile(`${outputPath}.sig`, `${signature}\n`)
 }

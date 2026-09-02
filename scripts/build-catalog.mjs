@@ -1,7 +1,8 @@
-import { createPrivateKey, sign } from 'node:crypto'
+import { sign } from 'node:crypto'
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
+import { loadPluginSigningKey } from './plugin-signing-key.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
 const metadataDir = path.join(root, 'dist', 'plugins')
@@ -35,7 +36,7 @@ await mkdir(outputDir, { recursive: true })
 const indexName = process.env.DIGIWORLD_DEV_CATALOG === '1' ? 'index.dev.json' : 'index.json'
 await writeFile(path.join(outputDir, indexName), bytes)
 if (process.env.DIGIWORLD_PLUGIN_SIGNING_KEY_B64) {
-  const key = createPrivateKey(Buffer.from(process.env.DIGIWORLD_PLUGIN_SIGNING_KEY_B64, 'base64'))
+  const key = loadPluginSigningKey(process.env.DIGIWORLD_PLUGIN_SIGNING_KEY_B64)
   await writeFile(path.join(outputDir, 'index.json.sig'), `${sign(null, bytes, key).toString('base64')}\n`)
 } else if (process.env.DIGIWORLD_DEV_CATALOG !== '1') {
   throw new Error('DIGIWORLD_PLUGIN_SIGNING_KEY_B64 is required for a production catalog')

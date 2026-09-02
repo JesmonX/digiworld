@@ -31,6 +31,10 @@ DIGIWORLD_PLUGIN_PUBLIC_KEY_B64
 DIGIWORLD_UPDATER_PUBLIC_KEY
 ```
 
+`DIGIWORLD_PLUGIN_SIGNING_KEY_B64` accepts base64-encoded PEM/PKCS#8 private
+keys and base64-encoded 32-byte Ed25519 seeds. The recommended value is a
+single-line base64 encoding of an Ed25519 PEM private key.
+
 The workflow input also updates the checked-out Tauri version and updater
 public key for that build; it does not modify the repository. When a
 public-trust signing provider is available, Authenticode signing will be added

@@ -45,6 +45,8 @@ jobs:
       - name: Confirm preview signing keys
         shell: pwsh
         run: Write-Host 'Plugin archives and updater bundles are cryptographically signed; Windows Authenticode is intentionally omitted for this preview.'
+      - name: Validate plugin signing key format
+        run: node scripts/validate-plugin-signing-key.mjs
       - name: Configure release metadata
         run: node scripts/configure-release.mjs
       - run: pnpm install --frozen-lockfile
