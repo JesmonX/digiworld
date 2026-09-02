@@ -1,4 +1,13 @@
-export interface KeyDefinition { id: string; label: string; width?: number; spacer?: number }
+export interface KeyDefinition {
+  id: string
+  label: string
+  width?: number
+  spacer?: number
+  row?: number
+  column?: number
+  rowSpan?: number
+  columnSpan?: number
+}
 
 const k = (id: string, label: string, width = 1, spacer = 0): KeyDefinition => ({ id, label, width, spacer })
 
@@ -25,10 +34,13 @@ export const navRows: KeyDefinition[][] = [
   [k('ArrowLeft', '←'), k('ArrowDown', '↓'), k('ArrowRight', '→')],
 ]
 
-export const numpadRows: KeyDefinition[][] = [
-  [k('NumLock', 'Num'), k('NumpadDivide', '/'), k('NumpadMultiply', '×'), k('NumpadSubtract', '−')],
-  [k('Numpad7', '7'), k('Numpad8', '8'), k('Numpad9', '9'), k('NumpadAdd', '+')],
-  [k('Numpad4', '4'), k('Numpad5', '5'), k('Numpad6', '6'), k('NumpadAdd', '+')],
-  [k('Numpad1', '1'), k('Numpad2', '2'), k('Numpad3', '3'), k('NumpadEnter', 'Enter')],
-  [k('Numpad0', '0', 2.05), k('NumpadDecimal', '.'), k('NumpadEnter', 'Enter')],
+const nk = (id: string, label: string, row: number, column: number, rowSpan = 1, columnSpan = 1): KeyDefinition =>
+  ({ id, label, row, column, rowSpan, columnSpan })
+
+export const numpadKeys: KeyDefinition[] = [
+  nk('NumLock', 'Num', 1, 1), nk('NumpadDivide', '/', 1, 2), nk('NumpadMultiply', '×', 1, 3), nk('NumpadSubtract', '−', 1, 4),
+  nk('Numpad7', '7', 2, 1), nk('Numpad8', '8', 2, 2), nk('Numpad9', '9', 2, 3), nk('NumpadAdd', '+', 2, 4, 2),
+  nk('Numpad4', '4', 3, 1), nk('Numpad5', '5', 3, 2), nk('Numpad6', '6', 3, 3),
+  nk('Numpad1', '1', 4, 1), nk('Numpad2', '2', 4, 2), nk('Numpad3', '3', 4, 3), nk('NumpadEnter', 'Enter', 4, 4, 2),
+  nk('Numpad0', '0', 5, 1, 1, 2), nk('NumpadDecimal', '.', 5, 3),
 ]

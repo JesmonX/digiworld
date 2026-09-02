@@ -1,4 +1,8 @@
-import type { HostToPluginMessage, PluginToHostMessage } from './types.js'
+import type { HostToPluginMessage, PluginTheme, PluginToHostMessage } from './types.js'
+
+export interface PluginBridgeOptions {
+  contextMenu?: 'disabled' | 'native'
+}
 
 export interface DigiworldPluginBridge {
   request<T>(method: string, payload?: unknown): Promise<T>
@@ -6,10 +10,26 @@ export interface DigiworldPluginBridge {
   ready(): void
 }
 
-export function createPluginBridge(pluginId: string): DigiworldPluginBridge {
+export function applyPluginTheme(theme: Partial<PluginTheme>, root: HTMLElement = document.documentElement): void {
+  for (const [key, value] of Object.entries(theme)) {
+    if (value === undefined) continue
+    root.style.setProperty(`--dw-${key}`, String(value))
+  }
+  if (theme['color-scheme']) root.style.colorScheme = theme['color-scheme']
+}
+
+export function suppressContextMenu(target: EventTarget = window): () => void {
+  const preventMenu = (event: Event) => event.preventDefault()
+  target.addEventListener('contextmenu', preventMenu)
+  return () => target.removeEventListener('contextmenu', preventMenu)
+}
+
+export function createPluginBridge(pluginId: string, options: PluginBridgeOptions = {}): DigiworldPluginBridge {
   let sequence = 0
   const pending = new Map<string, { resolve(value: unknown): void; reject(error: Error): void }>()
   const listeners = new Map<string, Set<(payload: unknown) => void>>()
+
+  if (options.contextMenu !== 'native') suppressContextMenu()
 
   window.addEventListener('message', (event: MessageEvent<HostToPluginMessage>) => {
     const message = event.data
@@ -30,9 +50,7 @@ export function createPluginBridge(pluginId: string): DigiworldPluginBridge {
     }
 
     if (message.kind === 'theme' && typeof message.payload === 'object' && message.payload) {
-      for (const [key, value] of Object.entries(message.payload)) {
-        document.documentElement.style.setProperty(`--dw-${key}`, String(value))
-      }
+      applyPluginTheme(message.payload as Partial<PluginTheme>)
     }
   })
 

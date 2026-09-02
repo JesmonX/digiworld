@@ -16,10 +16,10 @@
         "title": "Digiworld",
         "width": 1180,
         "height": 760,
-        "minWidth": 760,
-        "minHeight": 600,
+        "minWidth": 1000,
+        "minHeight": 680,
         "center": true,
-        "decorations": true,
+        "decorations": false,
         "transparent": false,
         "visible": true
       }

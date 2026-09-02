@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
-import type { HostToPluginMessage, PluginToHostMessage } from '@digiworld/plugin-sdk'
+import type { HostToPluginMessage, PluginTheme, PluginToHostMessage } from '@digiworld/plugin-sdk'
 import { api } from '../lib/api'
 
 interface PluginFrameProps {
@@ -7,16 +7,21 @@ interface PluginFrameProps {
   html: string
 }
 
-const THEME = {
-  'bg': '#080b12',
-  'surface': '#101621',
-  'surface-raised': '#161e2c',
-  'text': '#f4f7fb',
-  'text-muted': '#8e9bad',
-  'accent': '#42f5c5',
-  'accent-secondary': '#7c6cff',
-  'danger': '#ff5f79',
-  'font-sans': 'Inter, Segoe UI, Microsoft YaHei UI, sans-serif',
+const THEME: PluginTheme = {
+  'color-scheme': 'light',
+  'bg': '#f5f7fb',
+  'surface': '#ffffff',
+  'surface-raised': '#ffffff',
+  'surface-subtle': '#f0f3f8',
+  'border': '#dde3ec',
+  'text': '#172033',
+  'text-muted': '#667085',
+  'accent': '#5b5ce2',
+  'accent-strong': '#4338ca',
+  'accent-contrast': '#ffffff',
+  'accent-secondary': '#8b5cf6',
+  'danger': '#d92d20',
+  'font-sans': '"Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", sans-serif',
 }
 
 export function PluginFrame({ pluginId, html }: PluginFrameProps) {

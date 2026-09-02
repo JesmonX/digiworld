@@ -61,6 +61,23 @@ export interface CatalogIndex {
   plugins: CatalogPlugin[]
 }
 
+export interface PluginTheme {
+  'color-scheme': 'light' | 'dark'
+  'bg': string
+  'surface': string
+  'surface-raised': string
+  'surface-subtle': string
+  'border': string
+  'text': string
+  'text-muted': string
+  'accent': string
+  'accent-strong': string
+  'accent-contrast': string
+  'accent-secondary': string
+  'danger': string
+  'font-sans': string
+}
+
 export type RpcId = string | number
 
 export interface RpcRequest<T = unknown> {

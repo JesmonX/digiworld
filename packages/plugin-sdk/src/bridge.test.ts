@@ -1,0 +1,33 @@
+import { describe, expect, it } from 'vitest'
+import { applyPluginTheme, suppressContextMenu } from './bridge.js'
+
+describe('plugin presentation helpers', () => {
+  it('applies semantic theme variables and the document color scheme', () => {
+    const properties = new Map<string, string>()
+    const root = {
+      style: {
+        colorScheme: '',
+        setProperty(name: string, value: string) { properties.set(name, value) },
+      },
+    } as unknown as HTMLElement
+
+    applyPluginTheme({ 'color-scheme': 'light', text: '#172033', accent: '#5b5ce2' }, root)
+
+    expect(root.style.colorScheme).toBe('light')
+    expect(properties.get('--dw-text')).toBe('#172033')
+    expect(properties.get('--dw-accent')).toBe('#5b5ce2')
+  })
+
+  it('suppresses and restores the native context menu', () => {
+    const target = new EventTarget()
+    const restore = suppressContextMenu(target)
+    const blocked = new Event('contextmenu', { cancelable: true })
+    target.dispatchEvent(blocked)
+    expect(blocked.defaultPrevented).toBe(true)
+
+    restore()
+    const restored = new Event('contextmenu', { cancelable: true })
+    target.dispatchEvent(restored)
+    expect(restored.defaultPrevented).toBe(false)
+  })
+})
