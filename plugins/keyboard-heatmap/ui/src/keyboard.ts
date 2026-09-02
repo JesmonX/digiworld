@@ -9,6 +9,21 @@ export interface KeyDefinition {
   columnSpan?: number
 }
 
+export type KeyboardLayoutId = 'full' | 'tkl' | '75' | '65' | '60'
+
+export interface KeyboardLayout {
+  id: KeyboardLayoutId
+  label: string
+  keyCount: number
+  description: string
+  minWidth: number
+  functionRow: KeyDefinition[]
+  alphaRows: KeyDefinition[][]
+  navRows: KeyDefinition[][]
+  numpadKeys: KeyDefinition[]
+  preview: number[][]
+}
+
 const k = (id: string, label: string, width = 1, spacer = 0): KeyDefinition => ({ id, label, width, spacer })
 
 export const functionRow: KeyDefinition[] = [
@@ -44,3 +59,48 @@ export const numpadKeys: KeyDefinition[] = [
   nk('Numpad1', '1', 4, 1), nk('Numpad2', '2', 4, 2), nk('Numpad3', '3', 4, 3), nk('NumpadEnter', 'Enter', 4, 4, 2),
   nk('Numpad0', '0', 5, 1, 1, 2), nk('NumpadDecimal', '.', 5, 3),
 ]
+
+const compactFunctionRow = functionRow.slice(0, 13)
+const compactNavRows: KeyDefinition[][] = [
+  [k('Delete', 'Del'), k('PageUp', 'PgUp')],
+  [k('PageDown', 'PgDn')],
+  [],
+  [k('ArrowUp', '↑', 1, 1)],
+  [k('ArrowLeft', '←'), k('ArrowDown', '↓'), k('ArrowRight', '→')],
+]
+
+export const keyboardLayouts: KeyboardLayout[] = [
+  {
+    id: 'full', label: '104 键', keyCount: 104, description: '全尺寸 · 独立功能区与数字小键盘', minWidth: 900,
+    functionRow, alphaRows, navRows, numpadKeys,
+    preview: [[17, 4], [14, 3, 4], [14, 3, 4], [14, 3, 4]],
+  },
+  {
+    id: 'tkl', label: '87 键', keyCount: 87, description: 'TKL · 保留功能键与导航区', minWidth: 740,
+    functionRow, alphaRows, navRows, numpadKeys: [],
+    preview: [[17], [14, 3], [14, 3], [14, 3]],
+  },
+  {
+    id: '75', label: '84 键', keyCount: 84, description: '75% · 紧凑功能键与导航区', minWidth: 700,
+    functionRow: compactFunctionRow, alphaRows, navRows, numpadKeys: [],
+    preview: [[16], [14, 2], [14, 2], [14, 2]],
+  },
+  {
+    id: '65', label: '68 键', keyCount: 68, description: '65% · 保留方向键与常用导航键', minWidth: 690,
+    functionRow: [], alphaRows, navRows: compactNavRows, numpadKeys: [],
+    preview: [[14, 2], [14, 2], [14, 2], [14, 2]],
+  },
+  {
+    id: '60', label: '61 键', keyCount: 61, description: '60% · 仅保留主键区', minWidth: 610,
+    functionRow: [], alphaRows, navRows: [], numpadKeys: [],
+    preview: [[14], [14], [14], [14]],
+  },
+]
+
+export function getKeyboardLayout(id: KeyboardLayoutId): KeyboardLayout {
+  return keyboardLayouts.find(layout => layout.id === id) ?? keyboardLayouts[0]!
+}
+
+export function layoutKeys(layout: KeyboardLayout): KeyDefinition[] {
+  return [...layout.functionRow, ...layout.alphaRows.flat(), ...layout.navRows.flat(), ...layout.numpadKeys]
+}

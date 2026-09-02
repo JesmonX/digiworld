@@ -5,28 +5,17 @@ import { api } from '../lib/api'
 interface PluginFrameProps {
   pluginId: string
   html: string
+  theme: PluginTheme
 }
 
-const THEME: PluginTheme = {
-  'color-scheme': 'light',
-  'bg': '#f5f7fb',
-  'surface': '#ffffff',
-  'surface-raised': '#ffffff',
-  'surface-subtle': '#f0f3f8',
-  'border': '#dde3ec',
-  'text': '#172033',
-  'text-muted': '#667085',
-  'accent': '#5b5ce2',
-  'accent-strong': '#4338ca',
-  'accent-contrast': '#ffffff',
-  'accent-secondary': '#8b5cf6',
-  'danger': '#d92d20',
-  'font-sans': '"Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", sans-serif',
-}
-
-export function PluginFrame({ pluginId, html }: PluginFrameProps) {
+export function PluginFrame({ pluginId, html, theme }: PluginFrameProps) {
   const frame = useRef<HTMLIFrameElement>(null)
+  const ready = useRef(false)
   const source = useMemo(() => html, [html])
+
+  useEffect(() => {
+    ready.current = false
+  }, [pluginId, source])
 
   useEffect(() => {
     const onMessage = async (event: MessageEvent<PluginToHostMessage>) => {
@@ -35,8 +24,9 @@ export function PluginFrame({ pluginId, html }: PluginFrameProps) {
       if (message?.source !== 'digiworld-plugin' || message.pluginId !== pluginId) return
 
       if (message.kind === 'ready') {
+        ready.current = true
         const themeMessage: HostToPluginMessage = {
-          source: 'digiworld-host', pluginId, kind: 'theme', payload: THEME,
+          source: 'digiworld-host', pluginId, kind: 'theme', payload: theme,
         }
         frame.current?.contentWindow?.postMessage(themeMessage, '*')
         return
@@ -57,7 +47,15 @@ export function PluginFrame({ pluginId, html }: PluginFrameProps) {
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [pluginId])
+  }, [pluginId, theme])
+
+  useEffect(() => {
+    if (!ready.current) return
+    const themeMessage: HostToPluginMessage = {
+      source: 'digiworld-host', pluginId, kind: 'theme', payload: theme,
+    }
+    frame.current?.contentWindow?.postMessage(themeMessage, '*')
+  }, [pluginId, theme])
 
   return <iframe ref={frame} className="plugin-frame" title={pluginId} sandbox="allow-scripts allow-downloads" srcDoc={source} />
 }

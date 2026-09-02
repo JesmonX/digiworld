@@ -1,6 +1,6 @@
 use crate::model::{
-    AgentKind, Breakdown, DaySnapshot, FileUsage, ScanBatch, SnapshotRequest, SourceStatus,
-    TokenUsage, UsageSettings, UsageSnapshot, UsageTotals,
+    AgentKind, Breakdown, DaySnapshot, FileUsage, ModelBreakdown, ScanBatch, SnapshotRequest,
+    SourceStatus, TokenUsage, UsageSettings, UsageSnapshot, UsageTotals,
 };
 use anyhow::{Context, Result};
 use chrono::{Duration, Local};
@@ -8,7 +8,8 @@ use rusqlite::{Connection, OptionalExtension, params};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-const PARSER_VERSION: i64 = 1;
+const PARSER_VERSION: i64 = 2;
+const DATABASE_VERSION: i64 = 2;
 
 pub struct Database {
     connection: Connection,
@@ -34,18 +35,6 @@ impl Database {
                 parser_version INTEGER NOT NULL,
                 PRIMARY KEY(source_id, agent, file_hash)
             );
-            CREATE TABLE IF NOT EXISTS daily_file_usage (
-                source_id TEXT NOT NULL,
-                agent TEXT NOT NULL,
-                file_hash TEXT NOT NULL,
-                day TEXT NOT NULL,
-                input_tokens INTEGER NOT NULL CHECK(input_tokens >= 0),
-                output_tokens INTEGER NOT NULL CHECK(output_tokens >= 0),
-                cache_read_tokens INTEGER NOT NULL CHECK(cache_read_tokens >= 0),
-                cache_write_tokens INTEGER NOT NULL CHECK(cache_write_tokens >= 0),
-                cache_available INTEGER NOT NULL DEFAULT 0,
-                PRIMARY KEY(source_id, agent, file_hash, day)
-            );
             CREATE TABLE IF NOT EXISTS source_status (
                 source_id TEXT PRIMARY KEY,
                 status TEXT NOT NULL,
@@ -53,9 +42,60 @@ impl Database {
                 error TEXT,
                 warnings_json TEXT NOT NULL DEFAULT '[]'
             );
-            PRAGMA user_version = 1;
             ",
         )?;
+        let version: i64 = connection.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+        match version {
+            0 => connection.execute_batch(
+                "
+                CREATE TABLE daily_file_usage (
+                    source_id TEXT NOT NULL,
+                    agent TEXT NOT NULL,
+                    file_hash TEXT NOT NULL,
+                    day TEXT NOT NULL,
+                    model TEXT NOT NULL DEFAULT 'unknown',
+                    input_tokens INTEGER NOT NULL CHECK(input_tokens >= 0),
+                    output_tokens INTEGER NOT NULL CHECK(output_tokens >= 0),
+                    cache_read_tokens INTEGER NOT NULL CHECK(cache_read_tokens >= 0),
+                    cache_write_tokens INTEGER NOT NULL CHECK(cache_write_tokens >= 0),
+                    cache_available INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY(source_id, agent, file_hash, day, model)
+                );
+                PRAGMA user_version = 2;
+                ",
+            )?,
+            1 => connection.execute_batch(
+                "
+                BEGIN IMMEDIATE;
+                ALTER TABLE daily_file_usage RENAME TO daily_file_usage_v1;
+                CREATE TABLE daily_file_usage (
+                    source_id TEXT NOT NULL,
+                    agent TEXT NOT NULL,
+                    file_hash TEXT NOT NULL,
+                    day TEXT NOT NULL,
+                    model TEXT NOT NULL DEFAULT 'unknown',
+                    input_tokens INTEGER NOT NULL CHECK(input_tokens >= 0),
+                    output_tokens INTEGER NOT NULL CHECK(output_tokens >= 0),
+                    cache_read_tokens INTEGER NOT NULL CHECK(cache_read_tokens >= 0),
+                    cache_write_tokens INTEGER NOT NULL CHECK(cache_write_tokens >= 0),
+                    cache_available INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY(source_id, agent, file_hash, day, model)
+                );
+                INSERT INTO daily_file_usage(
+                    source_id, agent, file_hash, day, model, input_tokens, output_tokens,
+                    cache_read_tokens, cache_write_tokens, cache_available
+                )
+                SELECT source_id, agent, file_hash, day, 'unknown', input_tokens, output_tokens,
+                    cache_read_tokens, cache_write_tokens, cache_available
+                FROM daily_file_usage_v1;
+                DROP TABLE daily_file_usage_v1;
+                PRAGMA user_version = 2;
+                COMMIT;
+                ",
+            )?,
+            DATABASE_VERSION => {}
+            other => anyhow::bail!("unsupported token database schema version: {other}"),
+        }
         Ok(Self { connection })
     }
 
@@ -198,7 +238,7 @@ impl Database {
             .collect();
 
         let mut statement = self.connection.prepare(
-            "SELECT source_id, agent, day, input_tokens, output_tokens,
+            "SELECT source_id, agent, day, model, input_tokens, output_tokens,
                     cache_read_tokens, cache_write_tokens, cache_available
              FROM daily_file_usage ORDER BY day",
         )?;
@@ -207,20 +247,22 @@ impl Database {
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
                 row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
                 TokenUsage {
-                    input_tokens: row.get(3)?,
-                    output_tokens: row.get(4)?,
-                    cache_read_tokens: row.get(5)?,
-                    cache_write_tokens: row.get(6)?,
-                    cache_available: row.get(7)?,
+                    input_tokens: row.get(4)?,
+                    output_tokens: row.get(5)?,
+                    cache_read_tokens: row.get(6)?,
+                    cache_write_tokens: row.get(7)?,
+                    cache_available: row.get(8)?,
                 },
             ))
         })?;
         let mut totals = TokenUsage::default();
         let mut by_day = BTreeMap::<String, TokenUsage>::new();
         let mut breakdown = BTreeMap::<(String, AgentKind), TokenUsage>::new();
+        let mut model_breakdown = BTreeMap::<(String, AgentKind, String), TokenUsage>::new();
         for row in rows {
-            let (source_id, agent, day, usage) = row?;
+            let (source_id, agent, day, model, usage) = row?;
             let Some(agent) = parse_agent(&agent) else {
                 continue;
             };
@@ -237,7 +279,11 @@ impl Database {
             totals.add_assign(&usage);
             by_day.entry(day).or_default().add_assign(&usage);
             breakdown
-                .entry((source_id, agent))
+                .entry((source_id.clone(), agent))
+                .or_default()
+                .add_assign(&usage);
+            model_breakdown
+                .entry((source_id, agent, model))
                 .or_default()
                 .add_assign(&usage);
         }
@@ -273,6 +319,20 @@ impl Database {
                         .then_some(usage.cache_read_tokens as f64 / usage.input_tokens as f64),
                     source_id,
                     agent,
+                    usage,
+                })
+                .collect(),
+            model_breakdown: model_breakdown
+                .into_iter()
+                .map(|((source_id, agent, model), usage)| ModelBreakdown {
+                    source_label: labels
+                        .get(&source_id)
+                        .cloned()
+                        .unwrap_or_else(|| source_id.clone()),
+                    total_tokens: usage.total_tokens(),
+                    source_id,
+                    agent,
+                    model,
                     usage,
                 })
                 .collect(),
@@ -325,14 +385,15 @@ fn replace_file(
     )?;
     for row in &file.daily {
         transaction.execute(
-            "INSERT INTO daily_file_usage(source_id, agent, file_hash, day, input_tokens,
+            "INSERT INTO daily_file_usage(source_id, agent, file_hash, day, model, input_tokens,
              output_tokens, cache_read_tokens, cache_write_tokens, cache_available)
-             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 source_id,
                 file.agent.as_str(),
                 file.file_hash,
                 row.day,
+                row.model,
                 row.usage.input_tokens,
                 row.usage.output_tokens,
                 row.usage.cache_read_tokens,
@@ -383,6 +444,7 @@ mod tests {
                 modified: 1,
                 daily: vec![DailyUsage {
                     day: Local::now().format("%Y-%m-%d").to_string(),
+                    model: "gpt-5.6-sol".into(),
                     usage: TokenUsage {
                         input_tokens: 100,
                         output_tokens: 10,
@@ -409,5 +471,41 @@ mod tests {
             .unwrap();
         assert_eq!(snapshot.totals.total_tokens, 110);
         assert_eq!(snapshot.totals.cache_rate, Some(0.6));
+        assert_eq!(snapshot.model_breakdown.len(), 1);
+        assert_eq!(snapshot.model_breakdown[0].model, "gpt-5.6-sol");
+    }
+
+    #[test]
+    fn migrates_v1_rows_as_unknown_model() {
+        let path = std::env::temp_dir().join(format!(
+            "digiworld-token-migration-{}-{}.db",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        let connection = Connection::open(&path).unwrap();
+        connection.execute_batch(
+            "
+            CREATE TABLE daily_file_usage (
+                source_id TEXT NOT NULL, agent TEXT NOT NULL, file_hash TEXT NOT NULL,
+                day TEXT NOT NULL, input_tokens INTEGER NOT NULL, output_tokens INTEGER NOT NULL,
+                cache_read_tokens INTEGER NOT NULL, cache_write_tokens INTEGER NOT NULL,
+                cache_available INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(source_id, agent, file_hash, day)
+            );
+            INSERT INTO daily_file_usage VALUES('local', 'codex', 'one', '2026-09-02', 10, 2, 0, 0, 0);
+            PRAGMA user_version = 1;
+            ",
+        )
+        .unwrap();
+        drop(connection);
+
+        let database = Database::open(&path).unwrap();
+        let model: String = database
+            .connection
+            .query_row("SELECT model FROM daily_file_usage", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(model, "unknown");
+        drop(database);
+        std::fs::remove_file(path).unwrap();
     }
 }

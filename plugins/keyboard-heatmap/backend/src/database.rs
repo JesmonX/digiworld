@@ -98,20 +98,28 @@ impl Database {
     }
 
     pub fn setting_bool(&self, key: &str) -> Result<bool> {
+        Ok(self.setting(key)?.as_deref() == Some("true"))
+    }
+
+    pub fn setting(&self, key: &str) -> Result<Option<String>> {
         let value: Option<String> = self
             .connection
             .query_row("SELECT value FROM settings WHERE key = ?1", [key], |row| {
                 row.get(0)
             })
             .optional()?;
-        Ok(value.as_deref() == Some("true"))
+        Ok(value)
     }
 
     pub fn set_setting_bool(&self, key: &str, value: bool) -> Result<()> {
+        self.set_setting(key, if value { "true" } else { "false" })
+    }
+
+    pub fn set_setting(&self, key: &str, value: &str) -> Result<()> {
         self.connection.execute(
             "INSERT INTO settings(key, value) VALUES(?1, ?2)
              ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-            params![key, if value { "true" } else { "false" }],
+            params![key, value],
         )?;
         Ok(())
     }

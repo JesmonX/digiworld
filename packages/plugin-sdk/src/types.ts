@@ -76,6 +76,7 @@ export interface PluginTheme {
   'accent-strong': string
   'accent-contrast': string
   'accent-secondary': string
+  'accent-soft': string
   'danger': string
   'font-sans': string
 }

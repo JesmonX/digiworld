@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { alphaRows, functionRow, navRows, numpadKeys } from './keyboard'
+import { getKeyboardLayout, keyboardLayouts, layoutKeys, numpadKeys } from './keyboard'
 
-describe('104-key layout', () => {
-  it('contains every required physical key position', () => {
-    const ids = [...functionRow, ...alphaRows.flat(), ...navRows.flat(), ...numpadKeys].map(key => key.id)
-    expect(ids).toContain('Space')
-    expect(ids).toContain('ControlLeft')
-    expect(ids).toContain('ControlRight')
-    expect(ids).toContain('NumpadEnter')
-    expect(ids).toHaveLength(104)
-    expect(new Set(ids).size).toBe(104)
+describe('keyboard layouts', () => {
+  it('covers the mainstream 104, 87, 84, 68 and 61-key distributions', () => {
+    expect(keyboardLayouts.map(layout => layout.keyCount)).toEqual([104, 87, 84, 68, 61])
+    for (const layout of keyboardLayouts) {
+      const ids = layoutKeys(layout).map(key => key.id)
+      expect(ids).toHaveLength(layout.keyCount)
+      expect(new Set(ids).size).toBe(layout.keyCount)
+      expect(ids).toContain('Space')
+      expect(ids).toContain('ControlLeft')
+    }
+    expect(layoutKeys(getKeyboardLayout('full')).map(key => key.id)).toContain('NumpadEnter')
+    expect(layoutKeys(getKeyboardLayout('60')).map(key => key.id)).not.toContain('F1')
   })
 
   it('renders tall numpad keys as single physical keys', () => {

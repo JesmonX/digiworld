@@ -13,6 +13,7 @@
   --muted: #667085;
   --accent: #5b5ce2;
   --accent-strong: #4338ca;
+  --accent-secondary: #8b5cf6;
   --accent-soft: #ededff;
   --danger: #d92d20;
 }
@@ -21,7 +22,7 @@
 html, body, #root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 body { background: var(--canvas); }
 button { font: inherit; }
-button:focus-visible { outline: 2px solid rgba(91, 92, 226, .55); outline-offset: 2px; }
+button:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 2px; }
 
 .app-window { display: flex; flex-direction: column; width: 100%; height: 100%; background: var(--canvas); }
 .window-chrome {
@@ -36,7 +37,7 @@ button:focus-visible { outline: 2px solid rgba(91, 92, 226, .55); outline-offset
   user-select: none;
 }
 .window-brand { display: flex; align-items: center; gap: 9px; height: 100%; padding-left: 16px; color: #2e3748; font-size: 13px; font-weight: 600; }
-.window-brand-mark { width: 16px; height: 16px; border-radius: 5px; background: linear-gradient(135deg, #3b82f6, #7c3aed 68%, #ec4899); box-shadow: 0 3px 10px rgba(91, 92, 226, .25); }
+.window-brand-mark { width: 16px; height: 16px; border-radius: 5px; background: linear-gradient(135deg, var(--accent-secondary), var(--accent) 62%, var(--accent-strong)); box-shadow: 0 3px 10px color-mix(in srgb, var(--accent) 25%, transparent); }
 .window-controls { align-self: stretch; display: flex; }
 .window-controls button { display: grid; place-items: center; width: 46px; border: 0; border-radius: 0; color: #4d596b; background: transparent; cursor: default; }
 .window-controls button:hover { color: var(--text); background: #edf0f5; }
@@ -69,7 +70,7 @@ nav { display: flex; flex-direction: column; gap: 4px; }
 .plugin-open .content { padding: 18px 22px 22px; overflow: hidden; }
 
 .primary, .secondary, .icon-button, .danger-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; transition: border-color .15s ease, background .15s ease, color .15s ease, transform .15s ease; }
-.primary { padding: 0 15px; border: 1px solid var(--accent); color: white; background: var(--accent); box-shadow: 0 4px 12px rgba(91, 92, 226, .16); }
+.primary { padding: 0 15px; border: 1px solid var(--accent); color: white; background: var(--accent); box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 16%, transparent); }
 .primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
 .secondary { padding: 0 14px; border: 1px solid var(--border-strong); color: #3e4a5d; background: var(--surface); }
 .secondary:hover { border-color: #aeb9c9; color: var(--text); background: #fafbfc; }
@@ -80,7 +81,7 @@ nav { display: flex; flex-direction: column; gap: 4px; }
 .primary svg, .secondary svg, .icon-button svg { width: 15px; height: 15px; }
 .full { width: 100%; margin-top: auto; }
 .icon-button { width: 36px; padding: 0; border: 1px solid var(--border); color: var(--muted); background: var(--surface); }
-.icon-button:hover { color: var(--accent); border-color: #bfc3ee; }
+.icon-button:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
 .spin { animation: spin .9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -126,6 +127,16 @@ nav { display: flex; flex-direction: column; gap: 4px; }
 .settings-card { display: flex; align-items: center; justify-content: space-between; min-height: 76px; padding: 16px 18px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
 .settings-card h3 { margin: 0 0 5px; font-size: 14px; font-weight: 600; }
 .settings-card p { margin: 0; color: var(--muted); font-size: 12px; }
+.theme-card { align-items: flex-start; flex-direction: column; gap: 14px; }
+.theme-copy h3 { display: flex; align-items: center; gap: 7px; }
+.theme-copy h3 svg { width: 15px; height: 15px; color: var(--accent); }
+.theme-options { display: grid; grid-template-columns: repeat(5, minmax(82px, 1fr)); gap: 7px; width: 100%; }
+.theme-options button { position: relative; min-width: 0; height: 42px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 1px solid var(--border); border-radius: 7px; color: var(--muted); background: var(--surface); cursor: pointer; }
+.theme-options button:hover { border-color: color-mix(in srgb, var(--theme-swatch) 42%, var(--border)); background: #fafbfc; }
+.theme-options button.active { border-color: color-mix(in srgb, var(--theme-swatch) 58%, var(--border)); color: var(--text); background: color-mix(in srgb, var(--theme-swatch) 7%, white); box-shadow: 0 0 0 1px color-mix(in srgb, var(--theme-swatch) 12%, transparent); }
+.theme-options button > span { flex: 0 0 17px; width: 17px; height: 17px; border: 4px solid color-mix(in srgb, var(--theme-swatch) 16%, white); border-radius: 50%; background: var(--theme-swatch); box-shadow: 0 0 0 1px color-mix(in srgb, var(--theme-swatch) 24%, var(--border)); }
+.theme-options button small { overflow: hidden; font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.theme-options button svg { width: 13px; height: 13px; margin-left: auto; color: var(--theme-swatch); stroke-width: 2.5; }
 .settings-card.proxy-card { align-items: flex-end; }
 .proxy-copy { flex: 1; min-width: 0; }
 .proxy-copy h3 { display: flex; align-items: center; gap: 7px; }
@@ -163,3 +174,7 @@ nav { display: flex; flex-direction: column; gap: 4px; }
 .plugin-disabled { height: 100%; display: grid; place-content: center; justify-items: center; color: #98a2b3; }
 .plugin-disabled svg { width: 28px; }
 .plugin-disabled h2 { margin: 11px 0 0; color: var(--muted); font-size: 16px; font-weight: 600; }
+
+@media (max-width: 760px) {
+  .theme-options { grid-template-columns: repeat(3, minmax(82px, 1fr)); }
+}

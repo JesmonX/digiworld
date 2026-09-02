@@ -13,9 +13,10 @@ struct NativeUsage {
 }
 
 pub fn parse(agent: AgentKind, content: &str) -> (Vec<DailyUsage>, usize) {
-    let mut daily = BTreeMap::<String, TokenUsage>::new();
+    let mut daily = BTreeMap::<(String, String), TokenUsage>::new();
     let mut warnings = 0;
     let mut codex_previous: Option<NativeUsage> = None;
+    let mut current_model = String::from("unknown");
     for line in content.lines().filter(|line| !line.trim().is_empty()) {
         let value: Value = match serde_json::from_str(line) {
             Ok(value) => value,
@@ -24,6 +25,9 @@ pub fn parse(agent: AgentKind, content: &str) -> (Vec<DailyUsage>, usize) {
                 continue;
             }
         };
+        if let Some(model) = model_name(agent, &value) {
+            current_model = model;
+        }
         let item = match agent {
             AgentKind::Codex => parse_codex(&value, &mut codex_previous),
             AgentKind::Claude => parse_claude(&value),
@@ -37,15 +41,32 @@ pub fn parse(agent: AgentKind, content: &str) -> (Vec<DailyUsage>, usize) {
         }
         let day =
             local_day(&timestamp).unwrap_or_else(|| Local::now().format("%Y-%m-%d").to_string());
-        daily.entry(day).or_default().add_assign(&usage);
+        daily
+            .entry((day, current_model.clone()))
+            .or_default()
+            .add_assign(&usage);
     }
     (
         daily
             .into_iter()
-            .map(|(day, usage)| DailyUsage { day, usage })
+            .map(|((day, model), usage)| DailyUsage { day, model, usage })
             .collect(),
         warnings,
     )
+}
+
+fn model_name(agent: AgentKind, value: &Value) -> Option<String> {
+    let candidate = match agent {
+        AgentKind::Codex => value
+            .pointer("/payload/model")
+            .or_else(|| value.pointer("/payload/thread_settings/model")),
+        AgentKind::Claude | AgentKind::Pi => value
+            .pointer("/message/model")
+            .or_else(|| value.get("model")),
+    }?
+    .as_str()?
+    .trim();
+    (!candidate.is_empty() && candidate != "<synthetic>").then(|| candidate.to_string())
 }
 
 fn parse_codex(value: &Value, previous: &mut Option<NativeUsage>) -> Option<(String, TokenUsage)> {
@@ -196,10 +217,12 @@ mod tests {
 
     #[test]
     fn codex_uses_cumulative_deltas_without_double_counting_cache() {
-        let input = r#"{"timestamp":"2026-09-02T01:00:00Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"cached_input_tokens":60,"cache_write_input_tokens":0,"output_tokens":10}}}}
+        let input = r#"{"timestamp":"2026-09-02T00:59:00Z","type":"turn_context","payload":{"model":"gpt-5.6-sol"}}
+{"timestamp":"2026-09-02T01:00:00Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"cached_input_tokens":60,"cache_write_input_tokens":0,"output_tokens":10}}}}
 {"timestamp":"2026-09-02T02:00:00Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":140,"cached_input_tokens":80,"cache_write_input_tokens":0,"output_tokens":15}}}}"#;
         let (rows, warnings) = parse(AgentKind::Codex, input);
         assert_eq!(warnings, 0);
+        assert_eq!(rows[0].model, "gpt-5.6-sol");
         assert_eq!(
             rows.iter().map(|row| row.usage.input_tokens).sum::<u64>(),
             140
@@ -218,15 +241,29 @@ mod tests {
 
     #[test]
     fn normalizes_claude_and_pi_inputs() {
-        let claude = r#"{"timestamp":"2026-09-02T01:00:00Z","message":{"usage":{"input_tokens":10,"output_tokens":4,"cache_read_input_tokens":20,"cache_creation_input_tokens":5}}}"#;
-        let pi = r#"{"timestamp":"2026-09-02T01:00:00Z","message":{"usage":{"input":10,"output":4,"cacheRead":20,"cacheWrite":5}}}"#;
-        for (agent, data) in [(AgentKind::Claude, claude), (AgentKind::Pi, pi)] {
+        let claude = r#"{"timestamp":"2026-09-02T01:00:00Z","message":{"model":"claude-opus-4-8","usage":{"input_tokens":10,"output_tokens":4,"cache_read_input_tokens":20,"cache_creation_input_tokens":5}}}"#;
+        let pi = r#"{"timestamp":"2026-09-02T01:00:00Z","message":{"model":"glm-5.3","usage":{"input":10,"output":4,"cacheRead":20,"cacheWrite":5}}}"#;
+        for (agent, data, model) in [
+            (AgentKind::Claude, claude, "claude-opus-4-8"),
+            (AgentKind::Pi, pi, "glm-5.3"),
+        ] {
             let (rows, _) = parse(agent, data);
+            assert_eq!(rows[0].model, model);
             assert_eq!(rows[0].usage.input_tokens, 35);
             assert_eq!(rows[0].usage.output_tokens, 4);
             assert_eq!(rows[0].usage.cache_read_tokens, 20);
             assert_eq!(rows[0].usage.cache_write_tokens, 5);
         }
+    }
+
+    #[test]
+    fn keeps_models_separate_on_the_same_day() {
+        let input = r#"{"timestamp":"2026-09-02T01:00:00Z","message":{"model":"glm-5.2","usage":{"input":10,"output":2}}}
+{"timestamp":"2026-09-02T02:00:00Z","message":{"model":"glm-5.3","usage":{"input":20,"output":4}}}"#;
+        let (rows, _) = parse(AgentKind::Pi, input);
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].model, "glm-5.2");
+        assert_eq!(rows[1].model, "glm-5.3");
     }
 
     #[test]

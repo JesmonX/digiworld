@@ -1,8 +1,8 @@
 {
   "id": "io.github.jesmonx.digiworld.agent-token-heatmap",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "name": "Agent Token 热力图",
-  "description": "汇总 Codex、Claude Code 与 Pi 的本机及 SSH Token 使用量，不保存会话正文。",
+  "description": "汇总 Codex、Claude Code 与 Pi 的本机及 SSH Token 日用量、热力图和模型明细，不保存会话正文。",
   "author": "JesmonX",
   "license": "MIT",
   "minCoreVersion": "0.2.0",
