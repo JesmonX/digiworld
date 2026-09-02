@@ -1,4 +1,6 @@
 use crate::error::{DigiworldError, Result};
+use crate::model::ProxySettings;
+use crate::network;
 use serde_json::{Value, json};
 use std::path::Path;
 use std::process::Stdio;
@@ -15,7 +17,11 @@ pub struct PluginProcess {
 }
 
 impl PluginProcess {
-    pub async fn spawn(executable: &Path, data_dir: &Path) -> Result<Self> {
+    pub async fn spawn(
+        executable: &Path,
+        data_dir: &Path,
+        proxy: Option<&ProxySettings>,
+    ) -> Result<Self> {
         tokio::fs::create_dir_all(data_dir).await?;
         let mut command = Command::new(executable);
         command
@@ -26,6 +32,9 @@ impl PluginProcess {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
+        if let Some(proxy) = proxy {
+            network::configure_plugin_command(&mut command, proxy);
+        }
         #[cfg(windows)]
         command.creation_flags(0x0800_0000);
         let mut child = command.spawn().map_err(|error| {

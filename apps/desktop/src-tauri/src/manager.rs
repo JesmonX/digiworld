@@ -2,8 +2,9 @@ use crate::catalog::{CatalogClient, sha256_hex, verify_package};
 use crate::error::{DigiworldError, Result};
 use crate::model::{
     CORE_VERSION, CatalogIndex, InstallResult, MANIFEST_SCHEMA_VERSION, PROTOCOL_VERSION,
-    PluginManifest, PluginSummary, target_key,
+    PluginManifest, PluginSummary, ProxySettings, ProxyTestResult, target_key,
 };
+use crate::network;
 use crate::process::PluginProcess;
 use crate::store::Store;
 use semver::Version;
@@ -12,7 +13,7 @@ use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 
 const MAX_EXTRACTED_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_UI_BYTES: u64 = 8 * 1024 * 1024;
@@ -23,6 +24,7 @@ pub struct PluginManager {
     data_dir: PathBuf,
     store: Store,
     catalog: CatalogClient,
+    proxy: RwLock<ProxySettings>,
     processes: Mutex<HashMap<String, Arc<Mutex<PluginProcess>>>>,
     catalog_cache: Mutex<Option<CatalogIndex>>,
 }
@@ -35,12 +37,18 @@ impl PluginManager {
         tokio::fs::create_dir_all(&data_dir).await?;
         let store = Store::open(&root.join("digiworld.db"))?;
         let catalog = CatalogClient::new(root.join("cache/catalog-v1.json"))?;
+        let proxy = store
+            .metadata_string("proxy_settings")?
+            .and_then(|value| serde_json::from_str(&value).ok())
+            .and_then(|value| network::normalized(value).ok())
+            .unwrap_or_default();
         Ok(Arc::new(Self {
             root,
             plugins_dir,
             data_dir,
             store,
             catalog,
+            proxy: RwLock::new(proxy),
             processes: Mutex::new(HashMap::new()),
             catalog_cache: Mutex::new(None),
         }))
@@ -55,13 +63,53 @@ impl PluginManager {
             return Ok(catalog);
         }
         let accepted = self.store.metadata_u64("catalog_sequence")?;
-        let catalog = self.catalog.load(refresh, accepted).await?;
+        let proxy = self.proxy.read().await.clone();
+        let catalog = self.catalog.load(refresh, accepted, &proxy).await?;
         if catalog.sequence > accepted {
             self.store
                 .set_metadata("catalog_sequence", &catalog.sequence.to_string())?;
         }
         *self.catalog_cache.lock().await = Some(catalog.clone());
         Ok(catalog)
+    }
+
+    pub async fn proxy_settings(&self) -> ProxySettings {
+        self.proxy.read().await.clone()
+    }
+
+    pub async fn set_proxy_settings(&self, settings: ProxySettings) -> Result<ProxySettings> {
+        let settings = network::normalized(settings)?;
+        self.store
+            .set_metadata("proxy_settings", &serde_json::to_string(&settings)?)?;
+        *self.proxy.write().await = settings.clone();
+        *self.catalog_cache.lock().await = None;
+
+        let affected: Vec<_> = self
+            .store
+            .manifests(true)?
+            .into_iter()
+            .filter(has_network_permission)
+            .collect();
+        for manifest in affected {
+            self.stop(&manifest.id).await;
+            if let Err(error) = self.start(&manifest).await {
+                let _ = self
+                    .store
+                    .set_state(&manifest.id, "failed", Some(&error.to_string()));
+            }
+        }
+        Ok(settings)
+    }
+
+    pub async fn test_proxy_settings(&self, settings: ProxySettings) -> Result<ProxyTestResult> {
+        let settings = network::normalized(settings)?;
+        let started = std::time::Instant::now();
+        self.catalog.test_proxy(&settings).await?;
+        Ok(ProxyTestResult {
+            ok: true,
+            latency_ms: started.elapsed().as_millis(),
+            message: "official catalog and signature are reachable".into(),
+        })
     }
 
     pub async fn start_enabled(&self) {
@@ -98,9 +146,10 @@ impl PluginManager {
             .ok_or_else(|| {
                 DigiworldError::Catalog(format!("plugin has no artifact for {target}"))
             })?;
+        let proxy = self.proxy.read().await.clone();
         let bytes = self
             .catalog
-            .download_plugin(&artifact.url, artifact.size)
+            .download_plugin(&artifact.url, artifact.size, &proxy)
             .await?;
         verify_package(&bytes, &artifact.sha256, &artifact.signature)?;
 
@@ -259,8 +308,13 @@ impl PluginManager {
                 "installed backend hash mismatch".into(),
             ));
         }
-        let mut process =
-            PluginProcess::spawn(&executable, &self.data_dir.join(&manifest.id)).await?;
+        let proxy = self.proxy.read().await.clone();
+        let mut process = PluginProcess::spawn(
+            &executable,
+            &self.data_dir.join(&manifest.id),
+            has_network_permission(manifest).then_some(&proxy),
+        )
+        .await?;
         process.health().await?;
         self.processes
             .lock()
@@ -275,6 +329,13 @@ impl PluginManager {
             process.lock().await.stop().await;
         }
     }
+}
+
+fn has_network_permission(manifest: &PluginManifest) -> bool {
+    manifest
+        .permissions
+        .iter()
+        .any(|permission| permission.id.starts_with("network:"))
 }
 
 async fn extract_package(bytes: Vec<u8>, destination: PathBuf) -> Result<()> {

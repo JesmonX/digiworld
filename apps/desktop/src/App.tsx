@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Boxes, Check, ChevronRight, CircleAlert, Download, Gauge, Library,
-  LoaderCircle, Pause, RefreshCw, Settings, ShieldCheck,
+  LoaderCircle, Network, Pause, RefreshCw, Settings, ShieldCheck,
 } from 'lucide-react'
 import { suppressContextMenu, type CatalogIndex, type CatalogPlugin, type PluginSummary } from '@digiworld/plugin-sdk'
 import { PluginFrame } from './components/PluginFrame'
 import { WindowChrome } from './components/WindowChrome'
-import { api, type AppState } from './lib/api'
+import { api, type AppState, type ProxyMode, type ProxySettings } from './lib/api'
 import './styles.css'
 
 type Page = 'home' | 'catalog' | 'settings' | { pluginId: string }
@@ -16,6 +16,8 @@ function permissionLabel(id: string): string {
     'background': '后台运行',
     'global-input': '读取全局键位事件',
     'plugin-storage': '本地插件存储',
+    'filesystem:agent-session-data': '读取 Coding Agent 会话数据',
+    'process:ssh': '使用系统 SSH',
   }
   return labels[id] ?? id
 }
@@ -225,9 +227,53 @@ function Catalog({ catalog, installed, busy, onInstall, onRefresh, onOpen }: { c
 
 function SettingsPage({ state, onChange }: { state: AppState; onChange(enabled: boolean): Promise<void> }) {
   const [checking, setChecking] = useState(false)
+  const [proxy, setProxy] = useState<ProxySettings>({ mode: 'system' })
+  const [proxyBusy, setProxyBusy] = useState<'save' | 'test' | null>(null)
+  const [proxyMessage, setProxyMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    api.proxySettings().then(setProxy).catch(reason => setProxyMessage(String(reason)))
+  }, [])
+
+  const updateMode = (mode: ProxyMode) => setProxy(current => mode === 'custom'
+    ? (current.url ? { mode, url: current.url } : { mode })
+    : { mode })
+
+  const runProxyAction = async (action: 'save' | 'test') => {
+    setProxyBusy(action)
+    setProxyMessage(null)
+    try {
+      if (action === 'save') {
+        setProxy(await api.setProxySettings(proxy))
+        setProxyMessage('代理设置已保存')
+      } else {
+        const result = await api.testProxySettings(proxy)
+        setProxyMessage(`连接成功 · ${result.latencyMs} ms`)
+      }
+    } catch (reason) {
+      setProxyMessage(String(reason))
+    } finally {
+      setProxyBusy(null)
+    }
+  }
+
   return (
     <div className="settings-stack">
       <article className="settings-card"><div><h3>开机启动</h3><p>在后台启动已启用的插件</p></div><button aria-label="切换开机启动" className={`switch ${state.launchAtStartup ? 'on' : ''}`} onClick={() => void onChange(!state.launchAtStartup)}><span /></button></article>
+      <article className="settings-card proxy-card">
+        <div className="proxy-copy">
+          <h3><Network />网络代理</h3>
+          <p>用于功能库、程序更新和声明网络权限的插件</p>
+          <div className="proxy-modes" role="group" aria-label="代理模式">
+            {([['system', '系统代理'], ['custom', '自定义'], ['direct', '直连']] as const).map(([mode, label]) => (
+              <button key={mode} className={proxy.mode === mode ? 'active' : ''} aria-pressed={proxy.mode === mode} onClick={() => updateMode(mode)}>{label}</button>
+            ))}
+          </div>
+          {proxy.mode === 'custom' && <input aria-label="自定义代理地址" value={proxy.url ?? ''} onChange={event => setProxy({ mode: 'custom', url: event.target.value })} placeholder="http://127.0.0.1:7890" />}
+          {proxyMessage && <small className="proxy-message">{proxyMessage}</small>}
+        </div>
+        <div className="proxy-actions"><button className="secondary" disabled={proxyBusy !== null} onClick={() => void runProxyAction('test')}>{proxyBusy === 'test' ? '测试中…' : '测试连接'}</button><button className="primary" disabled={proxyBusy !== null} onClick={() => void runProxyAction('save')}>{proxyBusy === 'save' ? '保存中…' : '保存'}</button></div>
+      </article>
       <article className="settings-card"><div><h3>核心更新</h3><p>当前版本 {state.version}</p></div><button className="secondary" disabled={checking} onClick={async () => { setChecking(true); await api.checkCoreUpdate(); setChecking(false) }}>{checking ? '检查中…' : '检查更新'}</button></article>
       <article className="settings-card"><div><h3>诊断信息</h3><p>导出版本、插件状态和日志</p></div><button className="secondary" onClick={() => void api.exportDiagnostics()}>导出</button></article>
       <div className="version-line"><ShieldCheck /> Digiworld {state.version}</div>

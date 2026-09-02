@@ -4,6 +4,20 @@
   "generatedAt": "2026-09-02T00:00:00.000Z",
   "plugins": [
     {
+      "id": "io.github.jesmonx.digiworld.agent-token-heatmap",
+      "version": "0.1.0",
+      "name": "Agent Token 热力图",
+      "description": "汇总 Codex、Claude Code 与 Pi 的本机及 SSH Token 使用量，不保存会话正文。",
+      "author": "JesmonX",
+      "minCoreVersion": "0.2.0",
+      "permissions": [
+        { "id": "filesystem:agent-session-data", "reason": "读取 Codex、Claude Code 与 Pi 会话文件中的 Token usage 字段。" },
+        { "id": "process:ssh", "reason": "按需使用系统 OpenSSH 读取用户配置的远端设备统计。" },
+        { "id": "plugin-storage", "reason": "保存聚合 Token 指标、设备设置和增量扫描游标。" }
+      ],
+      "artifacts": []
+    },
+    {
       "id": "io.github.jesmonx.digiworld.keyboard-heatmap",
       "version": "0.1.0",
       "name": "键盘热力图",

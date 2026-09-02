@@ -1,6 +1,6 @@
 {
   "name": "digiworld",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.21.0",
@@ -11,6 +11,7 @@
     "test": "pnpm -r --if-present test",
     "lint": "pnpm -r --if-present lint",
     "package:keyboard": "node scripts/package-plugin.mjs keyboard-heatmap",
+    "package:agent-tokens": "node scripts/package-plugin.mjs agent-token-heatmap",
     "catalog:build": "node scripts/build-catalog.mjs"
   },
   "devDependencies": {

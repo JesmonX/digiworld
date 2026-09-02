@@ -7,15 +7,16 @@ import { loadPluginSigningKey } from './plugin-signing-key.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
 const pluginName = process.argv[2]
-if (pluginName !== 'keyboard-heatmap') throw new Error('Usage: package-plugin.mjs keyboard-heatmap')
+if (!pluginName || !/^[a-z0-9-]+$/.test(pluginName)) throw new Error('Usage: package-plugin.mjs <plugin-directory>')
 
 const source = JSON.parse(await readFile(path.join(root, 'plugins', pluginName, 'plugin.json'), 'utf8'))
 const target = process.env.DIGIWORLD_TARGET ?? ({ win32: 'windows-x86_64', linux: 'linux-x86_64', darwin: 'darwin-x86_64' })[process.platform]
 if (!target) throw new Error(`Unsupported host platform: ${process.platform}`)
 
+const binaryName = `digiworld-${pluginName}`
 const executableName = process.platform === 'win32' || target.startsWith('windows')
-  ? 'digiworld-keyboard-heatmap.exe'
-  : 'digiworld-keyboard-heatmap'
+  ? `${binaryName}.exe`
+  : binaryName
 const backendPath = process.env.DIGIWORLD_PLUGIN_BACKEND
   ? path.resolve(process.env.DIGIWORLD_PLUGIN_BACKEND)
   : path.join(root, 'target', 'release', executableName)

@@ -18,3 +18,15 @@ metadata under its own privacy terms.
 
 Diagnostic logs stay on the local computer, omit individual key events and
 credentials, and are exported only when the user explicitly requests it.
+
+The optional Agent Token Heatmap plugin reads Codex, Claude Code, and Pi
+session files only when the user starts a scan. It extracts timestamps and
+input, output, cache-read, and cache-write token counts. It stores aggregated
+daily counts, source identifiers, hashed file paths, and scan fingerprints;
+it does not store prompts, responses, tool payloads, project paths, SSH
+passwords, or private keys.
+
+For an SSH source, Digiworld reuses the system OpenSSH client, SSH config,
+known-hosts policy, ssh-agent, and keys. An ephemeral Python 3 parser runs in
+memory on the selected Unix device and returns only normalized usage records,
+hashed paths, and file fingerprints. No Digiworld helper is installed remotely.

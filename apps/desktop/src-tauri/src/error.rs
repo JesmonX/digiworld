@@ -9,6 +9,8 @@ pub enum DigiworldError {
     Database(#[from] rusqlite::Error),
     #[error("network error: {0}")]
     Network(#[from] reqwest::Error),
+    #[error("proxy configuration error: {0}")]
+    NetworkConfig(String),
     #[error("invalid JSON: {0}")]
     Json(#[from] serde_json::Error),
     #[error("invalid archive: {0}")]

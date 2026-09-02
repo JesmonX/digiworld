@@ -2,19 +2,22 @@ mod catalog;
 mod error;
 mod manager;
 mod model;
+mod network;
 mod process;
 mod store;
 
 use crate::error::{DigiworldError, Result};
 use crate::manager::PluginManager;
-use crate::model::{AppState, CatalogIndex, InstallResult, PluginSummary, UpdateInfo, target_key};
+use crate::model::{
+    AppState, CatalogIndex, InstallResult, PluginSummary, ProxySettings, ProxyTestResult,
+    UpdateInfo, target_key,
+};
 use serde_json::Value;
 use std::sync::Arc;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, State, WindowEvent};
 use tauri_plugin_autostart::ManagerExt as AutostartManagerExt;
-use tauri_plugin_updater::UpdaterExt;
 
 struct LogGuard {
     _guard: tracing_appender::non_blocking::WorkerGuard,
@@ -106,18 +109,41 @@ async fn set_launch_at_startup(app: AppHandle, enabled: bool) -> Result<()> {
     Ok(())
 }
 
+#[tauri::command]
+async fn get_proxy_settings(manager: State<'_, Arc<PluginManager>>) -> Result<ProxySettings> {
+    Ok(manager.proxy_settings().await)
+}
+
+#[tauri::command]
+async fn set_proxy_settings(
+    settings: ProxySettings,
+    manager: State<'_, Arc<PluginManager>>,
+) -> Result<ProxySettings> {
+    manager.set_proxy_settings(settings).await
+}
+
+#[tauri::command]
+async fn test_proxy_settings(
+    settings: ProxySettings,
+    manager: State<'_, Arc<PluginManager>>,
+) -> Result<ProxyTestResult> {
+    manager.test_proxy_settings(settings).await
+}
+
 fn updater_configured() -> bool {
     option_env!("DIGIWORLD_UPDATER_PUBLIC_KEY").is_some()
 }
 
 #[tauri::command]
-async fn check_core_update(app: AppHandle) -> Result<Option<UpdateInfo>> {
+async fn check_core_update(
+    app: AppHandle,
+    manager: State<'_, Arc<PluginManager>>,
+) -> Result<Option<UpdateInfo>> {
     if !updater_configured() {
         return Ok(None);
     }
-    let update = app
-        .updater()
-        .map_err(|error| DigiworldError::Update(error.to_string()))?
+    let updater = network::updater(&app, &manager.proxy_settings().await)?;
+    let update = updater
         .check()
         .await
         .map_err(|error| DigiworldError::Update(error.to_string()))?;
@@ -128,15 +154,14 @@ async fn check_core_update(app: AppHandle) -> Result<Option<UpdateInfo>> {
 }
 
 #[tauri::command]
-async fn install_core_update(app: AppHandle) -> Result<()> {
+async fn install_core_update(app: AppHandle, manager: State<'_, Arc<PluginManager>>) -> Result<()> {
     if !updater_configured() {
         return Err(DigiworldError::Update(
             "release updater key is not configured".into(),
         ));
     }
-    let Some(update) = app
-        .updater()
-        .map_err(|error| DigiworldError::Update(error.to_string()))?
+    let updater = network::updater(&app, &manager.proxy_settings().await)?;
+    let Some(update) = updater
         .check()
         .await
         .map_err(|error| DigiworldError::Update(error.to_string()))?
@@ -158,11 +183,13 @@ async fn export_diagnostics(manager: State<'_, Arc<PluginManager>>) -> Result<St
         "digiworld-diagnostics-{}.json",
         chrono::Utc::now().format("%Y%m%d-%H%M%S")
     ));
+    let proxy = manager.proxy_settings().await;
     let payload = serde_json::json!({
         "generatedAt": chrono::Utc::now().to_rfc3339(),
         "coreVersion": env!("CARGO_PKG_VERSION"),
         "platform": std::env::consts::OS,
         "target": target_key(),
+        "proxyMode": proxy.mode,
         "plugins": manager.summaries()?,
         "privacy": "No keyboard counts, key events, credentials, or user files are included."
     });
@@ -294,6 +321,9 @@ pub fn run() {
             get_plugin_ui,
             plugin_request,
             set_launch_at_startup,
+            get_proxy_settings,
+            set_proxy_settings,
+            test_proxy_settings,
             check_core_update,
             install_core_update,
             export_diagnostics,

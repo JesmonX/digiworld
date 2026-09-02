@@ -51,6 +51,15 @@ impl Store {
         Ok(value.and_then(|value| value.parse().ok()).unwrap_or(0))
     }
 
+    pub fn metadata_string(&self, key: &str) -> Result<Option<String>> {
+        let connection = self.connection.lock().expect("store lock poisoned");
+        Ok(connection
+            .query_row("SELECT value FROM metadata WHERE key = ?1", [key], |row| {
+                row.get(0)
+            })
+            .optional()?)
+    }
+
     pub fn set_metadata(&self, key: &str, value: &str) -> Result<()> {
         self.connection
             .lock()

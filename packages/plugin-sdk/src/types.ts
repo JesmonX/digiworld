@@ -6,6 +6,8 @@ export type PluginPermission =
   | 'global-input'
   | 'notifications'
   | 'plugin-storage'
+  | 'filesystem:agent-session-data'
+  | 'process:ssh'
   | `network:${string}`
   | `secret:${string}`
 

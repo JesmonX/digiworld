@@ -5,6 +5,31 @@ pub const MANIFEST_SCHEMA_VERSION: u32 = 1;
 pub const PROTOCOL_VERSION: u32 = 1;
 pub const CORE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum ProxyMode {
+    #[default]
+    System,
+    Custom,
+    Direct,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ProxySettings {
+    pub mode: ProxyMode,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProxyTestResult {
+    pub ok: bool,
+    pub latency_ms: u128,
+    pub message: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PermissionRequest {

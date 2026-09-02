@@ -18,7 +18,7 @@ base64 = "0.22"
 chrono.workspace = true
 ed25519-dalek = "2.2"
 hex = "0.4"
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-no-provider", "socks", "system-proxy"] }
 rusqlite = { version = "0.37", features = ["bundled"] }
 semver = { version = "1.0", features = ["serde"] }
 serde.workspace = true
@@ -35,6 +35,7 @@ tracing.workspace = true
 tracing-appender = "0.2"
 tracing-subscriber.workspace = true
 uuid = { version = "1.18", features = ["v4"] }
+url = "2.5"
 zip = { version = "4.6", default-features = false, features = ["deflate"] }
 
 [target.'cfg(windows)'.dependencies]

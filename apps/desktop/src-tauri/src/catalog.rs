@@ -1,5 +1,6 @@
 use crate::error::{DigiworldError, Result};
-use crate::model::{CatalogIndex, MANIFEST_SCHEMA_VERSION};
+use crate::model::{CatalogIndex, MANIFEST_SCHEMA_VERSION, ProxySettings};
+use crate::network;
 use base64::Engine;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use sha2::{Digest, Sha256};
@@ -10,21 +11,20 @@ const MAX_CATALOG_BYTES: usize = 2 * 1024 * 1024;
 const MAX_PLUGIN_BYTES: usize = 128 * 1024 * 1024;
 
 pub struct CatalogClient {
-    http: reqwest::Client,
     cache_path: PathBuf,
 }
 
 impl CatalogClient {
     pub fn new(cache_path: PathBuf) -> Result<Self> {
-        let http = reqwest::Client::builder()
-            .user_agent(format!("Digiworld/{}", env!("CARGO_PKG_VERSION")))
-            .https_only(true)
-            .timeout(std::time::Duration::from_secs(30))
-            .build()?;
-        Ok(Self { http, cache_path })
+        Ok(Self { cache_path })
     }
 
-    pub async fn load(&self, refresh: bool, accepted_sequence: u64) -> Result<CatalogIndex> {
+    pub async fn load(
+        &self,
+        refresh: bool,
+        accepted_sequence: u64,
+        proxy: &ProxySettings,
+    ) -> Result<CatalogIndex> {
         if cfg!(debug_assertions)
             && let Ok(path) = std::env::var("DIGIWORLD_DEV_CATALOG")
         {
@@ -39,20 +39,15 @@ impl CatalogClient {
             }
         }
 
-        let response = self
-            .http
-            .get(CATALOG_URL)
-            .send()
-            .await?
-            .error_for_status()?;
+        let http = self.http(proxy)?;
+        let response = http.get(CATALOG_URL).send().await?.error_for_status()?;
         let bytes = response.bytes().await?;
         if bytes.len() > MAX_CATALOG_BYTES {
             return Err(DigiworldError::Catalog(
                 "catalog exceeds the 2 MiB limit".into(),
             ));
         }
-        let signature = self
-            .http
+        let signature = http
             .get(format!("{CATALOG_URL}.sig"))
             .send()
             .await?
@@ -87,7 +82,12 @@ impl CatalogClient {
         Ok(catalog)
     }
 
-    pub async fn download_plugin(&self, url: &str, expected_size: u64) -> Result<Vec<u8>> {
+    pub async fn download_plugin(
+        &self,
+        url: &str,
+        expected_size: u64,
+        proxy: &ProxySettings,
+    ) -> Result<Vec<u8>> {
         if expected_size as usize > MAX_PLUGIN_BYTES {
             return Err(DigiworldError::Catalog(
                 "plugin exceeds the 128 MiB limit".into(),
@@ -109,7 +109,12 @@ impl CatalogClient {
                 "release downloads require HTTPS".into(),
             ));
         }
-        let response = self.http.get(url).send().await?.error_for_status()?;
+        let response = self
+            .http(proxy)?
+            .get(url)
+            .send()
+            .await?
+            .error_for_status()?;
         if let Some(length) = response.content_length()
             && length as usize > MAX_PLUGIN_BYTES
         {
@@ -124,6 +129,42 @@ impl CatalogClient {
             ));
         }
         Ok(bytes.to_vec())
+    }
+
+    pub async fn test_proxy(&self, proxy: &ProxySettings) -> Result<()> {
+        let http = self.http(proxy)?;
+        let response = http.get(CATALOG_URL).send().await?.error_for_status()?;
+        let bytes = response.bytes().await?;
+        if bytes.len() > MAX_CATALOG_BYTES {
+            return Err(DigiworldError::Catalog(
+                "catalog exceeds the 2 MiB limit".into(),
+            ));
+        }
+        let signature = http
+            .get(format!("{CATALOG_URL}.sig"))
+            .send()
+            .await?
+            .error_for_status()?
+            .text()
+            .await?;
+        if option_env!("DIGIWORLD_PLUGIN_PUBLIC_KEY_B64")
+            .unwrap_or("")
+            .is_empty()
+        {
+            Self::parse(&bytes, 0, true)?;
+            if signature.trim().is_empty() {
+                return Err(DigiworldError::Signature(
+                    "catalog signature response is empty".into(),
+                ));
+            }
+            Ok(())
+        } else {
+            verify_release_signature(&bytes, signature.trim())
+        }
+    }
+
+    fn http(&self, proxy: &ProxySettings) -> Result<reqwest::Client> {
+        network::http_client(proxy, &format!("Digiworld/{}", env!("CARGO_PKG_VERSION")))
     }
 }
 

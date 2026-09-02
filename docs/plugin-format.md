@@ -24,3 +24,9 @@ limited to 4 MiB, and time out after 15 seconds.
 
 Native official backends run with the current user's operating-system rights.
 The permission screen is consent and transparency, not an OS sandbox.
+
+Backends declaring a `network:*` permission receive `DIGIWORLD_PROXY_MODE`.
+In custom mode the host also provides the standard upper- and lower-case
+HTTP(S)/ALL proxy environment variables; in direct mode it removes them.
+Plugins using system mode must enable their runtime's native system-proxy
+support. SSH routing remains the responsibility of OpenSSH configuration.

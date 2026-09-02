@@ -2,7 +2,7 @@
 
 Digiworld is a lightweight, local-first desktop shell for installing official,
 signed feature plugins on demand. The first plugin is a privacy-preserving
-Windows keyboard heatmap.
+Windows keyboard heatmap and a cross-agent Token usage heatmap.
 
 ## Status
 
@@ -26,6 +26,16 @@ pnpm typecheck
 cargo test --workspace
 pnpm dev
 ```
+
+The Agent Token Heatmap plugin reads usage metadata from Codex, Claude Code,
+and Pi session files on the local computer. Optional SSH sources reuse the
+system OpenSSH configuration and run an ephemeral Python 3 parser remotely;
+only normalized usage totals are returned.
+
+Network access can follow the operating-system proxy, use an unauthenticated
+HTTP/HTTPS/SOCKS5 proxy URL, or bypass proxies. The selected policy is used for
+the official catalog, plugin downloads, core updates, and plugin backends that
+declare a `network:*` permission.
 
 Set `DIGIWORLD_DEV_CATALOG` to a local catalog JSON file to test unsigned local
 packages in a debug build. Release builds reject unsigned catalogs and plugins.
