@@ -79,7 +79,7 @@ export default function App() {
           <div><Flame /><span>最高频</span><strong>{snapshot?.topKey ?? '—'}</strong></div>
         </div>
         <div className="header-actions">
-          <div className="scope-toggle"><button className={scope === 'today' ? 'active' : ''} onClick={() => setScope('today')}>今天</button><button className={scope === 'all' ? 'active' : ''} onClick={() => setScope('all')}>全部</button></div>
+          <div className="scope-toggle" role="group" aria-label="统计时间范围"><button aria-pressed={scope === 'today'} className={scope === 'today' ? 'active' : ''} onClick={() => setScope('today')}>今天</button><button aria-pressed={scope === 'all'} className={scope === 'all' ? 'active' : ''} onClick={() => setScope('all')}>全部</button></div>
           <button className={`pause-button ${snapshot?.paused ? 'paused' : ''}`} onClick={() => void togglePause()}>{snapshot?.paused ? <Play /> : <Pause />}{snapshot?.paused ? '继续' : '暂停'}</button>
         </div>
       </header>
@@ -88,7 +88,7 @@ export default function App() {
 
       <section className="keyboard-card">
         <div className="board-toolbar">
-          <h2>实体键位</h2>
+          <h2>按键分布</h2>
           <div className="legend"><span>低</span>{[.08, .22, .42, .68, 1].map(value => <i key={value} style={{ '--heat': value } as React.CSSProperties} />)}<span>高</span></div>
         </div>
         <div className="keyboard-board">
@@ -117,7 +117,7 @@ export default function App() {
             <button onClick={() => void exportData('json')}><Download />JSON 备份</button>
             <button onClick={() => void exportData('csv')}><Download />CSV</button>
             <button onClick={() => importInput.current?.click()}><Upload />导入</button>
-            <button className="danger" onClick={() => void clear()}><RotateCcw />清除{scope === 'today' ? '今天' : '全部'}</button>
+            <button className="danger" onClick={() => void clear()}><RotateCcw />清除数据</button>
           </div>
           <input ref={importInput} type="file" accept="application/json,.json" hidden onChange={event => { const file = event.target.files?.[0]; if (file) void importData(file); event.currentTarget.value = '' }} />
         </article>
@@ -136,7 +136,7 @@ function Keycap({ definition, count, max, grid = false }: { definition: KeyDefin
     ? { gridRow: `${definition.row} / span ${definition.rowSpan ?? 1}`, gridColumn: `${definition.column} / span ${definition.columnSpan ?? 1}`, '--heat': heat }
     : { '--width': definition.width ?? 1, '--spacer': definition.spacer ?? 0, '--heat': heat }
   return (
-    <div className={`key ${heat >= .78 ? 'hot' : ''}`} title={`${definition.id}: ${count.toLocaleString()} 次`} aria-label={`${definition.label || definition.id}，${count.toLocaleString()} 次`} style={style as React.CSSProperties}>
+    <div className={`key ${count > 0 ? 'has-count' : ''} ${heat >= .58 ? 'strong-heat' : ''}`} title={`${definition.id}: ${count.toLocaleString()} 次`} aria-label={`${definition.label || definition.id}，${count.toLocaleString()} 次`} style={style as React.CSSProperties}>
       <span>{definition.label}</span>
       {count > 0 && <small>{count > 999 ? `${(count / 1000).toFixed(1)}k` : count}</small>}
     </div>
