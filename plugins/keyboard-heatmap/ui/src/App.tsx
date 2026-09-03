@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Download, Flame, Pause, Play, RotateCcw, Upload } from 'lucide-react'
+import { Check, Download, Flame, Keyboard, Pause, Play, RotateCcw, Upload } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
-import { alphaRows, functionRow, navRows, numpadKeys, type KeyDefinition } from './keyboard'
+import {
+  getKeyboardLayout, keyboardLayouts, layoutKeys, type KeyboardLayoutId, type KeyDefinition,
+} from './keyboard'
 import './styles.css'
 
 const PLUGIN_ID = 'io.github.jesmonx.digiworld.keyboard-heatmap'
@@ -22,6 +24,7 @@ interface ExportPayload { content: string; filename: string; mime: string }
 export default function App() {
   const [scope, setScope] = useState<'today' | 'all'>('today')
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
+  const [layoutId, setLayoutId] = useState<KeyboardLayoutId>('full')
   const [error, setError] = useState<string | null>(null)
   const importInput = useRef<HTMLInputElement>(null)
 
@@ -41,7 +44,27 @@ export default function App() {
     return () => window.clearInterval(interval)
   }, [refresh])
 
-  const maxCount = useMemo(() => Math.max(0, ...Object.values(snapshot?.counts ?? {})), [snapshot])
+  useEffect(() => {
+    bridge.request<{ layout: KeyboardLayoutId }>('heatmap.getLayout')
+      .then(value => setLayoutId(value.layout))
+      .catch(reason => setError(reason instanceof Error ? reason.message : String(reason)))
+  }, [])
+
+  const layout = getKeyboardLayout(layoutId)
+  const visibleKeys = useMemo(() => layoutKeys(layout), [layout])
+  const maxCount = useMemo(() => Math.max(0, ...visibleKeys.map(key => snapshot?.counts[key.id] ?? 0)), [snapshot, visibleKeys])
+
+  const selectLayout = async (next: KeyboardLayoutId) => {
+    const previous = layoutId
+    setLayoutId(next)
+    try {
+      await bridge.request('heatmap.setLayout', { layout: next })
+      setError(null)
+    } catch (reason) {
+      setLayoutId(previous)
+      setError(reason instanceof Error ? reason.message : String(reason))
+    }
+  }
 
   const togglePause = async () => {
     if (!snapshot) return
@@ -87,17 +110,25 @@ export default function App() {
       {error && <div className="plugin-error">{error}</div>}
 
       <section className="keyboard-card">
-        <div className="board-toolbar">
-          <h2>按键分布</h2>
-          <div className="legend"><span>低</span>{[.08, .22, .42, .68, 1].map(value => <i key={value} style={{ '--heat': value } as React.CSSProperties} />)}<span>高</span></div>
+        <div className="layout-picker" role="radiogroup" aria-label="键盘布局">
+          {keyboardLayouts.map(option => <button key={option.id} role="radio" aria-checked={layoutId === option.id} className={layoutId === option.id ? 'active' : ''} onClick={() => void selectLayout(option.id)}>
+            <span className="layout-preview" aria-hidden="true">{option.preview.map((row, rowIndex) => <i key={rowIndex}>{row.map((width, index) => <b key={index} style={{ flex: width }} />)}</i>)}</span>
+            <span><strong>{option.label}</strong><small>{option.id === 'full' ? '全尺寸' : option.id === 'tkl' ? 'TKL' : `${option.id}%`}</small></span>
+            {layoutId === option.id && <Check />}
+          </button>)}
         </div>
-        <div className="keyboard-board">
-          <div className="function-row-layout"><KeyboardRow keys={functionRow} counts={snapshot?.counts ?? {}} max={maxCount} /></div>
-          <div className="keyboard-gap" />
-          <div className="keyboard-sections">
-            <div className="alpha-section">{alphaRows.map((row, index) => <KeyboardRow key={index} keys={row} counts={snapshot?.counts ?? {}} max={maxCount} />)}</div>
-            <div className="nav-section">{navRows.map((row, index) => <KeyboardRow key={index} keys={row} counts={snapshot?.counts ?? {}} max={maxCount} />)}</div>
-            <div className="numpad-section">{numpadKeys.map(key => <Keycap key={key.id} definition={key} count={snapshot?.counts[key.id] ?? 0} max={maxCount} grid />)}</div>
+        <div className="keyboard-scroll" style={{ '--board-min-width': `${layout.minWidth}px` } as React.CSSProperties}>
+          <div className="board-toolbar">
+            <div><h2><Keyboard />按键分布</h2><p>{layout.description}</p></div>
+            <div className="legend"><span>低</span>{[.08, .22, .42, .68, 1].map(value => <i key={value} style={{ '--heat': value } as React.CSSProperties} />)}<span>高</span></div>
+          </div>
+          <div className={`keyboard-board layout-${layout.id}`}>
+            {layout.functionRow.length > 0 && <><div className="function-row-layout"><KeyboardRow keys={layout.functionRow} counts={snapshot?.counts ?? {}} max={maxCount} /></div><div className="keyboard-gap" /></>}
+            <div className={`keyboard-sections ${layout.numpadKeys.length ? '' : 'without-numpad'} ${layout.navRows.length ? '' : 'without-nav'}`}>
+              <div className="alpha-section">{layout.alphaRows.map((row, index) => <KeyboardRow key={index} keys={row} counts={snapshot?.counts ?? {}} max={maxCount} />)}</div>
+              {layout.navRows.length > 0 && <div className="nav-section">{layout.navRows.map((row, index) => <KeyboardRow key={index} keys={row} counts={snapshot?.counts ?? {}} max={maxCount} />)}</div>}
+              {layout.numpadKeys.length > 0 && <div className="numpad-section">{layout.numpadKeys.map(key => <Keycap key={key.id} definition={key} count={snapshot?.counts[key.id] ?? 0} max={maxCount} grid />)}</div>}
+            </div>
           </div>
         </div>
       </section>

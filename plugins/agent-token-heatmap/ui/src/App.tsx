@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Check, Cloud, Cpu, Database, HardDrive, Plus, RefreshCw, Server, Settings2, Trash2, X } from 'lucide-react'
+import { AlertTriangle, BarChart3, Check, Cloud, Cpu, Database, HardDrive, Plus, RefreshCw, Server, Settings2, Trash2, X } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
-import { calendarCells, heatLevel, type Metric, type UsageDay } from './heatmap'
+import { calendarCells, formatTokens, heatLevel, type Metric, type UsageDay } from './heatmap'
 import './styles.css'
 
 const PLUGIN_ID = 'io.github.jesmonx.digiworld.agent-token-heatmap'
@@ -31,14 +31,14 @@ interface Totals {
   cacheRate?: number
 }
 interface Breakdown extends Totals { sourceId: string; sourceLabel: string; agent: Agent }
-interface SourceStatus { sourceId: string; status: string; lastScannedAt?: string; error?: string; warnings: string[] }
+interface ModelBreakdown extends Totals { sourceId: string; sourceLabel: string; agent: Agent; model: string }
 interface Snapshot {
   startDay?: string
   endDay: string
   totals: Totals
   days: UsageDay[]
   breakdown: Breakdown[]
-  statuses: SourceStatus[]
+  modelBreakdown: ModelBreakdown[]
 }
 interface RefreshStatus {
   running: boolean
@@ -134,6 +134,9 @@ export default function App() {
     return calendarCells(start, snapshot.endDay, snapshot.days, metric)
   }, [metric, snapshot])
   const max = Math.max(0, ...cells.map(cell => cell.value))
+  const dailyRanking = useMemo(() => [...(snapshot?.days ?? [])].filter(day => day.totalTokens > 0).sort((a, b) => b.totalTokens - a.totalTokens || b.day.localeCompare(a.day)).slice(0, 10), [snapshot])
+  const dailyMax = dailyRanking[0]?.totalTokens ?? 1
+  const modelBreakdown = useMemo(() => [...(snapshot?.modelBreakdown ?? [])].filter(row => row.totalTokens > 0).sort((a, b) => b.totalTokens - a.totalTokens), [snapshot])
   const sourceOptions = settings ? [{ id: 'local', label: '本机' }, ...settings.sshSources] : []
 
   return (
@@ -167,8 +170,13 @@ export default function App() {
 
       <section className="lower-grid">
         <article className="breakdown-card"><h2>来源明细</h2>{snapshot?.breakdown.length ? <div className="breakdown-table">{[...snapshot.breakdown].sort((a, b) => b.totalTokens - a.totalTokens).map(row => <div key={`${row.sourceId}-${row.agent}`}><span className={`agent-dot ${row.agent}`} /><strong>{agentLabel[row.agent]}</strong><span>{row.sourceLabel}</span><b>{formatTokens(row.totalTokens)}</b><small>{row.cacheRate == null ? `${formatTokens(row.cacheReadTokens)} cache` : `${(row.cacheRate * 100).toFixed(1)}% cache`}</small></div>)}</div> : <Empty />}</article>
-        <article className="status-card"><h2>同步状态</h2>{snapshot?.statuses.map(status => <div className="status-row" key={status.sourceId}><span className={`status-dot ${status.status}`} /><div><strong>{sourceOptions.find(source => source.id === status.sourceId)?.label ?? status.sourceId}</strong><small>{status.error ?? status.warnings[0] ?? (status.lastScannedAt ? `更新于 ${new Date(status.lastScannedAt).toLocaleString()}` : '尚未扫描')}</small></div></div>)}</article>
+        <article className="daily-ranking-card"><h2>每日用量排行</h2>{dailyRanking.length ? <div className="daily-ranking">{dailyRanking.map((day, index) => <div key={day.day}><b>{index + 1}</b><span>{day.day}</span><i><em style={{ width: `${(day.totalTokens / dailyMax) * 100}%` }} /></i><strong>{formatTokens(day.totalTokens)}</strong></div>)}</div> : <Empty />}</article>
       </section>
+
+      <article className="model-card">
+        <div className="model-card-heading"><div><h2>模型来源明细</h2><p>按设备、Agent 与会话记录中的模型聚合</p></div><BarChart3 /></div>
+        {modelBreakdown.length ? <div className="model-table">{modelBreakdown.map(row => <div key={`${row.sourceId}-${row.agent}-${row.model}`}><span className={`agent-dot ${row.agent}`} /><strong title={row.model}>{row.model === 'unknown' ? '未知模型' : row.model}</strong><span>{agentLabel[row.agent]}</span><span>{row.sourceLabel}</span><b>{formatTokens(row.totalTokens)}</b></div>)}</div> : <Empty />}
+      </article>
 
       {settingsOpen && settings && <SourceDialog settings={settings} refreshRunning={refresh.running} onClose={() => setSettingsOpen(false)} onSave={async value => {
         const saved = await bridge.request<UsageSettings>('usage.saveSettings', { settings: value })
@@ -209,4 +217,3 @@ function SourceDialog({ settings, refreshRunning, onClose, onSave, onScan }: { s
 }
 
 function toggleRequired<T>(values: T[], value: T): T[] { return values.includes(value) ? (values.length === 1 ? values : values.filter(item => item !== value)) : [...values, value] }
-function formatTokens(value: number): string { return new Intl.NumberFormat('zh-CN', { notation: value >= 10_000 ? 'compact' : 'standard', maximumFractionDigits: 1 }).format(value) }

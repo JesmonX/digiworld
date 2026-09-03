@@ -165,15 +165,18 @@ def day(value):
     except Exception:
         return datetime.datetime.now(offset).strftime('%Y-%m-%d')
 
-def add(rows, stamp, usage):
+def clean_model(value):
+    return value.strip() if isinstance(value, str) and value.strip() and value != '<synthetic>' else None
+
+def add(rows, stamp, model, usage):
     if not any(value for key, value in usage.items() if key != 'cacheAvailable'): return
-    key = day(stamp)
-    target = rows.setdefault(key, {'inputTokens': 0, 'outputTokens': 0, 'cacheReadTokens': 0, 'cacheWriteTokens': 0, 'cacheAvailable': False})
+    key = (day(stamp), model)
+    target = rows.setdefault(key, {'day': key[0], 'model': model, 'inputTokens': 0, 'outputTokens': 0, 'cacheReadTokens': 0, 'cacheWriteTokens': 0, 'cacheAvailable': False})
     for name in ('inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens'): target[name] += max(0, int(usage.get(name, 0)))
     target['cacheAvailable'] = target['cacheAvailable'] or bool(usage.get('cacheAvailable', False))
 
 def parse_file(agent, path):
-    rows, previous, invalid = {}, None, 0
+    rows, previous, invalid, model = {}, None, 0, 'unknown'
     with open(path, 'r', encoding='utf-8', errors='replace') as handle:
         for line in handle:
             if not line.strip(): continue
@@ -182,6 +185,10 @@ def parse_file(agent, path):
                 invalid += 1
                 continue
             stamp, usage = value.get('timestamp'), None
+            payload = value.get('payload') or {}
+            message = value.get('message') or {}
+            candidate = clean_model(payload.get('model') or (payload.get('thread_settings') or {}).get('model')) if agent == 'codex' else clean_model(message.get('model') or value.get('model'))
+            if candidate: model = candidate
             if agent == 'codex' and value.get('type') == 'event_msg' and (value.get('payload') or {}).get('type') == 'token_count':
                 info = ((value.get('payload') or {}).get('info') or {})
                 raw = info.get('total_token_usage') or info.get('last_token_usage')
@@ -193,21 +200,19 @@ def parse_file(agent, path):
                     else: usage = current
                     if info.get('total_token_usage'): previous = current
             elif agent == 'claude':
-                message = value.get('message') or {}
                 raw = message.get('usage') or value.get('usage')
                 stamp = stamp or message.get('timestamp')
                 if isinstance(raw, dict):
                     read, write = n(raw, 'cache_read_input_tokens'), n(raw, 'cache_creation_input_tokens')
                     usage = {'inputTokens': n(raw, 'input_tokens') + read + write, 'outputTokens': n(raw, 'output_tokens'), 'cacheReadTokens': read, 'cacheWriteTokens': write, 'cacheAvailable': 'cache_read_input_tokens' in raw or 'cache_creation_input_tokens' in raw}
             elif agent == 'pi':
-                message = value.get('message') or {}
                 raw = message.get('usage') or value.get('usage')
                 stamp = stamp or message.get('timestamp')
                 if isinstance(raw, dict):
                     read, write = n(raw, 'cacheRead'), n(raw, 'cacheWrite')
                     usage = {'inputTokens': n(raw, 'input') + read + write, 'outputTokens': n(raw, 'output'), 'cacheReadTokens': read, 'cacheWriteTokens': write, 'cacheAvailable': 'cacheRead' in raw or 'cacheWrite' in raw}
-            if usage: add(rows, stamp, usage)
-    return [{'day': key, **value} for key, value in sorted(rows.items())], invalid
+            if usage: add(rows, stamp, model, usage)
+    return [value for key, value in sorted(rows.items())], invalid
 
 for agent in request.get('agents', []):
     root = os.path.abspath(os.path.expanduser(request.get('roots', {}).get(agent, '')))
@@ -253,7 +258,7 @@ mod tests {
         let session = root.join("private-project.jsonl");
         fs::write(
             &session,
-            r#"{"timestamp":"2026-09-02T01:00:00Z","message":{"content":"TOP_SECRET","usage":{"input":10,"output":3,"cacheRead":20,"cacheWrite":2}}}"#,
+            r#"{"timestamp":"2026-09-02T01:00:00Z","message":{"model":"glm-5.3","content":"TOP_SECRET","usage":{"input":10,"output":3,"cacheRead":20,"cacheWrite":2}}}"#,
         )
         .unwrap();
         let request = serde_json::json!({
@@ -282,6 +287,7 @@ mod tests {
         let batch: ScanBatch = serde_json::from_str(&text).unwrap();
         assert_eq!(batch.files[0].daily[0].usage.input_tokens, 32);
         assert_eq!(batch.files[0].daily[0].usage.output_tokens, 3);
+        assert_eq!(batch.files[0].daily[0].model, "glm-5.3");
         fs::remove_dir_all(root).unwrap();
     }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calendarCells, heatLevel } from './heatmap'
+import { calendarCells, formatTokens, heatLevel } from './heatmap'
 
 describe('calendar heatmap', () => {
   it('aligns Monday-first weeks and fills missing dates', () => {
@@ -11,9 +11,17 @@ describe('calendar heatmap', () => {
     expect(cells.map(cell => cell.value)).toEqual([0, 12, 0])
   })
 
-  it('uses a bounded logarithmic intensity scale', () => {
-    expect(heatLevel(0, 100)).toBe(0)
-    expect(heatLevel(100, 100)).toBe(5)
-    expect(heatLevel(10, 100)).toBeGreaterThan(1)
+  it('separates values that differ by orders of magnitude', () => {
+    expect(heatLevel(0, 200_000_000)).toBe(0)
+    expect(heatLevel(2_000_000, 200_000_000)).toBe(3)
+    expect(heatLevel(20_000_000, 200_000_000)).toBe(4)
+    expect(heatLevel(200_000_000, 200_000_000)).toBe(5)
+  })
+
+  it('formats token quantities with computer-style units', () => {
+    expect(formatTokens(999)).toBe('999')
+    expect(formatTokens(12_500)).toBe('12.5K')
+    expect(formatTokens(200_000_000)).toBe('200M')
+    expect(formatTokens(1_250_000_000)).toBe('1.25B')
   })
 })

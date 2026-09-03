@@ -58,8 +58,14 @@ impl TokenUsage {
 #[serde(rename_all = "camelCase")]
 pub struct DailyUsage {
     pub day: String,
+    #[serde(default = "unknown_model")]
+    pub model: String,
     #[serde(flatten)]
     pub usage: TokenUsage,
+}
+
+fn unknown_model() -> String {
+    "unknown".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -166,6 +172,18 @@ pub struct Breakdown {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ModelBreakdown {
+    pub source_id: String,
+    pub source_label: String,
+    pub agent: AgentKind,
+    pub model: String,
+    #[serde(flatten)]
+    pub usage: TokenUsage,
+    pub total_tokens: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UsageTotals {
     #[serde(flatten)]
     pub usage: TokenUsage,
@@ -181,6 +199,7 @@ pub struct UsageSnapshot {
     pub totals: UsageTotals,
     pub days: Vec<DaySnapshot>,
     pub breakdown: Vec<Breakdown>,
+    pub model_breakdown: Vec<ModelBreakdown>,
     pub statuses: Vec<SourceStatus>,
 }
 

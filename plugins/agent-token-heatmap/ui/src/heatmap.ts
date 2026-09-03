@@ -31,7 +31,27 @@ export function calendarCells(startDay: string, endDay: string, days: UsageDay[]
 
 export function heatLevel(value: number, max: number): number {
   if (value <= 0 || max <= 0) return 0
-  return Math.max(1, Math.min(5, Math.ceil((Math.log1p(value) / Math.log1p(max)) * 5)))
+  const ratio = value / max
+  if (ratio >= .5) return 5
+  if (ratio >= .1) return 4
+  if (ratio >= .01) return 3
+  if (ratio >= .001) return 2
+  return 1
+}
+
+export function formatTokens(value: number): string {
+  const units = [
+    { threshold: 1_000_000_000, suffix: 'B' },
+    { threshold: 1_000_000, suffix: 'M' },
+    { threshold: 1_000, suffix: 'K' },
+  ]
+  const unit = units.find(candidate => Math.abs(value) >= candidate.threshold)
+  if (!unit) return Math.round(value).toLocaleString('en-US')
+  const scaled = value / unit.threshold
+  const digits = Math.abs(scaled) >= 100 ? 0 : Math.abs(scaled) >= 10 ? 1 : 2
+  const fixed = scaled.toFixed(digits)
+  const compact = fixed.includes('.') ? fixed.replace(/0+$/, '').replace(/\.$/, '') : fixed
+  return `${compact}${unit.suffix}`
 }
 
 function parseDay(day: string): Date {

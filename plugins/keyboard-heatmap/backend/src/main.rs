@@ -101,6 +101,15 @@ fn handle(engine: &StatsEngine, method: &str, params: Value) -> Result<Value> {
             engine.accept_privacy()?;
             Ok(json!({ "accepted": true }))
         }
+        "heatmap.getLayout" => Ok(json!({ "layout": engine.layout()? })),
+        "heatmap.setLayout" => {
+            let layout = params
+                .get("layout")
+                .and_then(Value::as_str)
+                .context("layout must be a string")?;
+            engine.set_layout(layout)?;
+            Ok(json!({ "layout": layout }))
+        }
         "heatmap.clear" => {
             let scope = params
                 .get("scope")

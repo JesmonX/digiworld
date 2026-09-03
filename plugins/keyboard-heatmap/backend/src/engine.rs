@@ -111,6 +111,30 @@ impl StatsEngine {
             .set_setting_bool("privacy_accepted", true)
     }
 
+    pub fn layout(&self) -> Result<String> {
+        let value = self
+            .database
+            .lock()
+            .expect("database lock poisoned")
+            .setting("keyboard_layout")?
+            .unwrap_or_else(|| "full".into());
+        Ok(if valid_layout(&value) {
+            value
+        } else {
+            "full".into()
+        })
+    }
+
+    pub fn set_layout(&self, layout: &str) -> Result<()> {
+        if !valid_layout(layout) {
+            anyhow::bail!("unsupported keyboard layout: {layout}");
+        }
+        self.database
+            .lock()
+            .expect("database lock poisoned")
+            .set_setting("keyboard_layout", layout)
+    }
+
     pub fn clear(&self, scope: &str) -> Result<()> {
         self.flush()?;
         self.database
@@ -148,5 +172,23 @@ impl StatsEngine {
     pub fn shutdown(&self) -> Result<()> {
         self.stopping.store(true, Ordering::Relaxed);
         self.flush()
+    }
+}
+
+fn valid_layout(layout: &str) -> bool {
+    matches!(layout, "full" | "tkl" | "75" | "65" | "60")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn persists_supported_keyboard_layouts() {
+        let engine = StatsEngine::open(Path::new(":memory:")).unwrap();
+        assert_eq!(engine.layout().unwrap(), "full");
+        engine.set_layout("65").unwrap();
+        assert_eq!(engine.layout().unwrap(), "65");
+        assert!(engine.set_layout("ergonomic").is_err());
     }
 }

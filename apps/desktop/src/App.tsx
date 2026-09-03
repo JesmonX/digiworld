@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Boxes, Check, ChevronRight, CircleAlert, Download, Gauge, Library,
-  LoaderCircle, Network, Pause, RefreshCw, Settings, ShieldCheck,
+  LoaderCircle, Network, Palette, Pause, RefreshCw, Settings, ShieldCheck,
 } from 'lucide-react'
 import { suppressContextMenu, type CatalogIndex, type CatalogPlugin, type PluginSummary } from '@digiworld/plugin-sdk'
 import { PluginFrame } from './components/PluginFrame'
 import { WindowChrome } from './components/WindowChrome'
 import { api, type AppState, type ProxyMode, type ProxySettings } from './lib/api'
+import {
+  ACCENT_THEMES, accentThemeStyle, getAccentTheme, loadAccentThemeId, pluginTheme,
+  saveAccentThemeId, type AccentThemeId,
+} from './theme'
 import './styles.css'
 
 type Page = 'home' | 'catalog' | 'settings' | { pluginId: string }
@@ -42,6 +46,11 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [pluginHtml, setPluginHtml] = useState<string | null>(null)
   const [confirmInstall, setConfirmInstall] = useState<CatalogPlugin | null>(null)
+  const [accentThemeId, setAccentThemeId] = useState<AccentThemeId>(loadAccentThemeId)
+  const accentTheme = getAccentTheme(accentThemeId)
+  const activePluginTheme = useMemo(() => pluginTheme(accentTheme), [accentTheme])
+
+  useEffect(() => saveAccentThemeId(accentThemeId), [accentThemeId])
 
   const refreshState = useCallback(async () => setState(await api.appState()), [])
   const refreshCatalog = useCallback(async (force = false) => setCatalog(await api.catalog(force)), [])
@@ -112,7 +121,7 @@ function App() {
   const pluginOpen = typeof page !== 'string'
 
   return (
-    <div className={`app-window ${pluginOpen ? 'plugin-open' : ''}`}>
+    <div className={`app-window ${pluginOpen ? 'plugin-open' : ''}`} style={accentThemeStyle(accentTheme)}>
       <WindowChrome />
       <div className="app-shell">
         <aside className="sidebar">
@@ -148,11 +157,11 @@ function App() {
           <section className="content">
             {page === 'home' && <Home plugins={state?.plugins ?? []} onCatalog={() => setPage('catalog')} onOpen={id => setPage({ pluginId: id })} />}
             {page === 'catalog' && <Catalog catalog={catalog} installed={installed} busy={busy} onInstall={setConfirmInstall} onRefresh={() => refreshCatalog(true)} onOpen={id => setPage({ pluginId: id })} />}
-            {page === 'settings' && state && <SettingsPage state={state} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
+            {page === 'settings' && state && <SettingsPage state={state} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
             {pluginOpen && (
               !selectedPlugin ? <Loading label="载入插件" />
                 : selectedPlugin.enabled
-                  ? (pluginHtml ? <PluginFrame pluginId={page.pluginId} html={pluginHtml} /> : <Loading label="载入界面" />)
+                  ? (pluginHtml ? <PluginFrame pluginId={page.pluginId} html={pluginHtml} theme={activePluginTheme} /> : <Loading label="载入界面" />)
                   : <div className="plugin-disabled"><Pause /><h2>已停用</h2></div>
             )}
           </section>
@@ -225,7 +234,7 @@ function Catalog({ catalog, installed, busy, onInstall, onRefresh, onOpen }: { c
   )
 }
 
-function SettingsPage({ state, onChange }: { state: AppState; onChange(enabled: boolean): Promise<void> }) {
+function SettingsPage({ state, accentThemeId, onAccentThemeChange, onChange }: { state: AppState; accentThemeId: AccentThemeId; onAccentThemeChange(id: AccentThemeId): void; onChange(enabled: boolean): Promise<void> }) {
   const [checking, setChecking] = useState(false)
   const [proxy, setProxy] = useState<ProxySettings>({ mode: 'system' })
   const [proxyBusy, setProxyBusy] = useState<'save' | 'test' | null>(null)
@@ -259,6 +268,31 @@ function SettingsPage({ state, onChange }: { state: AppState; onChange(enabled: 
 
   return (
     <div className="settings-stack">
+      <article className="settings-card theme-card">
+        <div className="theme-copy">
+          <h3><Palette />主题颜色</h3>
+          <p>选择按钮、选中状态和图表的强调色，界面仍保持浅色</p>
+        </div>
+        <div className="theme-options" role="radiogroup" aria-label="主题颜色">
+          {ACCENT_THEMES.map(theme => (
+            <button
+              key={theme.id}
+              type="button"
+              className={accentThemeId === theme.id ? 'active' : ''}
+              role="radio"
+              aria-checked={accentThemeId === theme.id}
+              aria-label={theme.label}
+              title={theme.label}
+              style={{ '--theme-swatch': theme.accent } as React.CSSProperties}
+              onClick={() => onAccentThemeChange(theme.id)}
+            >
+              <span />
+              <small>{theme.label}</small>
+              {accentThemeId === theme.id && <Check />}
+            </button>
+          ))}
+        </div>
+      </article>
       <article className="settings-card"><div><h3>开机启动</h3><p>在后台启动已启用的插件</p></div><button aria-label="切换开机启动" className={`switch ${state.launchAtStartup ? 'on' : ''}`} onClick={() => void onChange(!state.launchAtStartup)}><span /></button></article>
       <article className="settings-card proxy-card">
         <div className="proxy-copy">
