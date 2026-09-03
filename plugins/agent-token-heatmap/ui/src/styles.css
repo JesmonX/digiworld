@@ -68,7 +68,7 @@ button svg { width: 14px; height: 14px; }
 .quota-window strong { font-size: 15px; font-weight: 680; }
 .quota-window span { color: #4b5565; font-size: 10px; }
 .quota-track { height: 7px; margin: 7px 0 6px; overflow: hidden; border-radius: 5px; background: #e9edf3; }
-.quota-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--dw-accent, #5b5ce2), var(--dw-accent-secondary, #8b5cf6)); }
+.quota-track i { display: block; height: 100%; margin-left: auto; border-radius: inherit; background: linear-gradient(90deg, var(--dw-accent, #5b5ce2), var(--dw-accent-secondary, #8b5cf6)); }
 .quota-window small { display: flex; align-items: center; gap: 4px; color: var(--dw-text-muted, #667085); font-size: 9px; }
 .quota-window small svg { width: 11px; height: 11px; }
 .quota-meta { margin-top: 13px; padding-top: 8px; border-top: 1px solid #eef1f5; color: var(--dw-text-muted, #667085); font-size: 9px; }

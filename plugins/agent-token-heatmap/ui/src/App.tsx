@@ -296,8 +296,8 @@ function QuotaCard({ quota, loading, configured, onRefresh, onConfigure }: { quo
       : loading && !quota ? <div className="quota-empty"><RefreshCw className="spin" /><span>正在获取最新限额…</span></div>
         : available ? <>
           <div className="quota-windows">{quota.windows.map((window, index) => {
-            const used = Math.max(0, Math.min(100, window.usedPercent))
-            return <div key={`${window.windowDurationMins ?? index}-${window.resetsAt ?? index}`} className="quota-window"><div><strong>{formatDuration(window.windowDurationMins)}</strong><span>已用 {window.usedPercent}% · 剩余 {Math.max(0, 100 - window.usedPercent)}%</span></div><div className="quota-track"><i style={{ width: `${used}%` }} /></div><small><Clock3 />{formatReset(window.resetsAt)}</small></div>
+            const remaining = 100 - Math.max(0, Math.min(100, window.usedPercent))
+            return <div key={`${window.windowDurationMins ?? index}-${window.resetsAt ?? index}`} className="quota-window"><div><strong>{formatDuration(window.windowDurationMins)}</strong><span>已用 {window.usedPercent}% · 剩余 {Math.max(0, 100 - window.usedPercent)}%</span></div><div className="quota-track"><i style={{ width: `${remaining}%` }} /></div><small><Clock3 />{formatReset(window.resetsAt)}</small></div>
           })}</div>
           <div className={`quota-meta ${quota.status === 'stale' ? 'warning' : ''}`}>{quota.status === 'stale' ? `刷新失败，显示上次结果：${quota.error ?? '未知错误'}` : `更新于 ${formatFetchedAt(quota.fetchedAt)}`}</div>
         </> : <div className="quota-empty error"><AlertTriangle /><span>{quota?.error ?? '当前设备无法获取 Codex 限额'}</span><button onClick={onConfigure}>检查设置</button></div>}
