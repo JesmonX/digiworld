@@ -128,6 +128,38 @@ pub struct UpdateInfo {
     pub notes: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginUpdateInfo {
+    pub id: String,
+    pub name: String,
+    pub current_version: String,
+    pub version: String,
+    pub min_core_version: String,
+    pub compatible: bool,
+    pub permissions_changed: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginUpdateRequest {
+    pub id: String,
+    pub version: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateProgress {
+    pub operation: String,
+    pub item_id: Option<String>,
+    pub item_name: String,
+    pub stage: String,
+    pub downloaded: u64,
+    pub total: Option<u64>,
+    pub completed_items: usize,
+    pub total_items: usize,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InstallResult {

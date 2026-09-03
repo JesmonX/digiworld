@@ -82,12 +82,16 @@ impl CatalogClient {
         Ok(catalog)
     }
 
-    pub async fn download_plugin(
+    pub async fn download_plugin<F>(
         &self,
         url: &str,
         expected_size: u64,
         proxy: &ProxySettings,
-    ) -> Result<Vec<u8>> {
+        mut on_progress: F,
+    ) -> Result<Vec<u8>>
+    where
+        F: FnMut(u64, Option<u64>),
+    {
         if expected_size as usize > MAX_PLUGIN_BYTES {
             return Err(DigiworldError::Catalog(
                 "plugin exceeds the 128 MiB limit".into(),
@@ -102,6 +106,7 @@ impl CatalogClient {
                     "plugin exceeds the 128 MiB limit".into(),
                 ));
             }
+            on_progress(bytes.len() as u64, Some(bytes.len() as u64));
             return Ok(bytes);
         }
         if !url.starts_with("https://") {
@@ -109,26 +114,34 @@ impl CatalogClient {
                 "release downloads require HTTPS".into(),
             ));
         }
-        let response = self
+        let mut response = self
             .http(proxy)?
             .get(url)
             .send()
             .await?
             .error_for_status()?;
-        if let Some(length) = response.content_length()
+        let content_length = response.content_length();
+        if let Some(length) = content_length
             && length as usize > MAX_PLUGIN_BYTES
         {
             return Err(DigiworldError::Catalog(
                 "plugin exceeds the 128 MiB limit".into(),
             ));
         }
-        let bytes = response.bytes().await?;
-        if bytes.len() > MAX_PLUGIN_BYTES {
-            return Err(DigiworldError::Catalog(
-                "plugin exceeds the 128 MiB limit".into(),
-            ));
+        let total = content_length.or((expected_size > 0).then_some(expected_size));
+        let mut bytes =
+            Vec::with_capacity(total.unwrap_or_default().min(MAX_PLUGIN_BYTES as u64) as usize);
+        on_progress(0, total);
+        while let Some(chunk) = response.chunk().await? {
+            if bytes.len().saturating_add(chunk.len()) > MAX_PLUGIN_BYTES {
+                return Err(DigiworldError::Catalog(
+                    "plugin exceeds the 128 MiB limit".into(),
+                ));
+            }
+            bytes.extend_from_slice(&chunk);
+            on_progress(bytes.len() as u64, total);
         }
-        Ok(bytes.to_vec())
+        Ok(bytes)
     }
 
     pub async fn test_proxy(&self, proxy: &ProxySettings) -> Result<()> {

@@ -76,6 +76,11 @@ jobs:
         run: pnpm --filter @digiworld/desktop tauri build
       - name: Build updater manifest
         run: node scripts/build-update-manifest.mjs
+      - name: Stage updater manifest for GitHub Pages
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path updates | Out-Null
+          Copy-Item target/release/bundle/nsis/latest.json updates/latest.json
       - name: Generate checksums and preview notice
         shell: pwsh
         run: |
@@ -109,14 +114,19 @@ jobs:
             PREVIEW-UNSIGNED.txt
       - uses: actions/upload-artifact@v7
         with:
-          name: signed-plugin-catalog
-          path: catalog
+          name: release-update-site
+          path: |
+            catalog
+            updates
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ inputs.version }}
           name: Digiworld v${{ inputs.version }} Preview
-          prerelease: true
+          # Keep the unsigned "Preview" product label, but publish this as the
+          # latest release so Digiworld <= 0.2.1 can bootstrap from its legacy
+          # /releases/latest/download/latest.json endpoint.
+          prerelease: false
           generate_release_notes: true
           files: |
             dist/plugins/*
@@ -133,8 +143,8 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: signed-plugin-catalog
-          path: site/catalog
+          name: release-update-site
+          path: site
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:

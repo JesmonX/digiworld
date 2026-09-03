@@ -23,9 +23,17 @@ jobs:
       - name: Refuse unsigned production catalog
         shell: bash
         run: test -s catalog/v1/index.json.sig
+      - name: Preserve the current updater manifest
+        shell: bash
+        run: |
+          mkdir -p site/catalog site/updates
+          cp -R catalog/. site/catalog/
+          curl --fail --silent --show-error --location \
+            https://jesmonx.github.io/digiworld/updates/latest.json \
+            --output site/updates/latest.json
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: catalog
+          path: site
       - id: deployment
         uses: actions/deploy-pages@v5

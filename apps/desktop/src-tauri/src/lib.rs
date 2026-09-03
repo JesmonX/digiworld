@@ -9,14 +9,15 @@ mod store;
 use crate::error::{DigiworldError, Result};
 use crate::manager::PluginManager;
 use crate::model::{
-    AppState, CatalogIndex, InstallResult, PluginSummary, ProxySettings, ProxyTestResult,
-    UpdateInfo, target_key,
+    AppState, CatalogIndex, InstallResult, PluginSummary, PluginUpdateInfo, PluginUpdateRequest,
+    ProxySettings, ProxyTestResult, UpdateInfo, UpdateProgress, target_key,
 };
 use serde_json::Value;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, State, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 use tauri_plugin_autostart::ManagerExt as AutostartManagerExt;
 
 struct LogGuard {
@@ -50,10 +51,86 @@ async fn get_catalog(
 
 #[tauri::command]
 async fn install_plugin(
+    app: AppHandle,
     plugin_id: String,
     manager: State<'_, Arc<PluginManager>>,
 ) -> Result<InstallResult> {
-    manager.install(&plugin_id).await
+    let progress_app = app.clone();
+    let progress_id = plugin_id.clone();
+    manager
+        .install(&plugin_id, move |stage, name, downloaded, total| {
+            let _ = progress_app.emit(
+                "update-progress",
+                UpdateProgress {
+                    operation: "plugin-install".into(),
+                    item_id: Some(progress_id.clone()),
+                    item_name: name.into(),
+                    stage: stage.into(),
+                    downloaded,
+                    total,
+                    completed_items: usize::from(stage == "completed"),
+                    total_items: 1,
+                },
+            );
+        })
+        .await
+}
+
+#[tauri::command]
+async fn check_plugin_updates(
+    manager: State<'_, Arc<PluginManager>>,
+) -> Result<Vec<PluginUpdateInfo>> {
+    manager.available_updates().await
+}
+
+#[tauri::command]
+async fn install_plugin_updates(
+    app: AppHandle,
+    updates: Vec<PluginUpdateRequest>,
+    manager: State<'_, Arc<PluginManager>>,
+) -> Result<Vec<InstallResult>> {
+    let positions: HashMap<_, _> = updates
+        .iter()
+        .enumerate()
+        .map(|(index, update)| (update.id.clone(), index))
+        .collect();
+    let total_items = updates.len();
+    let progress_app = app.clone();
+    let result = manager
+        .install_updates(&updates, move |id, name, stage, downloaded, total| {
+            let index = positions.get(id).copied().unwrap_or_default();
+            let completed_items = index + usize::from(stage == "completed");
+            let _ = progress_app.emit(
+                "update-progress",
+                UpdateProgress {
+                    operation: "plugin-update".into(),
+                    item_id: Some(id.into()),
+                    item_name: name.into(),
+                    stage: stage.into(),
+                    downloaded,
+                    total,
+                    completed_items,
+                    total_items,
+                },
+            );
+        })
+        .await;
+    if result.is_err() {
+        let _ = app.emit(
+            "update-progress",
+            UpdateProgress {
+                operation: "plugin-update".into(),
+                item_id: None,
+                item_name: "插件更新".into(),
+                stage: "failed".into(),
+                downloaded: 0,
+                total: None,
+                completed_items: 0,
+                total_items,
+            },
+        );
+    }
+    result
 }
 
 #[tauri::command]
@@ -140,7 +217,9 @@ async fn check_core_update(
     manager: State<'_, Arc<PluginManager>>,
 ) -> Result<Option<UpdateInfo>> {
     if !updater_configured() {
-        return Ok(None);
+        return Err(DigiworldError::Update(
+            "release updater key is not configured".into(),
+        ));
     }
     let updater = network::updater(&app, &manager.proxy_settings().await)?;
     let update = updater
@@ -154,7 +233,11 @@ async fn check_core_update(
 }
 
 #[tauri::command]
-async fn install_core_update(app: AppHandle, manager: State<'_, Arc<PluginManager>>) -> Result<()> {
+async fn install_core_update(
+    app: AppHandle,
+    version: String,
+    manager: State<'_, Arc<PluginManager>>,
+) -> Result<()> {
     if !updater_configured() {
         return Err(DigiworldError::Update(
             "release updater key is not configured".into(),
@@ -166,12 +249,69 @@ async fn install_core_update(app: AppHandle, manager: State<'_, Arc<PluginManage
         .await
         .map_err(|error| DigiworldError::Update(error.to_string()))?
     else {
-        return Ok(());
+        return Err(DigiworldError::Update(
+            "the update is no longer available; check for updates again".into(),
+        ));
     };
+    if update.version != version {
+        return Err(DigiworldError::Update(
+            "available version changed; check for updates again".into(),
+        ));
+    }
+    let download_app = app.clone();
+    let install_app = app.clone();
+    let progress_version = update.version.clone();
+    let install_version = progress_version.clone();
+    let mut downloaded = 0_u64;
     update
-        .download_and_install(|_, _| {}, || {})
+        .download_and_install(
+            move |chunk_size, total| {
+                downloaded = downloaded.saturating_add(chunk_size as u64);
+                let _ = download_app.emit(
+                    "update-progress",
+                    UpdateProgress {
+                        operation: "core-update".into(),
+                        item_id: None,
+                        item_name: format!("Digiworld {progress_version}"),
+                        stage: "downloading".into(),
+                        downloaded,
+                        total,
+                        completed_items: 0,
+                        total_items: 1,
+                    },
+                );
+            },
+            move || {
+                let _ = install_app.emit(
+                    "update-progress",
+                    UpdateProgress {
+                        operation: "core-update".into(),
+                        item_id: None,
+                        item_name: format!("Digiworld {install_version}"),
+                        stage: "installing".into(),
+                        downloaded: 0,
+                        total: None,
+                        completed_items: 0,
+                        total_items: 1,
+                    },
+                );
+            },
+        )
         .await
         .map_err(|error| DigiworldError::Update(error.to_string()))?;
+    let _ = app.emit(
+        "update-progress",
+        UpdateProgress {
+            operation: "core-update".into(),
+            item_id: None,
+            item_name: format!("Digiworld {version}"),
+            stage: "completed".into(),
+            downloaded: 0,
+            total: None,
+            completed_items: 1,
+            total_items: 1,
+        },
+    );
     app.restart();
 }
 
@@ -316,6 +456,8 @@ pub fn run() {
             get_app_state,
             get_catalog,
             install_plugin,
+            check_plugin_updates,
+            install_plugin_updates,
             set_plugin_enabled,
             uninstall_plugin,
             get_plugin_ui,

@@ -13,6 +13,13 @@ Consequently, Windows SmartScreen can show an unknown-publisher warning, and
 Windows 11 Smart App Control may block the installer. Users should verify the
 published SHA-256 list and download only from the official GitHub release.
 
+The signed updater manifest is deployed to
+`https://jesmonx.github.io/digiworld/updates/latest.json`. Preview releases are
+distributed as unsigned Preview builds. Until a separate stable channel exists,
+the workflow also marks the newest Preview as GitHub's latest release so clients
+through 0.2.1 can bootstrap from their legacy `/releases/latest/` endpoint. The
+same Pages deployment publishes the signed plugin catalog.
+
 The workflow requires the following values in the `production-release`
 Environment:
 

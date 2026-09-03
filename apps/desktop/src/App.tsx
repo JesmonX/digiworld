@@ -6,7 +6,10 @@ import {
 import { suppressContextMenu, type CatalogIndex, type CatalogPlugin, type PluginSummary } from '@digiworld/plugin-sdk'
 import { PluginFrame } from './components/PluginFrame'
 import { WindowChrome } from './components/WindowChrome'
-import { api, type AppState, type ProxyMode, type ProxySettings } from './lib/api'
+import {
+  api, type AppState, type CoreUpdateInfo, type PluginUpdateInfo, type ProxyMode,
+  type ProxySettings, type UpdateProgress,
+} from './lib/api'
 import {
   ACCENT_THEMES, accentThemeStyle, getAccentTheme, loadAccentThemeId, pluginTheme,
   saveAccentThemeId, type AccentThemeId,
@@ -46,6 +49,7 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [pluginHtml, setPluginHtml] = useState<string | null>(null)
   const [confirmInstall, setConfirmInstall] = useState<CatalogPlugin | null>(null)
+  const [updateProgress, setUpdateProgress] = useState<UpdateProgress | null>(null)
   const [accentThemeId, setAccentThemeId] = useState<AccentThemeId>(loadAccentThemeId)
   const accentTheme = getAccentTheme(accentThemeId)
   const activePluginTheme = useMemo(() => pluginTheme(accentTheme), [accentTheme])
@@ -56,6 +60,19 @@ function App() {
   const refreshCatalog = useCallback(async (force = false) => setCatalog(await api.catalog(force)), [])
 
   useEffect(() => suppressContextMenu(), [])
+
+  useEffect(() => {
+    let disposed = false
+    let unlisten: (() => void) | undefined
+    void api.onUpdateProgress(progress => setUpdateProgress(progress)).then(stop => {
+      if (disposed) stop()
+      else unlisten = stop
+    }).catch(reason => setError(String(reason)))
+    return () => {
+      disposed = true
+      unlisten?.()
+    }
+  }, [])
 
   useEffect(() => {
     Promise.all([refreshState(), refreshCatalog()]).catch(reason => setError(String(reason)))
@@ -157,7 +174,7 @@ function App() {
           <section className="content">
             {page === 'home' && <Home plugins={state?.plugins ?? []} onCatalog={() => setPage('catalog')} onOpen={id => setPage({ pluginId: id })} />}
             {page === 'catalog' && <Catalog catalog={catalog} installed={installed} busy={busy} onInstall={setConfirmInstall} onRefresh={() => refreshCatalog(true)} onOpen={id => setPage({ pluginId: id })} />}
-            {page === 'settings' && state && <SettingsPage state={state} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
+            {page === 'settings' && state && <SettingsPage state={state} progress={updateProgress} onProgressReset={() => setUpdateProgress(null)} onPluginsUpdated={refreshState} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
             {pluginOpen && (
               !selectedPlugin ? <Loading label="载入插件" />
                 : selectedPlugin.enabled
@@ -168,7 +185,7 @@ function App() {
         </main>
       </div>
 
-      {confirmInstall && <InstallDialog plugin={confirmInstall} busy={busy === confirmInstall.id} onCancel={() => setConfirmInstall(null)} onConfirm={() => void install(confirmInstall)} />}
+      {confirmInstall && <InstallDialog plugin={confirmInstall} busy={busy === confirmInstall.id} progress={updateProgress?.operation === 'plugin-install' && updateProgress.itemId === confirmInstall.id ? updateProgress : null} onCancel={() => setConfirmInstall(null)} onConfirm={() => { setUpdateProgress(null); void install(confirmInstall) }} />}
     </div>
   )
 }
@@ -234,11 +251,27 @@ function Catalog({ catalog, installed, busy, onInstall, onRefresh, onOpen }: { c
   )
 }
 
-function SettingsPage({ state, accentThemeId, onAccentThemeChange, onChange }: { state: AppState; accentThemeId: AccentThemeId; onAccentThemeChange(id: AccentThemeId): void; onChange(enabled: boolean): Promise<void> }) {
-  const [checking, setChecking] = useState(false)
+type UpdateDialog =
+  | { kind: 'plugins'; updates: PluginUpdateInfo[] }
+  | { kind: 'core'; update: CoreUpdateInfo }
+
+function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, accentThemeId, onAccentThemeChange, onChange }: {
+  state: AppState
+  progress: UpdateProgress | null
+  onProgressReset(): void
+  onPluginsUpdated(): Promise<void>
+  accentThemeId: AccentThemeId
+  onAccentThemeChange(id: AccentThemeId): void
+  onChange(enabled: boolean): Promise<void>
+}) {
   const [proxy, setProxy] = useState<ProxySettings>({ mode: 'system' })
   const [proxyBusy, setProxyBusy] = useState<'save' | 'test' | null>(null)
   const [proxyMessage, setProxyMessage] = useState<string | null>(null)
+  const [updateBusy, setUpdateBusy] = useState<'plugin-check' | 'plugin-install' | 'core-check' | 'core-install' | null>(null)
+  const [pluginMessage, setPluginMessage] = useState<string | null>(null)
+  const [coreMessage, setCoreMessage] = useState<string | null>(null)
+  const [updateError, setUpdateError] = useState<string | null>(null)
+  const [updateDialog, setUpdateDialog] = useState<UpdateDialog | null>(null)
 
   useEffect(() => {
     api.proxySettings().then(setProxy).catch(reason => setProxyMessage(String(reason)))
@@ -263,6 +296,69 @@ function SettingsPage({ state, accentThemeId, onAccentThemeChange, onChange }: {
       setProxyMessage(String(reason))
     } finally {
       setProxyBusy(null)
+    }
+  }
+
+  const checkPluginUpdates = async () => {
+    setUpdateBusy('plugin-check')
+    setPluginMessage(null)
+    setUpdateError(null)
+    try {
+      const updates = await api.checkPluginUpdates()
+      if (updates.length === 0) setPluginMessage('所有插件均为最新版本')
+      else setUpdateDialog({ kind: 'plugins', updates })
+    } catch (reason) {
+      setPluginMessage(String(reason))
+    } finally {
+      setUpdateBusy(null)
+    }
+  }
+
+  const checkCoreUpdate = async () => {
+    setUpdateBusy('core-check')
+    setCoreMessage(null)
+    setUpdateError(null)
+    try {
+      const update = await api.checkCoreUpdate()
+      if (update) setUpdateDialog({ kind: 'core', update })
+      else setCoreMessage('当前已是最新版本')
+    } catch (reason) {
+      setCoreMessage(String(reason))
+    } finally {
+      setUpdateBusy(null)
+    }
+  }
+
+  const confirmUpdate = async () => {
+    if (!updateDialog) return
+    setUpdateError(null)
+    onProgressReset()
+    if (updateDialog.kind === 'plugins') {
+      const compatible = updateDialog.updates.filter(update => update.compatible)
+      if (compatible.length === 0) {
+        setUpdateError('这些插件需要更新 Digiworld 主程序后才能安装')
+        return
+      }
+      setUpdateBusy('plugin-install')
+      try {
+        await api.installPluginUpdates(compatible.map(({ id, version }) => ({ id, version })))
+        await onPluginsUpdated()
+        setPluginMessage(`已更新 ${compatible.length} 个插件`)
+        setUpdateDialog(null)
+      } catch (reason) {
+        setUpdateError(String(reason))
+      } finally {
+        setUpdateBusy(null)
+      }
+      return
+    }
+
+    setUpdateBusy('core-install')
+    try {
+      await api.installCoreUpdate(updateDialog.update.version)
+    } catch (reason) {
+      setUpdateError(String(reason))
+      setUpdateBusy(null)
     }
   }
 
@@ -308,14 +404,31 @@ function SettingsPage({ state, accentThemeId, onAccentThemeChange, onChange }: {
         </div>
         <div className="proxy-actions"><button className="secondary" disabled={proxyBusy !== null} onClick={() => void runProxyAction('test')}>{proxyBusy === 'test' ? '测试中…' : '测试连接'}</button><button className="primary" disabled={proxyBusy !== null} onClick={() => void runProxyAction('save')}>{proxyBusy === 'save' ? '保存中…' : '保存'}</button></div>
       </article>
-      <article className="settings-card"><div><h3>核心更新</h3><p>当前版本 {state.version}</p></div><button className="secondary" disabled={checking} onClick={async () => { setChecking(true); await api.checkCoreUpdate(); setChecking(false) }}>{checking ? '检查中…' : '检查更新'}</button></article>
+      <article className="settings-card update-card">
+        <div><h3>插件更新</h3><p>一次检查并更新所有已安装插件，通过上方已保存的代理连接</p>{pluginMessage && <small className="update-message">{pluginMessage}</small>}</div>
+        <button className="secondary" disabled={updateBusy !== null} onClick={() => void checkPluginUpdates()}>{updateBusy === 'plugin-check' ? <><LoaderCircle className="spin" />检查中…</> : '检查全部插件'}</button>
+      </article>
+      <article className="settings-card update-card">
+        <div><h3>主程序更新</h3><p>当前版本 {state.version}，检查后由你确认是否下载和安装</p>{coreMessage && <small className="update-message">{coreMessage}</small>}</div>
+        <button className="secondary" disabled={updateBusy !== null} onClick={() => void checkCoreUpdate()}>{updateBusy === 'core-check' ? <><LoaderCircle className="spin" />检查中…</> : '检查主程序'}</button>
+      </article>
       <article className="settings-card"><div><h3>诊断信息</h3><p>导出版本、插件状态和日志</p></div><button className="secondary" onClick={() => void api.exportDiagnostics()}>导出</button></article>
       <div className="version-line"><ShieldCheck /> Digiworld {state.version}</div>
+      {updateDialog && (
+        <UpdateDialogView
+          dialog={updateDialog}
+          busy={updateBusy === 'plugin-install' || updateBusy === 'core-install'}
+          progress={progress}
+          error={updateError}
+          onCancel={() => { if (!updateBusy) setUpdateDialog(null) }}
+          onConfirm={() => void confirmUpdate()}
+        />
+      )}
     </div>
   )
 }
 
-function InstallDialog({ plugin, busy, onCancel, onConfirm }: { plugin: CatalogPlugin; busy: boolean; onCancel(): void; onConfirm(): void }) {
+function InstallDialog({ plugin, busy, progress, onCancel, onConfirm }: { plugin: CatalogPlugin; busy: boolean; progress: UpdateProgress | null; onCancel(): void; onConfirm(): void }) {
   return (
     <div className="modal-backdrop">
       <div className="modal" role="dialog" aria-modal="true" aria-labelledby="install-title">
@@ -324,10 +437,85 @@ function InstallDialog({ plugin, busy, onCancel, onConfirm }: { plugin: CatalogP
         <div className="permission-dialog">
           {plugin.permissions.map(permission => <div key={permission.id}><Check /><span><strong>{permissionLabel(permission.id)}</strong><small>{permission.reason}</small></span></div>)}
         </div>
+        {busy && <ProgressView progress={progress} fallbackName={plugin.name} />}
         <div className="modal-actions"><button className="secondary" disabled={busy} onClick={onCancel}>取消</button><button className="primary" disabled={busy} onClick={onConfirm}>{busy ? <LoaderCircle className="spin" /> : <Download />}安装</button></div>
       </div>
     </div>
   )
+}
+
+function UpdateDialogView({ dialog, busy, progress, error, onCancel, onConfirm }: { dialog: UpdateDialog; busy: boolean; progress: UpdateProgress | null; error: string | null; onCancel(): void; onConfirm(): void }) {
+  const isPlugins = dialog.kind === 'plugins'
+  const compatibleCount = isPlugins ? dialog.updates.filter(update => update.compatible).length : 1
+  const matchingProgress = progress && (
+    (isPlugins && progress.operation === 'plugin-update') ||
+    (!isPlugins && progress.operation === 'core-update')
+  ) ? progress : null
+  return (
+    <div className="modal-backdrop">
+      <div className="modal update-modal" role="dialog" aria-modal="true" aria-labelledby="update-title">
+        <div className="modal-icon"><Download /></div>
+        <h2 id="update-title">{isPlugins ? `发现 ${dialog.updates.length} 个插件更新` : `发现 Digiworld ${dialog.update.version}`}</h2>
+        {isPlugins ? (
+          <div className="update-list">
+            {dialog.updates.map(update => (
+              <div key={update.id} className={!update.compatible ? 'incompatible' : ''}>
+                <span><strong>{update.name}</strong><small>{update.currentVersion} → {update.version}</small></span>
+                <span className="update-flags">
+                  {update.permissionsChanged && <small>权限有变化</small>}
+                  {!update.compatible && <small>需 Digiworld {update.minCoreVersion}</small>}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="core-release-notes">
+            <p>{stateVersionLabel(dialog.update.version)}</p>
+            {dialog.update.notes && <pre>{dialog.update.notes}</pre>}
+          </div>
+        )}
+        {!busy && <p className="consent-copy">检查更新不会自动安装。点击下方按钮后才会通过当前代理下载并安装。</p>}
+        {busy && <ProgressView progress={matchingProgress} fallbackName={isPlugins ? '插件更新' : `Digiworld ${dialog.update.version}`} />}
+        {error && <div className="update-error"><CircleAlert />{error}</div>}
+        <div className="modal-actions">
+          <button className="secondary" disabled={busy} onClick={onCancel}>取消</button>
+          <button className="primary" disabled={busy || compatibleCount === 0} onClick={onConfirm}>
+            {busy ? <LoaderCircle className="spin" /> : <Download />}
+            {busy ? '正在更新…' : isPlugins ? `同意并更新 ${compatibleCount} 项` : '同意并更新'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function stateVersionLabel(version: string) {
+  return `将下载并安装版本 ${version}，安装完成后 Digiworld 会重启。`
+}
+
+function ProgressView({ progress, fallbackName }: { progress: UpdateProgress | null; fallbackName: string }) {
+  const downloading = progress?.stage === 'downloading'
+  const percent = downloading && progress.total
+    ? Math.min(100, Math.round(progress.downloaded / progress.total * 100))
+    : null
+  const stageLabel = !progress ? '准备下载' : downloading ? '正在下载' : progress.stage === 'completed' ? '安装完成' : '正在安装'
+  const currentItem = progress?.stage === 'completed' ? progress.completedItems : (progress?.completedItems ?? 0) + 1
+  const itemCount = progress && progress.totalItems > 1 ? ` · ${Math.min(currentItem, progress.totalItems)}/${progress.totalItems}` : ''
+  return (
+    <div className="update-progress" aria-live="polite">
+      <div><strong>{stageLabel}{itemCount}</strong><span>{progress?.itemName ?? fallbackName}</span></div>
+      <div className={`progress-track ${percent === null ? 'indeterminate' : ''}`} role="progressbar" aria-label={`${stageLabel}进度`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent ?? undefined}>
+        <span style={percent === null ? undefined : { width: `${percent}%` }} />
+      </div>
+      {downloading && <small>{formatBytes(progress.downloaded)}{progress.total ? ` / ${formatBytes(progress.total)} · ${percent}%` : ''}</small>}
+    </div>
+  )
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
 function Loading({ label }: { label: string }) {

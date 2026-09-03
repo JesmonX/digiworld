@@ -37,6 +37,10 @@ HTTP/HTTPS/SOCKS5 proxy URL, or bypass proxies. The selected policy is used for
 the official catalog, plugin downloads, core updates, and plugin backends that
 declare a `network:*` permission.
 
+Plugin and core update checks are explicit: Digiworld displays the available
+versions and asks for confirmation before downloading. Confirmed downloads and
+installs report progress in the app and use the saved proxy policy.
+
 Set `DIGIWORLD_DEV_CATALOG` to a local catalog JSON file to test unsigned local
 packages in a debug build. Release builds reject unsigned catalogs and plugins.
 

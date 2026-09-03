@@ -2,7 +2,8 @@ use crate::catalog::{CatalogClient, sha256_hex, verify_package};
 use crate::error::{DigiworldError, Result};
 use crate::model::{
     CORE_VERSION, CatalogIndex, InstallResult, MANIFEST_SCHEMA_VERSION, PROTOCOL_VERSION,
-    PluginManifest, PluginSummary, ProxySettings, ProxyTestResult, target_key,
+    PluginManifest, PluginSummary, PluginUpdateInfo, PluginUpdateRequest, ProxySettings,
+    ProxyTestResult, target_key,
 };
 use crate::network;
 use crate::process::PluginProcess;
@@ -129,14 +130,138 @@ impl PluginManager {
         }
     }
 
-    pub async fn install(&self, plugin_id: &str) -> Result<InstallResult> {
+    pub async fn available_updates(&self) -> Result<Vec<PluginUpdateInfo>> {
+        let catalog = self.load_catalog(true).await?;
+        let installed = self.summaries()?;
+        let target = target_key();
+        let core_version = Version::parse(CORE_VERSION)?;
+        let mut updates = Vec::new();
+        for current in installed {
+            let Some(entry) = catalog
+                .plugins
+                .iter()
+                .find(|plugin| plugin.id == current.id)
+            else {
+                continue;
+            };
+            if !is_newer_version(&current.version, &entry.version)? {
+                continue;
+            }
+            let compatible = Version::parse(&entry.min_core_version)? <= core_version
+                && entry
+                    .artifacts
+                    .iter()
+                    .any(|artifact| artifact.target == target);
+            updates.push(PluginUpdateInfo {
+                id: entry.id.clone(),
+                name: entry.name.clone(),
+                current_version: current.version,
+                version: entry.version.clone(),
+                min_core_version: entry.min_core_version.clone(),
+                compatible,
+                permissions_changed: current.permissions != entry.permissions,
+            });
+        }
+        Ok(updates)
+    }
+
+    pub async fn install<F>(&self, plugin_id: &str, mut on_progress: F) -> Result<InstallResult>
+    where
+        F: FnMut(&str, &str, u64, Option<u64>),
+    {
         validate_plugin_id(plugin_id)?;
         let catalog = self.load_catalog(true).await?;
+        self.install_from_catalog(plugin_id, None, &catalog, &mut on_progress)
+            .await
+    }
+
+    pub async fn install_updates<F>(
+        &self,
+        requests: &[PluginUpdateRequest],
+        mut on_progress: F,
+    ) -> Result<Vec<InstallResult>>
+    where
+        F: FnMut(&str, &str, &str, u64, Option<u64>),
+    {
+        if requests.is_empty() {
+            return Ok(Vec::new());
+        }
+        let catalog = self.load_catalog(true).await?;
+
+        // Validate the complete, user-approved update set before changing anything.
+        for request in requests {
+            validate_plugin_id(&request.id)?;
+            let current = self.summary(&request.id)?;
+            if !is_newer_version(&current.version, &request.version)? {
+                return Err(DigiworldError::Plugin(format!(
+                    "{} is no longer an update for {}",
+                    request.version, request.id
+                )));
+            }
+            let entry = catalog
+                .plugins
+                .iter()
+                .find(|plugin| plugin.id == request.id)
+                .ok_or_else(|| {
+                    DigiworldError::Catalog(format!("plugin not found: {}", request.id))
+                })?;
+            if entry.version != request.version {
+                return Err(DigiworldError::Catalog(format!(
+                    "catalog version changed for {}; check for updates again",
+                    request.id
+                )));
+            }
+            ensure_core_compatible(&entry.min_core_version)?;
+            if !entry
+                .artifacts
+                .iter()
+                .any(|artifact| artifact.target == target_key())
+            {
+                return Err(DigiworldError::Catalog(format!(
+                    "plugin has no artifact for {}",
+                    target_key()
+                )));
+            }
+        }
+
+        let mut results = Vec::with_capacity(requests.len());
+        for request in requests {
+            let id = request.id.clone();
+            let result = self
+                .install_from_catalog(
+                    &request.id,
+                    Some(&request.version),
+                    &catalog,
+                    &mut |stage, name, downloaded, total| {
+                        on_progress(&id, name, stage, downloaded, total)
+                    },
+                )
+                .await?;
+            results.push(result);
+        }
+        Ok(results)
+    }
+
+    async fn install_from_catalog<F>(
+        &self,
+        plugin_id: &str,
+        expected_version: Option<&str>,
+        catalog: &CatalogIndex,
+        on_progress: &mut F,
+    ) -> Result<InstallResult>
+    where
+        F: FnMut(&str, &str, u64, Option<u64>),
+    {
         let entry = catalog
             .plugins
             .iter()
             .find(|plugin| plugin.id == plugin_id)
             .ok_or_else(|| DigiworldError::Catalog(format!("plugin not found: {plugin_id}")))?;
+        if expected_version.is_some_and(|version| version != entry.version) {
+            return Err(DigiworldError::Catalog(format!(
+                "catalog version changed for {plugin_id}; check for updates again"
+            )));
+        }
         ensure_core_compatible(&entry.min_core_version)?;
         let target = target_key();
         let artifact = entry
@@ -147,10 +272,19 @@ impl PluginManager {
                 DigiworldError::Catalog(format!("plugin has no artifact for {target}"))
             })?;
         let proxy = self.proxy.read().await.clone();
+        on_progress("downloading", &entry.name, 0, Some(artifact.size));
         let bytes = self
             .catalog
-            .download_plugin(&artifact.url, artifact.size, &proxy)
+            .download_plugin(&artifact.url, artifact.size, &proxy, |downloaded, total| {
+                on_progress("downloading", &entry.name, downloaded, total)
+            })
             .await?;
+        on_progress(
+            "installing",
+            &entry.name,
+            bytes.len() as u64,
+            Some(bytes.len() as u64),
+        );
         verify_package(&bytes, &artifact.sha256, &artifact.signature)?;
 
         let staging = self
@@ -165,6 +299,12 @@ impl PluginManager {
         let manifest =
             load_and_validate_manifest(&staging, plugin_id, &entry.version, &target).await?;
         let old_manifest = self.store.manifest(plugin_id)?;
+        let was_enabled = self
+            .summaries()?
+            .into_iter()
+            .find(|plugin| plugin.id == plugin_id)
+            .map(|plugin| plugin.enabled)
+            .unwrap_or(true);
         self.stop(plugin_id).await;
         let destination = self.plugins_dir.join(plugin_id);
         let rollback = self.plugins_dir.join(format!(".rollback-{plugin_id}"));
@@ -176,15 +316,22 @@ impl PluginManager {
         }
         tokio::fs::rename(&staging, &destination).await?;
 
-        let permissions_changed = self.store.install(&manifest, true)?;
-        if let Err(error) = self.start(&manifest).await {
+        let permissions_changed = self.store.install(&manifest, was_enabled)?;
+        let start_result = if was_enabled {
+            self.start(&manifest).await
+        } else {
+            Ok(())
+        };
+        if let Err(error) = start_result {
             let _ = tokio::fs::remove_dir_all(&destination).await;
             if rollback.exists() {
                 let _ = tokio::fs::rename(&rollback, &destination).await;
             }
             if let Some(old) = old_manifest {
-                let _ = self.store.install(&old, true);
-                let _ = self.start(&old).await;
+                let _ = self.store.install(&old, was_enabled);
+                if was_enabled {
+                    let _ = self.start(&old).await;
+                }
             } else {
                 let _ = self.store.remove(plugin_id);
             }
@@ -194,6 +341,12 @@ impl PluginManager {
             tokio::fs::remove_dir_all(&rollback).await?;
         }
         let summary = self.summary(plugin_id)?;
+        on_progress(
+            "completed",
+            &entry.name,
+            bytes.len() as u64,
+            Some(bytes.len() as u64),
+        );
         Ok(InstallResult {
             plugin: summary,
             permissions_changed,
@@ -428,6 +581,10 @@ fn ensure_core_compatible(minimum: &str) -> Result<()> {
     Ok(())
 }
 
+fn is_newer_version(current: &str, candidate: &str) -> Result<bool> {
+    Ok(Version::parse(candidate)? > Version::parse(current)?)
+}
+
 fn validate_plugin_id(id: &str) -> Result<()> {
     if id.len() > 120
         || id.is_empty()
@@ -477,5 +634,13 @@ mod tests {
         assert!(safe_join(Path::new("/tmp/root"), "ui/index.html").is_ok());
         assert!(safe_join(Path::new("/tmp/root"), "../secret").is_err());
         assert!(safe_join(Path::new("/tmp/root"), "/secret").is_err());
+    }
+
+    #[test]
+    fn compares_plugin_versions_semantically() {
+        assert!(is_newer_version("1.9.0", "1.10.0").unwrap());
+        assert!(!is_newer_version("2.0.0", "2.0.0").unwrap());
+        assert!(!is_newer_version("2.1.0", "2.0.9").unwrap());
+        assert!(is_newer_version("1.0.0-beta.1", "1.0.0").unwrap());
     }
 }

@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { CatalogIndex, PluginSummary } from '@digiworld/plugin-sdk'
 
 export interface AppState {
@@ -29,6 +30,32 @@ export interface ProxyTestResult {
   message: string
 }
 
+export interface CoreUpdateInfo {
+  version: string
+  notes?: string
+}
+
+export interface PluginUpdateInfo {
+  id: string
+  name: string
+  currentVersion: string
+  version: string
+  minCoreVersion: string
+  compatible: boolean
+  permissionsChanged: boolean
+}
+
+export interface UpdateProgress {
+  operation: 'plugin-install' | 'plugin-update' | 'core-update'
+  itemId?: string
+  itemName: string
+  stage: 'downloading' | 'installing' | 'completed' | 'failed'
+  downloaded: number
+  total?: number
+  completedItems: number
+  totalItems: number
+}
+
 export const api = {
   appState: () => invoke<AppState>('get_app_state'),
   catalog: (refresh = false) => invoke<CatalogIndex>('get_catalog', { refresh }),
@@ -46,7 +73,12 @@ export const api = {
     invoke<ProxySettings>('set_proxy_settings', { settings }),
   testProxySettings: (settings: ProxySettings) =>
     invoke<ProxyTestResult>('test_proxy_settings', { settings }),
-  checkCoreUpdate: () => invoke<{ version: string; notes?: string } | null>('check_core_update'),
-  installCoreUpdate: () => invoke<void>('install_core_update'),
+  checkPluginUpdates: () => invoke<PluginUpdateInfo[]>('check_plugin_updates'),
+  installPluginUpdates: (updates: Array<{ id: string; version: string }>) =>
+    invoke<InstallResult[]>('install_plugin_updates', { updates }),
+  checkCoreUpdate: () => invoke<CoreUpdateInfo | null>('check_core_update'),
+  installCoreUpdate: (version: string) => invoke<void>('install_core_update', { version }),
+  onUpdateProgress: (handler: (progress: UpdateProgress) => void): Promise<UnlistenFn> =>
+    listen<UpdateProgress>('update-progress', event => handler(event.payload)),
   exportDiagnostics: () => invoke<string>('export_diagnostics'),
 }
