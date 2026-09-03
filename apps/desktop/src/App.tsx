@@ -18,6 +18,23 @@ import './styles.css'
 
 type Page = 'home' | 'catalog' | 'settings' | { pluginId: string }
 
+const PROXY_TEST_DEADLINE_MS = 20_000
+const UPDATE_CHECK_DEADLINE_MS = 35_000
+
+function errorMessage(reason: unknown): string {
+  return reason instanceof Error ? reason.message : String(reason)
+}
+
+function withDeadline<T>(operation: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error(message)), timeoutMs)
+    operation.then(
+      value => { window.clearTimeout(timeout); resolve(value) },
+      reason => { window.clearTimeout(timeout); reject(reason) },
+    )
+  })
+}
+
 function permissionLabel(id: string): string {
   const labels: Record<string, string> = {
     'background': '后台运行',
@@ -69,7 +86,7 @@ function App() {
     void api.onUpdateProgress(progress => setUpdateProgress(progress)).then(stop => {
       if (disposed) stop()
       else unlisten = stop
-    }).catch(reason => setError(String(reason)))
+    }).catch(reason => setError(errorMessage(reason)))
     return () => {
       disposed = true
       unlisten?.()
@@ -77,7 +94,7 @@ function App() {
   }, [])
 
   useEffect(() => {
-    Promise.all([refreshState(), refreshCatalog()]).catch(reason => setError(String(reason)))
+    Promise.all([refreshState(), refreshCatalog()]).catch(reason => setError(errorMessage(reason)))
   }, [refreshCatalog, refreshState])
 
   useEffect(() => {
@@ -85,7 +102,7 @@ function App() {
       setPluginHtml(null)
       return
     }
-    api.pluginUi(page.pluginId).then(setPluginHtml).catch(reason => setError(String(reason)))
+    api.pluginUi(page.pluginId).then(setPluginHtml).catch(reason => setError(errorMessage(reason)))
   }, [page])
 
   const installed = useMemo(() => new Map(state?.plugins.map(plugin => [plugin.id, plugin]) ?? []), [state])
@@ -95,12 +112,12 @@ function App() {
     setBusy(plugin.id)
     setError(null)
     try {
-      await api.install(plugin.id)
+      await api.install(plugin.id, plugin.version)
       await refreshState()
       setConfirmInstall(null)
       setPage({ pluginId: plugin.id })
     } catch (reason) {
-      setError(String(reason))
+      setError(errorMessage(reason))
     } finally {
       setBusy(null)
     }
@@ -113,7 +130,7 @@ function App() {
       await api.setEnabled(plugin.id, enabled)
       await refreshState()
     } catch (reason) {
-      setError(String(reason))
+      setError(errorMessage(reason))
     } finally {
       setBusy(null)
     }
@@ -128,7 +145,7 @@ function App() {
       await refreshState()
       setPage('home')
     } catch (reason) {
-      setError(String(reason))
+      setError(errorMessage(reason))
     } finally {
       setBusy(null)
     }
@@ -276,7 +293,7 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
   const [updateDialog, setUpdateDialog] = useState<UpdateDialog | null>(null)
 
   useEffect(() => {
-    api.proxySettings().then(setProxy).catch(reason => setProxyMessage(String(reason)))
+    api.proxySettings().then(setProxy).catch(reason => setProxyMessage(errorMessage(reason)))
   }, [])
 
   const updateMode = (mode: ProxyMode) => setProxy(current => mode === 'custom'
@@ -291,11 +308,15 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
         setProxy(await api.setProxySettings(proxy))
         setProxyMessage('代理设置已保存')
       } else {
-        const result = await api.testProxySettings(proxy)
+        const result = await withDeadline(
+          api.testProxySettings(proxy),
+          PROXY_TEST_DEADLINE_MS,
+          '代理测试超时，请确认地址、端口和代理类型后重试',
+        )
         setProxyMessage(`连接成功 · ${result.latencyMs} ms`)
       }
     } catch (reason) {
-      setProxyMessage(String(reason))
+      setProxyMessage(errorMessage(reason))
     } finally {
       setProxyBusy(null)
     }
@@ -306,11 +327,15 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
     setPluginMessage(null)
     setUpdateError(null)
     try {
-      const updates = await api.checkPluginUpdates()
+      const updates = await withDeadline(
+        api.checkPluginUpdates(),
+        UPDATE_CHECK_DEADLINE_MS,
+        '插件更新检查超时，请检查网络或代理后重试',
+      )
       if (updates.length === 0) setPluginMessage('所有插件均为最新版本')
       else setUpdateDialog({ kind: 'plugins', updates })
     } catch (reason) {
-      setPluginMessage(String(reason))
+      setPluginMessage(errorMessage(reason))
     } finally {
       setUpdateBusy(null)
     }
@@ -321,11 +346,15 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
     setCoreMessage(null)
     setUpdateError(null)
     try {
-      const update = await api.checkCoreUpdate()
+      const update = await withDeadline(
+        api.checkCoreUpdate(),
+        UPDATE_CHECK_DEADLINE_MS,
+        '主程序更新检查超时，请检查网络或代理后重试',
+      )
       if (update) setUpdateDialog({ kind: 'core', update })
       else setCoreMessage('当前已是最新版本')
     } catch (reason) {
-      setCoreMessage(String(reason))
+      setCoreMessage(errorMessage(reason))
     } finally {
       setUpdateBusy(null)
     }
@@ -348,7 +377,8 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
         setPluginMessage(`已更新 ${compatible.length} 个插件`)
         setUpdateDialog(null)
       } catch (reason) {
-        setUpdateError(String(reason))
+        setUpdateError(errorMessage(reason))
+        await onPluginsUpdated().catch(() => undefined)
       } finally {
         setUpdateBusy(null)
       }
@@ -359,7 +389,7 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
     try {
       await api.installCoreUpdate(updateDialog.update.version)
     } catch (reason) {
-      setUpdateError(String(reason))
+      setUpdateError(errorMessage(reason))
       setUpdateBusy(null)
     }
   }
@@ -401,7 +431,7 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
               <button key={mode} className={proxy.mode === mode ? 'active' : ''} aria-pressed={proxy.mode === mode} onClick={() => updateMode(mode)}>{label}</button>
             ))}
           </div>
-          {proxy.mode === 'custom' && <input aria-label="自定义代理地址" value={proxy.url ?? ''} onChange={event => setProxy({ mode: 'custom', url: event.target.value })} placeholder="http://127.0.0.1:7890" />}
+          {proxy.mode === 'custom' && <input aria-label="自定义代理地址" value={proxy.url ?? ''} onChange={event => setProxy({ mode: 'custom', url: event.target.value })} placeholder="http://127.0.0.1:7890 或 socks5h://127.0.0.1:7890" />}
           {proxyMessage && <small className="proxy-message">{proxyMessage}</small>}
         </div>
         <div className="proxy-actions"><button className="secondary" disabled={proxyBusy !== null} onClick={() => void runProxyAction('test')}>{proxyBusy === 'test' ? '测试中…' : '测试连接'}</button><button className="primary" disabled={proxyBusy !== null} onClick={() => void runProxyAction('save')}>{proxyBusy === 'save' ? '保存中…' : '保存'}</button></div>
@@ -500,7 +530,7 @@ function ProgressView({ progress, fallbackName }: { progress: UpdateProgress | n
   const percent = downloading && progress.total
     ? Math.min(100, Math.round(progress.downloaded / progress.total * 100))
     : null
-  const stageLabel = !progress ? '准备下载' : downloading ? '正在下载' : progress.stage === 'completed' ? '安装完成' : '正在安装'
+  const stageLabel = !progress ? '准备下载' : downloading ? '正在下载' : progress.stage === 'completed' ? '安装完成' : progress.stage === 'failed' ? '更新失败' : '正在安装'
   const currentItem = progress?.stage === 'completed' ? progress.completedItems : (progress?.completedItems ?? 0) + 1
   const itemCount = progress && progress.totalItems > 1 ? ` · ${Math.min(currentItem, progress.totalItems)}/${progress.totalItems}` : ''
   return (

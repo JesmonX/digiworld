@@ -165,14 +165,24 @@ impl PluginManager {
         Ok(updates)
     }
 
-    pub async fn install<F>(&self, plugin_id: &str, mut on_progress: F) -> Result<InstallResult>
+    pub async fn install<F>(
+        &self,
+        plugin_id: &str,
+        expected_version: &str,
+        mut on_progress: F,
+    ) -> Result<InstallResult>
     where
         F: FnMut(&str, &str, u64, Option<u64>),
     {
         validate_plugin_id(plugin_id)?;
-        let catalog = self.load_catalog(true).await?;
-        self.install_from_catalog(plugin_id, None, &catalog, &mut on_progress)
-            .await
+        let catalog = self.load_catalog(false).await?;
+        self.install_from_catalog(
+            plugin_id,
+            Some(expected_version),
+            &catalog,
+            &mut on_progress,
+        )
+        .await
     }
 
     pub async fn install_updates<F>(
@@ -186,12 +196,17 @@ impl PluginManager {
         if requests.is_empty() {
             return Ok(Vec::new());
         }
-        let catalog = self.load_catalog(true).await?;
+        // Reuse the signed catalog snapshot the user just reviewed. Refreshing here would
+        // introduce a second failure point and could change the approved version mid-flow.
+        let catalog = self.load_catalog(false).await?;
 
         // Validate the complete, user-approved update set before changing anything.
         for request in requests {
             validate_plugin_id(&request.id)?;
             let current = self.summary(&request.id)?;
+            if current.version == request.version {
+                continue;
+            }
             if !is_newer_version(&current.version, &request.version)? {
                 return Err(DigiworldError::Plugin(format!(
                     "{} is no longer an update for {}",
@@ -227,6 +242,22 @@ impl PluginManager {
         let mut results = Vec::with_capacity(requests.len());
         for request in requests {
             let id = request.id.clone();
+            let current = self.summary(&request.id)?;
+            if current.version == request.version {
+                let entry = catalog
+                    .plugins
+                    .iter()
+                    .find(|plugin| plugin.id == request.id)
+                    .ok_or_else(|| {
+                        DigiworldError::Catalog(format!("plugin not found: {}", request.id))
+                    })?;
+                on_progress(&id, &entry.name, "completed", 0, None);
+                results.push(InstallResult {
+                    plugin: current,
+                    permissions_changed: false,
+                });
+                continue;
+            }
             let result = self
                 .install_from_catalog(
                     &request.id,

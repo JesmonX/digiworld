@@ -5,10 +5,13 @@ use base64::Engine;
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 const CATALOG_URL: &str = "https://jesmonx.github.io/digiworld/catalog/v1/index.json";
 const MAX_CATALOG_BYTES: usize = 2 * 1024 * 1024;
 const MAX_PLUGIN_BYTES: usize = 128 * 1024 * 1024;
+const METADATA_REQUEST_TIMEOUT: Duration = Duration::from_secs(12);
+const PROXY_TEST_TIMEOUT: Duration = Duration::from_secs(15);
 
 pub struct CatalogClient {
     cache_path: PathBuf,
@@ -39,21 +42,7 @@ impl CatalogClient {
             }
         }
 
-        let http = self.http(proxy)?;
-        let response = http.get(CATALOG_URL).send().await?.error_for_status()?;
-        let bytes = response.bytes().await?;
-        if bytes.len() > MAX_CATALOG_BYTES {
-            return Err(DigiworldError::Catalog(
-                "catalog exceeds the 2 MiB limit".into(),
-            ));
-        }
-        let signature = http
-            .get(format!("{CATALOG_URL}.sig"))
-            .send()
-            .await?
-            .error_for_status()?
-            .text()
-            .await?;
+        let (bytes, signature) = self.fetch_release(proxy).await?;
         verify_release_signature(&bytes, signature.trim())?;
         let catalog = Self::parse(&bytes, accepted_sequence, false)?;
         atomic_write(&self.cache_path, &bytes).await?;
@@ -145,21 +134,14 @@ impl CatalogClient {
     }
 
     pub async fn test_proxy(&self, proxy: &ProxySettings) -> Result<()> {
-        let http = self.http(proxy)?;
-        let response = http.get(CATALOG_URL).send().await?.error_for_status()?;
-        let bytes = response.bytes().await?;
-        if bytes.len() > MAX_CATALOG_BYTES {
-            return Err(DigiworldError::Catalog(
-                "catalog exceeds the 2 MiB limit".into(),
-            ));
-        }
-        let signature = http
-            .get(format!("{CATALOG_URL}.sig"))
-            .send()
-            .await?
-            .error_for_status()?
-            .text()
-            .await?;
+        let (bytes, signature) =
+            tokio::time::timeout(PROXY_TEST_TIMEOUT, self.fetch_release(proxy))
+                .await
+                .map_err(|_| {
+                    DigiworldError::NetworkTimeout(
+                        "proxy test did not finish within 15 seconds".into(),
+                    )
+                })??;
         if option_env!("DIGIWORLD_PLUGIN_PUBLIC_KEY_B64")
             .unwrap_or("")
             .is_empty()
@@ -174,6 +156,37 @@ impl CatalogClient {
         } else {
             verify_release_signature(&bytes, signature.trim())
         }
+    }
+
+    async fn fetch_release(&self, proxy: &ProxySettings) -> Result<(Vec<u8>, String)> {
+        let http = self.http(proxy)?;
+        let catalog_request = async {
+            let response = http
+                .get(CATALOG_URL)
+                .timeout(METADATA_REQUEST_TIMEOUT)
+                .send()
+                .await?
+                .error_for_status()?;
+            let bytes = response.bytes().await?;
+            if bytes.len() > MAX_CATALOG_BYTES {
+                return Err(DigiworldError::Catalog(
+                    "catalog exceeds the 2 MiB limit".into(),
+                ));
+            }
+            Ok::<_, DigiworldError>(bytes.to_vec())
+        };
+        let signature_request = async {
+            Ok::<_, DigiworldError>(
+                http.get(format!("{CATALOG_URL}.sig"))
+                    .timeout(METADATA_REQUEST_TIMEOUT)
+                    .send()
+                    .await?
+                    .error_for_status()?
+                    .text()
+                    .await?,
+            )
+        };
+        tokio::try_join!(catalog_request, signature_request)
     }
 
     fn http(&self, proxy: &ProxySettings) -> Result<reqwest::Client> {

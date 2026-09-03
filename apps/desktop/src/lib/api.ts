@@ -59,7 +59,8 @@ export interface UpdateProgress {
 export const api = {
   appState: () => invoke<AppState>('get_app_state'),
   catalog: (refresh = false) => invoke<CatalogIndex>('get_catalog', { refresh }),
-  install: (pluginId: string) => invoke<InstallResult>('install_plugin', { pluginId }),
+  install: (pluginId: string, version: string) =>
+    invoke<InstallResult>('install_plugin', { pluginId, version }),
   setEnabled: (pluginId: string, enabled: boolean) =>
     invoke<PluginSummary>('set_plugin_enabled', { pluginId, enabled }),
   uninstall: (pluginId: string, deleteData: boolean) =>

@@ -15,6 +15,7 @@ use crate::model::{
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
@@ -22,6 +23,11 @@ use tauri_plugin_autostart::ManagerExt as AutostartManagerExt;
 
 struct LogGuard {
     _guard: tracing_appender::non_blocking::WorkerGuard,
+}
+
+#[derive(Default)]
+struct CoreUpdateCache {
+    update: tokio::sync::Mutex<Option<tauri_plugin_updater::Update>>,
 }
 
 #[tauri::command]
@@ -53,27 +59,48 @@ async fn get_catalog(
 async fn install_plugin(
     app: AppHandle,
     plugin_id: String,
+    version: String,
     manager: State<'_, Arc<PluginManager>>,
 ) -> Result<InstallResult> {
     let progress_app = app.clone();
     let progress_id = plugin_id.clone();
-    manager
-        .install(&plugin_id, move |stage, name, downloaded, total| {
-            let _ = progress_app.emit(
-                "update-progress",
-                UpdateProgress {
-                    operation: "plugin-install".into(),
-                    item_id: Some(progress_id.clone()),
-                    item_name: name.into(),
-                    stage: stage.into(),
-                    downloaded,
-                    total,
-                    completed_items: usize::from(stage == "completed"),
-                    total_items: 1,
-                },
-            );
-        })
-        .await
+    let result = manager
+        .install(
+            &plugin_id,
+            &version,
+            move |stage, name, downloaded, total| {
+                let _ = progress_app.emit(
+                    "update-progress",
+                    UpdateProgress {
+                        operation: "plugin-install".into(),
+                        item_id: Some(progress_id.clone()),
+                        item_name: name.into(),
+                        stage: stage.into(),
+                        downloaded,
+                        total,
+                        completed_items: usize::from(stage == "completed"),
+                        total_items: 1,
+                    },
+                );
+            },
+        )
+        .await;
+    if result.is_err() {
+        let _ = app.emit(
+            "update-progress",
+            UpdateProgress {
+                operation: "plugin-install".into(),
+                item_id: Some(plugin_id.clone()),
+                item_name: plugin_id,
+                stage: "failed".into(),
+                downloaded: 0,
+                total: None,
+                completed_items: 0,
+                total_items: 1,
+            },
+        );
+    }
+    result
 }
 
 #[tauri::command]
@@ -95,11 +122,16 @@ async fn install_plugin_updates(
         .map(|(index, update)| (update.id.clone(), index))
         .collect();
     let total_items = updates.len();
+    let completed_items = Arc::new(AtomicUsize::new(0));
+    let progress_completed_items = completed_items.clone();
     let progress_app = app.clone();
     let result = manager
         .install_updates(&updates, move |id, name, stage, downloaded, total| {
             let index = positions.get(id).copied().unwrap_or_default();
-            let completed_items = index + usize::from(stage == "completed");
+            let progress_completed = index + usize::from(stage == "completed");
+            if stage == "completed" {
+                progress_completed_items.fetch_max(progress_completed, Ordering::Relaxed);
+            }
             let _ = progress_app.emit(
                 "update-progress",
                 UpdateProgress {
@@ -109,7 +141,7 @@ async fn install_plugin_updates(
                     stage: stage.into(),
                     downloaded,
                     total,
-                    completed_items,
+                    completed_items: progress_completed,
                     total_items,
                 },
             );
@@ -125,7 +157,7 @@ async fn install_plugin_updates(
                 stage: "failed".into(),
                 downloaded: 0,
                 total: None,
-                completed_items: 0,
+                completed_items: completed_items.load(Ordering::Relaxed),
                 total_items,
             },
         );
@@ -208,24 +240,35 @@ async fn test_proxy_settings(
 }
 
 fn updater_configured() -> bool {
-    option_env!("DIGIWORLD_UPDATER_PUBLIC_KEY").is_some()
+    option_env!("DIGIWORLD_UPDATER_PUBLIC_KEY").is_some_and(|value| !value.trim().is_empty())
+}
+
+async fn query_core_update(
+    app: &AppHandle,
+    settings: &ProxySettings,
+) -> Result<Option<tauri_plugin_updater::Update>> {
+    let updater = network::updater(app, settings)?;
+    tokio::time::timeout(network::UPDATE_CHECK_TIMEOUT, updater.check())
+        .await
+        .map_err(|_| {
+            DigiworldError::Update("update check did not finish within 30 seconds".into())
+        })?
+        .map_err(|error| DigiworldError::Update(error.to_string()))
 }
 
 #[tauri::command]
 async fn check_core_update(
     app: AppHandle,
     manager: State<'_, Arc<PluginManager>>,
+    cache: State<'_, CoreUpdateCache>,
 ) -> Result<Option<UpdateInfo>> {
     if !updater_configured() {
         return Err(DigiworldError::Update(
             "release updater key is not configured".into(),
         ));
     }
-    let updater = network::updater(&app, &manager.proxy_settings().await)?;
-    let update = updater
-        .check()
-        .await
-        .map_err(|error| DigiworldError::Update(error.to_string()))?;
+    let update = query_core_update(&app, &manager.proxy_settings().await).await?;
+    *cache.update.lock().await = update.clone();
     Ok(update.map(|update| UpdateInfo {
         version: update.version,
         notes: update.body,
@@ -237,21 +280,30 @@ async fn install_core_update(
     app: AppHandle,
     version: String,
     manager: State<'_, Arc<PluginManager>>,
+    cache: State<'_, CoreUpdateCache>,
 ) -> Result<()> {
     if !updater_configured() {
         return Err(DigiworldError::Update(
             "release updater key is not configured".into(),
         ));
     }
-    let updater = network::updater(&app, &manager.proxy_settings().await)?;
-    let Some(update) = updater
-        .check()
-        .await
-        .map_err(|error| DigiworldError::Update(error.to_string()))?
-    else {
-        return Err(DigiworldError::Update(
-            "the update is no longer available; check for updates again".into(),
-        ));
+    let cached = cache.update.lock().await.clone();
+    let update = match cached {
+        Some(update) if update.version == version => update,
+        Some(_) => {
+            return Err(DigiworldError::Update(
+                "available version changed; check for updates again".into(),
+            ));
+        }
+        None => {
+            let Some(update) = query_core_update(&app, &manager.proxy_settings().await).await?
+            else {
+                return Err(DigiworldError::Update(
+                    "the update is no longer available; check for updates again".into(),
+                ));
+            };
+            update
+        }
     };
     if update.version != version {
         return Err(DigiworldError::Update(
@@ -263,7 +315,7 @@ async fn install_core_update(
     let progress_version = update.version.clone();
     let install_version = progress_version.clone();
     let mut downloaded = 0_u64;
-    update
+    let install_result = update
         .download_and_install(
             move |chunk_size, total| {
                 downloaded = downloaded.saturating_add(chunk_size as u64);
@@ -297,8 +349,23 @@ async fn install_core_update(
                 );
             },
         )
-        .await
-        .map_err(|error| DigiworldError::Update(error.to_string()))?;
+        .await;
+    if let Err(error) = install_result {
+        let _ = app.emit(
+            "update-progress",
+            UpdateProgress {
+                operation: "core-update".into(),
+                item_id: None,
+                item_name: format!("Digiworld {version}"),
+                stage: "failed".into(),
+                downloaded: 0,
+                total: None,
+                completed_items: 0,
+                total_items: 1,
+            },
+        );
+        return Err(DigiworldError::Update(error.to_string()));
+    }
     let _ = app.emit(
         "update-progress",
         UpdateProgress {
@@ -312,6 +379,7 @@ async fn install_core_update(
             total_items: 1,
         },
     );
+    *cache.update.lock().await = None;
     app.restart();
 }
 
@@ -404,8 +472,11 @@ pub fn run() {
                 .args(["--background"])
                 .build(),
         )
-        .manage(LogGuard { _guard: guard });
-    if let Some(public_key) = option_env!("DIGIWORLD_UPDATER_PUBLIC_KEY") {
+        .manage(LogGuard { _guard: guard })
+        .manage(CoreUpdateCache::default());
+    if let Some(public_key) =
+        option_env!("DIGIWORLD_UPDATER_PUBLIC_KEY").filter(|value| !value.trim().is_empty())
+    {
         builder = builder.plugin(
             tauri_plugin_updater::Builder::new()
                 .pubkey(public_key)

@@ -38,7 +38,7 @@ pre-command, and refresh interval stay in plugin storage; authentication tokens
 and account identifiers are neither read nor retained by Digiworld.
 
 Network access can follow the operating-system proxy, use an unauthenticated
-HTTP/HTTPS/SOCKS5 proxy URL, or bypass proxies. The selected policy is used for
+HTTP/HTTPS/SOCKS5/SOCKS5H proxy URL, or bypass proxies. The selected policy is used for
 the official catalog, plugin downloads, core updates, and plugin backends that
 declare a `network:*` permission.
 

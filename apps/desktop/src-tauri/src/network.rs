@@ -6,6 +6,10 @@ use tauri::{AppHandle, Runtime};
 use tauri_plugin_updater::{Updater, UpdaterExt};
 use url::Url;
 
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(12);
+const READ_IDLE_TIMEOUT: Duration = Duration::from_secs(30);
+pub const UPDATE_CHECK_TIMEOUT: Duration = Duration::from_secs(30);
+
 const PROXY_ENVIRONMENT: &[&str] = &[
     "HTTP_PROXY",
     "HTTPS_PROXY",
@@ -33,9 +37,9 @@ pub fn normalized(settings: ProxySettings) -> Result<ProxySettings> {
             let parsed = Url::parse(raw).map_err(|error| {
                 DigiworldError::NetworkConfig(format!("invalid proxy URL: {error}"))
             })?;
-            if !matches!(parsed.scheme(), "http" | "https" | "socks5") {
+            if !matches!(parsed.scheme(), "http" | "https" | "socks5" | "socks5h") {
                 return Err(DigiworldError::NetworkConfig(
-                    "proxy scheme must be http, https, or socks5".into(),
+                    "proxy scheme must be http, https, socks5, or socks5h".into(),
                 ));
             }
             if parsed.host_str().is_none() || parsed.port().is_none() {
@@ -70,7 +74,8 @@ pub fn http_client(settings: &ProxySettings, user_agent: &str) -> Result<Client>
     let mut builder = ClientBuilder::new()
         .user_agent(user_agent)
         .https_only(true)
-        .timeout(Duration::from_secs(30));
+        .connect_timeout(CONNECT_TIMEOUT)
+        .read_timeout(READ_IDLE_TIMEOUT);
     builder = match settings.mode {
         ProxyMode::System => builder,
         ProxyMode::Direct => builder.no_proxy(),
@@ -82,7 +87,11 @@ pub fn http_client(settings: &ProxySettings, user_agent: &str) -> Result<Client>
 }
 
 pub fn updater<R: Runtime>(app: &AppHandle<R>, settings: &ProxySettings) -> Result<Updater> {
-    let mut builder = app.updater_builder();
+    let mut builder = app.updater_builder().configure_client(|builder| {
+        builder
+            .connect_timeout(CONNECT_TIMEOUT)
+            .read_timeout(READ_IDLE_TIMEOUT)
+    });
     match settings.mode {
         ProxyMode::System => {}
         ProxyMode::Direct => builder = builder.no_proxy(),
@@ -134,6 +143,16 @@ mod tests {
         })
         .unwrap();
         assert_eq!(value.url.as_deref(), Some("socks5://127.0.0.1:7890"));
+        assert_eq!(
+            normalized(ProxySettings {
+                mode: ProxyMode::Custom,
+                url: Some("socks5h://127.0.0.1:7890".into()),
+            })
+            .unwrap()
+            .url
+            .as_deref(),
+            Some("socks5h://127.0.0.1:7890")
+        );
         assert!(
             normalized(ProxySettings {
                 mode: ProxyMode::Custom,

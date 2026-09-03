@@ -7,6 +7,7 @@ import App from './App'
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const mocks = vi.hoisted(() => ({
+  testProxySettings: vi.fn(),
   checkPluginUpdates: vi.fn(),
   installPluginUpdates: vi.fn(),
   checkCoreUpdate: vi.fn(),
@@ -29,7 +30,7 @@ vi.mock('./lib/api', () => ({
     onUpdateProgress: vi.fn(async () => () => {}),
     setLaunchAtStartup: vi.fn(async () => {}),
     setProxySettings: vi.fn(async settings => settings),
-    testProxySettings: vi.fn(async () => ({ ok: true, latencyMs: 1, message: '' })),
+    testProxySettings: mocks.testProxySettings,
     exportDiagnostics: vi.fn(async () => ''),
     checkPluginUpdates: mocks.checkPluginUpdates,
     installPluginUpdates: mocks.installPluginUpdates,
@@ -52,14 +53,51 @@ describe('explicit update consent', () => {
   beforeEach(() => {
     container = document.createElement('div')
     document.body.append(container)
+    mocks.testProxySettings.mockReset()
     mocks.checkPluginUpdates.mockReset()
     mocks.installPluginUpdates.mockReset()
     mocks.checkCoreUpdate.mockReset()
     mocks.installCoreUpdate.mockReset()
+    mocks.testProxySettings.mockResolvedValue({ ok: true, latencyMs: 1, message: '' })
     mocks.installPluginUpdates.mockResolvedValue([])
   })
 
-  afterEach(() => container.remove())
+  afterEach(() => {
+    vi.useRealTimers()
+    container.remove()
+  })
+
+  it('stops showing proxy testing when the backend call never returns', async () => {
+    mocks.testProxySettings.mockReturnValue(new Promise(() => {}))
+    const root = createRoot(container)
+    await act(async () => { root.render(<App />); await flush() })
+    await act(async () => button(container, '设置')?.click())
+
+    vi.useFakeTimers()
+    await act(async () => button(container, '测试连接')?.click())
+    expect(container.textContent).toContain('测试中…')
+    await act(async () => { await vi.advanceTimersByTimeAsync(20_000) })
+
+    expect(container.textContent).toContain('代理测试超时')
+    expect(container.textContent).toContain('测试连接')
+    await act(async () => root.unmount())
+  })
+
+  it('stops showing plugin update checks when the backend call never returns', async () => {
+    mocks.checkPluginUpdates.mockReturnValue(new Promise(() => {}))
+    const root = createRoot(container)
+    await act(async () => { root.render(<App />); await flush() })
+    await act(async () => button(container, '设置')?.click())
+
+    vi.useFakeTimers()
+    await act(async () => button(container, '检查全部插件')?.click())
+    expect(container.textContent).toContain('检查中…')
+    await act(async () => { await vi.advanceTimersByTimeAsync(35_000) })
+
+    expect(container.textContent).toContain('插件更新检查超时')
+    expect(container.textContent).toContain('检查全部插件')
+    await act(async () => root.unmount())
+  })
 
   it('checks plugin updates without installing until the user confirms', async () => {
     mocks.checkPluginUpdates.mockResolvedValue([{
