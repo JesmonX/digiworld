@@ -1,0 +1,9 @@
+{
+  "name": "@digiworld/typography",
+  "version": "0.2.5",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./fonts.css": "./fonts.css"
+  }
+}

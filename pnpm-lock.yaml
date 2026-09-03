@@ -23,6 +23,9 @@ importers:
       '@digiworld/plugin-sdk':
         specifier: workspace:*
         version: link:../../packages/plugin-sdk
+      '@digiworld/typography':
+        specifier: workspace:*
+        version: link:../../packages/typography
       '@tauri-apps/api':
         specifier: ^2.8.0
         version: 2.11.1
@@ -64,11 +67,16 @@ importers:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@24.13.3)(jsdom@26.1.0)
 
+  packages/typography: {}
+
   plugins/agent-token-heatmap/ui:
     dependencies:
       '@digiworld/plugin-sdk':
         specifier: workspace:*
         version: link:../../../packages/plugin-sdk
+      '@digiworld/typography':
+        specifier: workspace:*
+        version: link:../../../packages/typography
       lucide-react:
         specifier: ^0.468.0
         version: 0.468.0(react@19.2.8)
@@ -106,6 +114,9 @@ importers:
       '@digiworld/plugin-sdk':
         specifier: workspace:*
         version: link:../../../packages/plugin-sdk
+      '@digiworld/typography':
+        specifier: workspace:*
+        version: link:../../../packages/typography
       lucide-react:
         specifier: ^0.468.0
         version: 0.468.0(react@19.2.8)

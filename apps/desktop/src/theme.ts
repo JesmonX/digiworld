@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react'
 import type { PluginTheme } from '@digiworld/plugin-sdk'
 
 export type AccentThemeId = 'violet' | 'blue' | 'teal' | 'orange' | 'rose'
+export type FontThemeId = 'plex' | 'wenkai' | 'system'
 
 export interface AccentTheme {
   id: AccentThemeId
@@ -12,6 +13,14 @@ export interface AccentTheme {
   accentSoft: string
 }
 
+export interface FontTheme {
+  id: FontThemeId
+  label: string
+  description: string
+  fontSans: string
+  fontDisplay: string
+}
+
 export const ACCENT_THEMES: AccentTheme[] = [
   { id: 'violet', label: '紫罗兰', accent: '#5b5ce2', accentStrong: '#4338ca', accentSecondary: '#8b5cf6', accentSoft: '#ededff' },
   { id: 'blue', label: '海蓝', accent: '#2563eb', accentStrong: '#1d4ed8', accentSecondary: '#0ea5e9', accentSoft: '#eaf2ff' },
@@ -20,11 +29,41 @@ export const ACCENT_THEMES: AccentTheme[] = [
   { id: 'rose', label: '玫瑰', accent: '#e11d48', accentStrong: '#be123c', accentSecondary: '#f43f5e', accentSoft: '#fff0f3' },
 ]
 
+export const FONT_THEMES: FontTheme[] = [
+  {
+    id: 'plex',
+    label: 'Plex 灵动',
+    description: '清晰现代，一级标题更有张力',
+    fontSans: '"Digiworld Plex Sans SC", "Segoe UI Variable Text", "Microsoft YaHei UI", sans-serif',
+    fontDisplay: '"Digiworld Smiley Sans", "Digiworld Plex Sans SC", "Microsoft YaHei UI", sans-serif',
+  },
+  {
+    id: 'wenkai',
+    label: '霞鹜文楷',
+    description: '温润舒展，中文与数字都更具人文感',
+    fontSans: '"Digiworld LXGW WenKai", "KaiTi", serif',
+    fontDisplay: '"Digiworld LXGW WenKai", "KaiTi", serif',
+  },
+  {
+    id: 'system',
+    label: 'Windows 原生',
+    description: '紧凑克制，保持熟悉的桌面观感',
+    fontSans: '"Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", sans-serif',
+    fontDisplay: '"Segoe UI Variable Display", "Segoe UI Variable Text", "Microsoft YaHei UI", sans-serif',
+  },
+]
+
 export const DEFAULT_ACCENT_THEME_ID: AccentThemeId = 'violet'
+export const DEFAULT_FONT_THEME_ID: FontThemeId = 'plex'
 export const THEME_STORAGE_KEY = 'digiworld.accent-theme.v1'
+export const FONT_THEME_STORAGE_KEY = 'digiworld.font-theme.v1'
 
 export function getAccentTheme(id: AccentThemeId): AccentTheme {
   return ACCENT_THEMES.find(theme => theme.id === id) ?? ACCENT_THEMES[0]!
+}
+
+export function getFontTheme(id: FontThemeId): FontTheme {
+  return FONT_THEMES.find(theme => theme.id === id) ?? FONT_THEMES[0]!
 }
 
 export function loadAccentThemeId(storage?: Pick<Storage, 'getItem'>): AccentThemeId {
@@ -44,6 +83,23 @@ export function saveAccentThemeId(id: AccentThemeId, storage?: Pick<Storage, 'se
   }
 }
 
+export function loadFontThemeId(storage?: Pick<Storage, 'getItem'>): FontThemeId {
+  try {
+    const value = (storage ?? window.localStorage).getItem(FONT_THEME_STORAGE_KEY)
+    return FONT_THEMES.some(theme => theme.id === value) ? value as FontThemeId : DEFAULT_FONT_THEME_ID
+  } catch {
+    return DEFAULT_FONT_THEME_ID
+  }
+}
+
+export function saveFontThemeId(id: FontThemeId, storage?: Pick<Storage, 'setItem'>): void {
+  try {
+    (storage ?? window.localStorage).setItem(FONT_THEME_STORAGE_KEY, id)
+  } catch {
+    // A typography preference should never prevent the desktop UI from working.
+  }
+}
+
 export function accentThemeStyle(theme: AccentTheme): CSSProperties {
   return {
     '--accent': theme.accent,
@@ -53,7 +109,14 @@ export function accentThemeStyle(theme: AccentTheme): CSSProperties {
   } as CSSProperties
 }
 
-export function pluginTheme(theme: AccentTheme): PluginTheme {
+export function fontThemeStyle(theme: FontTheme): CSSProperties {
+  return {
+    '--font-sans': theme.fontSans,
+    '--font-display': theme.fontDisplay,
+  } as CSSProperties
+}
+
+export function pluginTheme(theme: AccentTheme, font: FontTheme = getFontTheme(DEFAULT_FONT_THEME_ID)): PluginTheme {
   return {
     'color-scheme': 'light',
     'bg': '#f5f7fb',
@@ -69,6 +132,7 @@ export function pluginTheme(theme: AccentTheme): PluginTheme {
     'accent-secondary': theme.accentSecondary,
     'accent-soft': theme.accentSoft,
     'danger': '#d92d20',
-    'font-sans': '"Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", sans-serif',
+    'font-sans': font.fontSans,
+    'font-display': font.fontDisplay,
   }
 }

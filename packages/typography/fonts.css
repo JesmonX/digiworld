@@ -1,0 +1,54 @@
+@font-face {
+  font-family: "Digiworld Plex Sans SC";
+  src: url("./fonts/IBMPlexSansSC-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Digiworld Plex Sans SC";
+  src: url("./fonts/IBMPlexSansSC-SemiBold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Digiworld Smiley Sans";
+  src: url("./fonts/SmileySans-Oblique.ttf.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Digiworld LXGW WenKai";
+  src: url("./fonts/LXGWWenKaiLite-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Digiworld LXGW WenKai";
+  src: url("./fonts/LXGWWenKaiLite-Medium.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500 800;
+  font-display: swap;
+}
+
+:root {
+  --font-sans: "Digiworld Plex Sans SC", "Segoe UI Variable Text", "Microsoft YaHei UI", sans-serif;
+  --font-display: "Digiworld Smiley Sans", "Digiworld Plex Sans SC", "Microsoft YaHei UI", sans-serif;
+  --type-caption: 11px;
+  --type-body-sm: 12px;
+  --type-body: 13px;
+  --type-title-sm: 14px;
+  --type-title: 16px;
+  --type-page: 20px;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+}
