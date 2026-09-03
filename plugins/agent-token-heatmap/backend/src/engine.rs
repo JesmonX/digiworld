@@ -1,8 +1,10 @@
 use crate::database::Database;
 #[cfg(test)]
 use crate::model::AgentKind;
-use crate::model::{RefreshStatus, SnapshotRequest, SshSource, UsageSettings, UsageSnapshot};
-use crate::{remote, scanner};
+use crate::model::{
+    CodexQuotaSnapshot, RefreshStatus, SnapshotRequest, SshSource, UsageSettings, UsageSnapshot,
+};
+use crate::{quota, remote, scanner};
 use anyhow::{Result, bail};
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -47,6 +49,45 @@ impl UsageEngine {
         let database = self.database.lock().expect("database lock poisoned");
         let settings = database.settings()?;
         database.snapshot(&request, &settings)
+    }
+
+    pub fn codex_quota(&self) -> Result<CodexQuotaSnapshot> {
+        self.query_codex_quota(self.settings()?)
+    }
+
+    pub fn test_codex_quota(&self, mut settings: UsageSettings) -> Result<CodexQuotaSnapshot> {
+        normalize_settings(&mut settings)?;
+        self.query_codex_quota(settings)
+    }
+
+    fn query_codex_quota(&self, settings: UsageSettings) -> Result<CodexQuotaSnapshot> {
+        let Some(source_id) = settings.codex_quota.source_id.clone() else {
+            return Ok(CodexQuotaSnapshot::unconfigured());
+        };
+        let (source, label) = if source_id == "local" {
+            (None, "本机".to_string())
+        } else if let Some(source) = settings
+            .ssh_sources
+            .iter()
+            .find(|source| source.id == source_id)
+        {
+            (Some(source), source.label.clone())
+        } else {
+            return Ok(CodexQuotaSnapshot::unconfigured());
+        };
+        Ok(quota::query(
+            &settings.codex_quota,
+            source,
+            source_id.clone(),
+            label.clone(),
+        )
+        .unwrap_or_else(|error| {
+            CodexQuotaSnapshot::unavailable(
+                source_id,
+                label,
+                error.to_string().chars().take(500).collect(),
+            )
+        }))
     }
 
     pub fn refresh_status(&self) -> RefreshStatus {
@@ -196,6 +237,27 @@ fn normalize_settings(settings: &mut UsageSettings) -> Result<()> {
             }
         }
     }
+    settings.codex_quota.pre_command = settings.codex_quota.pre_command.trim().to_string();
+    if settings.codex_quota.pre_command.len() > 8192
+        || settings.codex_quota.pre_command.contains('\0')
+    {
+        bail!("Codex quota pre-command is invalid");
+    }
+    if settings
+        .codex_quota
+        .refresh_interval_seconds
+        .is_some_and(|seconds| !(30..=3600).contains(&seconds))
+    {
+        bail!("Codex quota refresh interval must be between 30 and 3600 seconds");
+    }
+    if settings
+        .codex_quota
+        .source_id
+        .as_ref()
+        .is_some_and(|source_id| !ids.contains(source_id))
+    {
+        settings.codex_quota.source_id = None;
+    }
     Ok(())
 }
 
@@ -232,5 +294,40 @@ mod tests {
             roots: Default::default(),
         });
         assert!(normalize_settings(&mut settings).is_err());
+    }
+
+    #[test]
+    fn normalizes_quota_source_and_interval_without_reenabling_disabled_refresh() {
+        let mut settings: UsageSettings = serde_json::from_value(serde_json::json!({
+            "localAgents": ["codex"],
+            "localRoots": {},
+            "sshSources": [],
+            "codexQuota": {
+                "sourceId": "missing",
+                "shellPreset": "bash",
+                "preCommand": "  source ~/proxy  ",
+                "refreshIntervalSeconds": null
+            }
+        }))
+        .unwrap();
+        normalize_settings(&mut settings).unwrap();
+        assert_eq!(settings.codex_quota.source_id, None);
+        assert_eq!(settings.codex_quota.refresh_interval_seconds, None);
+        assert_eq!(settings.codex_quota.pre_command, "source ~/proxy");
+
+        settings.codex_quota.refresh_interval_seconds = Some(10);
+        assert!(normalize_settings(&mut settings).is_err());
+    }
+
+    #[test]
+    fn old_settings_receive_quota_defaults() {
+        let settings: UsageSettings = serde_json::from_value(serde_json::json!({
+            "localAgents": ["codex"],
+            "localRoots": {},
+            "sshSources": []
+        }))
+        .unwrap();
+        assert_eq!(settings.codex_quota.source_id.as_deref(), Some("local"));
+        assert_eq!(settings.codex_quota.refresh_interval_seconds, Some(60));
     }
 }

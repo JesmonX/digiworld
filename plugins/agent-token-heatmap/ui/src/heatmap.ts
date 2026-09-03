@@ -7,6 +7,11 @@ export interface UsageDay {
   cacheReadTokens: number
   cacheWriteTokens: number
   totalTokens: number
+  cacheAvailable?: boolean
+}
+
+export interface WeeklyUsagePoint extends UsageDay {
+  cacheRate: number | undefined
 }
 
 export interface CalendarCell {
@@ -52,6 +57,27 @@ export function formatTokens(value: number): string {
   const fixed = scaled.toFixed(digits)
   const compact = fixed.includes('.') ? fixed.replace(/0+$/, '').replace(/\.$/, '') : fixed
   return `${compact}${unit.suffix}`
+}
+
+export function weeklyUsage(endDay: string, days: UsageDay[]): WeeklyUsagePoint[] {
+  const values = new Map(days.map(day => [day.day, day]))
+  const end = parseDay(endDay)
+  const start = new Date(end.getTime() - 6 * 86_400_000)
+  const result: WeeklyUsagePoint[] = []
+  for (let current = start; current <= end; current = new Date(current.getTime() + 86_400_000)) {
+    const day = current.toISOString().slice(0, 10)
+    const usage = values.get(day) ?? {
+      day, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0,
+      cacheWriteTokens: 0, totalTokens: 0, cacheAvailable: false,
+    }
+    result.push({
+      ...usage,
+      cacheRate: usage.cacheAvailable && usage.inputTokens > 0
+        ? usage.cacheReadTokens / usage.inputTokens
+        : undefined,
+    })
+  }
+  return result
 }
 
 function parseDay(day: string): Date {

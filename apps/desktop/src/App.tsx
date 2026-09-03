@@ -25,6 +25,8 @@ function permissionLabel(id: string): string {
     'plugin-storage': '本地插件存储',
     'filesystem:agent-session-data': '读取 Coding Agent 会话数据',
     'process:ssh': '使用系统 SSH',
+    'process:shell': '运行已配置的系统 Shell',
+    'network:openai': '访问 OpenAI Codex 服务',
   }
   return labels[id] ?? id
 }

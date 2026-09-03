@@ -2,6 +2,7 @@ mod database;
 mod engine;
 mod model;
 mod parsers;
+mod quota;
 mod remote;
 mod scanner;
 
@@ -80,6 +81,13 @@ fn handle(engine: &UsageEngine, method: &str, params: Value) -> Result<Value> {
             Ok(serde_json::to_value(engine.test_ssh(source)?)?)
         }
         "usage.refreshStatus" => Ok(serde_json::to_value(engine.refresh_status())?),
+        "usage.getCodexQuota" => Ok(serde_json::to_value(engine.codex_quota()?)?),
+        "usage.testCodexQuota" => {
+            let settings: UsageSettings =
+                serde_json::from_value(params.get("settings").cloned().unwrap_or(params))
+                    .context("invalid usage settings")?;
+            Ok(serde_json::to_value(engine.test_codex_quota(settings)?)?)
+        }
         "usage.snapshot" => {
             let request: SnapshotRequest =
                 serde_json::from_value(params).context("invalid snapshot request")?;

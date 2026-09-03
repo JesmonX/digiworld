@@ -89,6 +89,8 @@ pub struct UsageSettings {
     pub local_roots: BTreeMap<AgentKind, String>,
     #[serde(default)]
     pub ssh_sources: Vec<SshSource>,
+    #[serde(default)]
+    pub codex_quota: CodexQuotaSettings,
 }
 
 impl Default for UsageSettings {
@@ -97,6 +99,95 @@ impl Default for UsageSettings {
             local_agents: all_agents(),
             local_roots: BTreeMap::new(),
             ssh_sources: Vec::new(),
+            codex_quota: CodexQuotaSettings::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ShellPreset {
+    #[default]
+    Auto,
+    Powershell,
+    Zsh,
+    Bash,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexQuotaSettings {
+    #[serde(default = "default_quota_source")]
+    pub source_id: Option<String>,
+    #[serde(default)]
+    pub shell_preset: ShellPreset,
+    #[serde(default)]
+    pub pre_command: String,
+    #[serde(default = "default_quota_refresh_interval")]
+    pub refresh_interval_seconds: Option<u64>,
+}
+
+impl Default for CodexQuotaSettings {
+    fn default() -> Self {
+        Self {
+            source_id: default_quota_source(),
+            shell_preset: ShellPreset::Auto,
+            pre_command: String::new(),
+            refresh_interval_seconds: default_quota_refresh_interval(),
+        }
+    }
+}
+
+fn default_quota_source() -> Option<String> {
+    Some("local".into())
+}
+
+fn default_quota_refresh_interval() -> Option<u64> {
+    Some(60)
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexQuotaWindow {
+    pub used_percent: u32,
+    pub window_duration_mins: Option<i64>,
+    pub resets_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexQuotaSnapshot {
+    pub status: String,
+    pub source_id: Option<String>,
+    pub source_label: Option<String>,
+    pub fetched_at: Option<String>,
+    pub plan_type: Option<String>,
+    pub windows: Vec<CodexQuotaWindow>,
+    pub error: Option<String>,
+}
+
+impl CodexQuotaSnapshot {
+    pub fn unconfigured() -> Self {
+        Self {
+            status: "unconfigured".into(),
+            source_id: None,
+            source_label: None,
+            fetched_at: None,
+            plan_type: None,
+            windows: Vec::new(),
+            error: None,
+        }
+    }
+
+    pub fn unavailable(source_id: String, source_label: String, error: String) -> Self {
+        Self {
+            status: "unavailable".into(),
+            source_id: Some(source_id),
+            source_label: Some(source_label),
+            fetched_at: None,
+            plan_type: None,
+            windows: Vec::new(),
+            error: Some(error),
         }
     }
 }

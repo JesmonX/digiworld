@@ -32,6 +32,11 @@ and Pi session files on the local computer. Optional SSH sources reuse the
 system OpenSSH configuration and run an ephemeral Python 3 parser remotely;
 only normalized usage totals are returned.
 
+The plugin can also query one selected device's current ChatGPT Codex quota
+through the official local Codex App Server. The selected shell, optional
+pre-command, and refresh interval stay in plugin storage; authentication tokens
+and account identifiers are neither read nor retained by Digiworld.
+
 Network access can follow the operating-system proxy, use an unauthenticated
 HTTP/HTTPS/SOCKS5 proxy URL, or bypass proxies. The selected policy is used for
 the official catalog, plugin downloads, core updates, and plugin backends that

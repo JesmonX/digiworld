@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calendarCells, formatTokens, heatLevel } from './heatmap'
+import { calendarCells, formatTokens, heatLevel, weeklyUsage } from './heatmap'
 
 describe('calendar heatmap', () => {
   it('aligns Monday-first weeks and fills missing dates', () => {
@@ -23,5 +23,20 @@ describe('calendar heatmap', () => {
     expect(formatTokens(12_500)).toBe('12.5K')
     expect(formatTokens(200_000_000)).toBe('200M')
     expect(formatTokens(1_250_000_000)).toBe('1.25B')
+  })
+
+  it('builds a fixed seven-day series and only reports available cache rates', () => {
+    const points = weeklyUsage('2026-09-03', [{
+      day: '2026-09-02', inputTokens: 100, outputTokens: 10,
+      cacheReadTokens: 60, cacheWriteTokens: 0, totalTokens: 110,
+      cacheAvailable: true,
+    }])
+    expect(points).toHaveLength(7)
+    expect(points.map(point => point.day)).toEqual([
+      '2026-08-28', '2026-08-29', '2026-08-30', '2026-08-31',
+      '2026-09-01', '2026-09-02', '2026-09-03',
+    ])
+    expect(points[5]!.cacheRate).toBe(.6)
+    expect(points[6]!.cacheRate).toBeUndefined()
   })
 })

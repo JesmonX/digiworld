@@ -8,6 +8,7 @@ export type PluginPermission =
   | 'plugin-storage'
   | 'filesystem:agent-session-data'
   | 'process:ssh'
+  | 'process:shell'
   | `network:${string}`
   | `secret:${string}`
 
