@@ -9,11 +9,43 @@ interface PluginFrameProps {
   theme: PluginTheme
 }
 
-export function withHostTypography(html: string, typographyCss: string = hostTypographyCss): string {
-  const style = `<style data-digiworld-host-typography>${typographyCss}</style>`
+export function resolveTypographyUrls(css: string, baseUrl?: string): string {
+  if (!baseUrl) return css
+  return css.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g, (match, quote, url) => {
+    const trimmed = url.trim()
+    if (
+      trimmed.startsWith('data:') ||
+      trimmed.startsWith('http://') ||
+      trimmed.startsWith('https://') ||
+      trimmed.startsWith('blob:')
+    ) {
+      return match
+    }
+    try {
+      const resolved = new URL(trimmed, baseUrl).href
+      return `url(${quote || '"'}${resolved}${quote || '"'})`
+    } catch {
+      return match
+    }
+  })
+}
+
+export function withHostTypography(
+  html: string,
+  typographyCss: string = hostTypographyCss,
+  baseUrl?: string,
+): string {
+  const effectiveBase = baseUrl ?? (typeof document !== 'undefined' ? (document.baseURI || window.location.href) : '')
+  const resolvedCss = resolveTypographyUrls(typographyCss, effectiveBase)
+  const baseTag = effectiveBase && !/<base(?:\s[^>]*)?>/i.test(html)
+    ? `<base href="${effectiveBase}" />`
+    : ''
+  const style = `<style data-digiworld-host-typography>${resolvedCss}</style>`
+  const injection = `${baseTag}${style}`
+
   return /<head(?:\s[^>]*)?>/i.test(html)
-    ? html.replace(/<head(?:\s[^>]*)?>/i, match => `${match}${style}`)
-    : `${style}${html}`
+    ? html.replace(/<head(?:\s[^>]*)?>/i, match => `${match}${injection}`)
+    : `${injection}${html}`
 }
 
 export function PluginFrame({ pluginId, html, theme }: PluginFrameProps) {

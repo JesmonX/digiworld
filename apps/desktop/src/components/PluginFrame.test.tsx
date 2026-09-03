@@ -3,7 +3,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getAccentTheme, getFontTheme, pluginTheme } from '../theme'
-import { PluginFrame, withHostTypography } from './PluginFrame'
+import { PluginFrame, resolveTypographyUrls, withHostTypography } from './PluginFrame'
 
 describe('PluginFrame theme', () => {
   let container: HTMLDivElement
@@ -23,6 +23,21 @@ describe('PluginFrame theme', () => {
     expect(source).toContain('@font-face')
     expect(source).toContain('Digiworld Plex Sans SC')
     expect(source).toContain('<body></body>')
+  })
+
+  it('resolves relative font URLs against host baseUrl and injects base tag', () => {
+    const baseUrl = 'http://tauri.localhost/'
+    const css = '@font-face { font-family: "Digiworld Plex Sans SC"; src: url("/assets/IBMPlexSansSC-Regular.woff2") format("woff2"); }'
+    const resolved = resolveTypographyUrls(css, baseUrl)
+    expect(resolved).toContain('url("http://tauri.localhost/assets/IBMPlexSansSC-Regular.woff2")')
+
+    const source = withHostTypography(
+      '<!doctype html><html><head><title>Plugin</title></head><body></body></html>',
+      css,
+      baseUrl,
+    )
+    expect(source).toContain('<base href="http://tauri.localhost/" />')
+    expect(source).toContain('url("http://tauri.localhost/assets/IBMPlexSansSC-Regular.woff2")')
   })
 
   afterEach(() => container.remove())

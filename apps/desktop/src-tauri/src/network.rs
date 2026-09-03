@@ -124,17 +124,8 @@ pub fn configure_plugin_command(command: &mut tokio::process::Command, settings:
         }
         ProxyMode::Custom => {
             let value = settings.url.as_deref().unwrap_or_default();
-            if value.starts_with("socks5://") || value.starts_with("socks5h://") {
-                for name in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"] {
-                    command.env_remove(name);
-                }
-                for name in ["ALL_PROXY", "all_proxy"] {
-                    command.env(name, value);
-                }
-            } else {
-                for name in PROXY_ENVIRONMENT {
-                    command.env(name, value);
-                }
+            for name in PROXY_ENVIRONMENT {
+                command.env(name, value);
             }
         }
     }
@@ -191,5 +182,66 @@ mod tests {
                 None
             );
         }
+    }
+
+    #[test]
+    fn configures_plugin_command_environment_for_custom_and_direct() {
+        let mut custom_command = tokio::process::Command::new("test");
+        configure_plugin_command(
+            &mut custom_command,
+            &ProxySettings {
+                mode: ProxyMode::Custom,
+                url: Some("socks5://127.0.0.1:7890".into()),
+            },
+        );
+        let envs: std::collections::BTreeMap<_, _> = custom_command
+            .as_std()
+            .get_envs()
+            .map(|(k, v)| {
+                (
+                    k.to_string_lossy().to_string(),
+                    v.map(|s| s.to_string_lossy().to_string()),
+                )
+            })
+            .collect();
+        assert_eq!(
+            envs.get("DIGIWORLD_PROXY_MODE").and_then(|v| v.as_deref()),
+            Some("custom")
+        );
+        assert_eq!(
+            envs.get("HTTP_PROXY").and_then(|v| v.as_deref()),
+            Some("socks5://127.0.0.1:7890")
+        );
+        assert_eq!(
+            envs.get("ALL_PROXY").and_then(|v| v.as_deref()),
+            Some("socks5://127.0.0.1:7890")
+        );
+
+        let mut direct_command = tokio::process::Command::new("test");
+        direct_command.env("HTTP_PROXY", "socks5://127.0.0.1:7890");
+        configure_plugin_command(
+            &mut direct_command,
+            &ProxySettings {
+                mode: ProxyMode::Direct,
+                url: None,
+            },
+        );
+        let direct_envs: std::collections::BTreeMap<_, _> = direct_command
+            .as_std()
+            .get_envs()
+            .map(|(k, v)| {
+                (
+                    k.to_string_lossy().to_string(),
+                    v.map(|s| s.to_string_lossy().to_string()),
+                )
+            })
+            .collect();
+        assert_eq!(
+            direct_envs
+                .get("DIGIWORLD_PROXY_MODE")
+                .and_then(|v| v.as_deref()),
+            Some("direct")
+        );
+        assert_eq!(direct_envs.get("HTTP_PROXY"), Some(&None));
     }
 }

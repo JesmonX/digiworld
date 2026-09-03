@@ -15,7 +15,7 @@ struct NativeUsage {
 pub fn parse(agent: AgentKind, content: &str) -> (Vec<DailyUsage>, usize) {
     let mut daily = BTreeMap::<(String, String), TokenUsage>::new();
     let mut warnings = 0;
-    let mut codex_previous: Option<NativeUsage> = None;
+    let mut codex_previous = BTreeMap::<String, NativeUsage>::new();
     let mut current_model = String::from("unknown");
     for line in content.lines().filter(|line| !line.trim().is_empty()) {
         let value: Value = match serde_json::from_str(line) {
@@ -29,7 +29,7 @@ pub fn parse(agent: AgentKind, content: &str) -> (Vec<DailyUsage>, usize) {
             current_model = model;
         }
         let item = match agent {
-            AgentKind::Codex => parse_codex(&value, &mut codex_previous),
+            AgentKind::Codex => parse_codex(&value, &current_model, &mut codex_previous),
             AgentKind::Claude => parse_claude(&value),
             AgentKind::Pi => parse_pi(&value),
         };
@@ -69,7 +69,11 @@ fn model_name(agent: AgentKind, value: &Value) -> Option<String> {
     (!candidate.is_empty() && candidate != "<synthetic>").then(|| candidate.to_string())
 }
 
-fn parse_codex(value: &Value, previous: &mut Option<NativeUsage>) -> Option<(String, TokenUsage)> {
+fn parse_codex(
+    value: &Value,
+    model: &str,
+    previous_by_model: &mut BTreeMap<String, NativeUsage>,
+) -> Option<(String, TokenUsage)> {
     if value.get("type")?.as_str()? != "event_msg"
         || value.pointer("/payload/type")?.as_str()? != "token_count"
     {
@@ -82,6 +86,7 @@ fn parse_codex(value: &Value, previous: &mut Option<NativeUsage>) -> Option<(Str
         .pointer("/payload/info/last_token_usage")
         .and_then(native_codex);
     let native = if let Some(current) = total {
+        let previous = previous_by_model.get(model).copied();
         let delta = previous
             .map(|old| NativeUsage {
                 input: if current.input < old.input {
@@ -107,7 +112,7 @@ fn parse_codex(value: &Value, previous: &mut Option<NativeUsage>) -> Option<(Str
                 cache_available: current.cache_available,
             })
             .unwrap_or(current);
-        *previous = Some(current);
+        previous_by_model.insert(model.to_string(), current);
         delta
     } else {
         last?
@@ -271,5 +276,23 @@ mod tests {
         let (rows, warnings) = parse(AgentKind::Pi, "not-json\n{}");
         assert!(rows.is_empty());
         assert_eq!(warnings, 1);
+    }
+
+    #[test]
+    fn codex_tracks_deltas_separately_when_models_switch_in_the_same_session() {
+        let input = r#"{"timestamp":"2026-09-02T00:50:00Z","type":"turn_context","payload":{"model":"gpt-5.6-sol"}}
+{"timestamp":"2026-09-02T01:00:00Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"cached_input_tokens":60,"cache_write_input_tokens":0,"output_tokens":10}}}}
+{"timestamp":"2026-09-02T01:50:00Z","type":"turn_context","payload":{"model":"gpt-5.6-mini"}}
+{"timestamp":"2026-09-02T02:00:00Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":50,"cached_input_tokens":20,"cache_write_input_tokens":0,"output_tokens":5}}}}
+{"timestamp":"2026-09-02T02:50:00Z","type":"turn_context","payload":{"model":"gpt-5.6-sol"}}
+{"timestamp":"2026-09-02T03:00:00Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":160,"cached_input_tokens":90,"cache_write_input_tokens":0,"output_tokens":15}}}}"#;
+        let (rows, warnings) = parse(AgentKind::Codex, input);
+        assert_eq!(warnings, 0);
+        let sol = rows.iter().find(|r| r.model == "gpt-5.6-sol").unwrap();
+        let mini = rows.iter().find(|r| r.model == "gpt-5.6-mini").unwrap();
+        assert_eq!(sol.usage.input_tokens, 160);
+        assert_eq!(sol.usage.output_tokens, 15);
+        assert_eq!(mini.usage.input_tokens, 50);
+        assert_eq!(mini.usage.output_tokens, 5);
     }
 }

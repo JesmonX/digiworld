@@ -186,7 +186,7 @@ def add(rows, stamp, model, usage):
     target['cacheAvailable'] = target['cacheAvailable'] or bool(usage.get('cacheAvailable', False))
 
 def parse_file(agent, path):
-    rows, previous, invalid, model = {}, None, 0, 'unknown'
+    rows, previous, invalid, model = {}, {}, 0, 'unknown'
     with open(path, 'r', encoding='utf-8', errors='replace') as handle:
         for line in handle:
             if not line.strip(): continue
@@ -204,11 +204,12 @@ def parse_file(agent, path):
                 raw = info.get('total_token_usage') or info.get('last_token_usage')
                 if isinstance(raw, dict):
                     current = {'inputTokens': n(raw, 'input_tokens'), 'outputTokens': n(raw, 'output_tokens'), 'cacheReadTokens': n(raw, 'cached_input_tokens'), 'cacheWriteTokens': n(raw, 'cache_write_input_tokens'), 'cacheAvailable': 'cached_input_tokens' in raw or 'cache_write_input_tokens' in raw}
-                    if info.get('total_token_usage') and previous is not None:
-                        usage = {key: current[key] if current[key] < previous[key] else current[key] - previous[key] for key in ('inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens')}
+                    prev = previous.get(model)
+                    if info.get('total_token_usage') and prev is not None:
+                        usage = {key: current[key] if current[key] < prev[key] else current[key] - prev[key] for key in ('inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens')}
                         usage['cacheAvailable'] = current['cacheAvailable']
                     else: usage = current
-                    if info.get('total_token_usage'): previous = current
+                    if info.get('total_token_usage'): previous[model] = current
             elif agent == 'claude':
                 raw = message.get('usage') or value.get('usage')
                 stamp = stamp or message.get('timestamp')
