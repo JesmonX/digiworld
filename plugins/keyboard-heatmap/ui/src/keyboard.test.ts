@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getKeyboardLayout, keyboardLayouts, layoutKeys, numpadKeys } from './keyboard'
+import { formatKeyLabel, getKeyboardLayout, keyboardLayouts, layoutKeys, numpadKeys } from './keyboard'
 
 describe('keyboard layouts', () => {
   it('covers the mainstream 104, 87, 84, 68 and 61-key distributions', () => {
@@ -20,5 +20,13 @@ describe('keyboard layouts', () => {
     expect(numpadKeys.find(key => key.id === 'NumpadAdd')?.rowSpan).toBe(2)
     expect(numpadKeys.filter(key => key.id === 'NumpadEnter')).toHaveLength(1)
     expect(numpadKeys.find(key => key.id === 'NumpadEnter')?.rowSpan).toBe(2)
+  })
+
+  it('formats raw key identifiers into readable labels', () => {
+    expect(formatKeyLabel('KeyA')).toBe('A')
+    expect(formatKeyLabel('Digit1')).toBe('1')
+    expect(formatKeyLabel('Space')).toBe('空格')
+    expect(formatKeyLabel('BracketLeft')).toBe('[')
+    expect(formatKeyLabel('UnknownCustomKey')).toBe('UnknownCustomKey')
   })
 })

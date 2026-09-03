@@ -98,7 +98,12 @@ fn parse_codex(
     let last = value
         .pointer("/payload/info/last_token_usage")
         .and_then(native_codex);
-    let native = if let Some(current) = total {
+    let native = if let Some(last_usage) = last {
+        if let Some(current) = total {
+            previous_by_model.insert(model.to_string(), current);
+        }
+        last_usage
+    } else if let Some(current) = total {
         let previous = previous_by_model.get(model).copied();
         let delta = previous
             .map(|old| NativeUsage {
@@ -128,7 +133,7 @@ fn parse_codex(
         previous_by_model.insert(model.to_string(), current);
         delta
     } else {
-        last?
+        return None;
     };
     Some((
         timestamp(value)?,
@@ -695,6 +700,22 @@ mod tests {
         assert_eq!(sol.usage.output_tokens, 15);
         assert_eq!(mini.usage.input_tokens, 50);
         assert_eq!(mini.usage.output_tokens, 5);
+    }
+
+    #[test]
+    fn codex_prioritizes_last_token_usage_across_model_switches() {
+        let input = r#"{"timestamp":"2026-09-02T00:50:00Z","type":"turn_context","payload":{"model":"gpt-5.6-luna"}}
+{"timestamp":"2026-09-02T01:00:00Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":1000,"cached_input_tokens":600,"cache_write_input_tokens":0,"output_tokens":100},"last_token_usage":{"input_tokens":1000,"cached_input_tokens":600,"cache_write_input_tokens":0,"output_tokens":100}}}}
+{"timestamp":"2026-09-02T01:50:00Z","type":"turn_context","payload":{"model":"gpt-5.6-sol"}}
+{"timestamp":"2026-09-02T02:00:00Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":1500,"cached_input_tokens":900,"cache_write_input_tokens":0,"output_tokens":180},"last_token_usage":{"input_tokens":500,"cached_input_tokens":300,"cache_write_input_tokens":0,"output_tokens":80}}}}"#;
+        let (rows, warnings) = parse(AgentKind::Codex, input);
+        assert_eq!(warnings, 0);
+        let luna = rows.iter().find(|r| r.model == "gpt-5.6-luna").unwrap();
+        let sol = rows.iter().find(|r| r.model == "gpt-5.6-sol").unwrap();
+        assert_eq!(luna.usage.input_tokens, 1000);
+        assert_eq!(luna.usage.output_tokens, 100);
+        assert_eq!(sol.usage.input_tokens, 500);
+        assert_eq!(sol.usage.output_tokens, 80);
     }
 
     #[test]

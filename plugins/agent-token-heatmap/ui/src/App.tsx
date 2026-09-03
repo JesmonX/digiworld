@@ -335,7 +335,8 @@ function formatDuration(minutes: number | null): string {
 
 function formatReset(seconds: number | null): string {
   if (!seconds) return '未提供重置时间'
-  return `${new Date(seconds * 1000).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })} 重置`
+  const ms = seconds > 100_000_000_000 ? seconds : seconds * 1000
+  return `${new Date(ms).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })} 重置`
 }
 
 function formatFetchedAt(value: string | null): string {

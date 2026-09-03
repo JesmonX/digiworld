@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronDown, Download, Flame, Keyboard, Pause, Play, RotateCcw, Upload } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import {
-  getKeyboardLayout, keyboardLayouts, layoutKeys, type KeyboardLayoutId, type KeyDefinition,
+  formatKeyLabel, getKeyboardLayout, keyboardLayouts, layoutKeys, type KeyboardLayoutId, type KeyDefinition,
 } from './keyboard'
 import './styles.css'
 
@@ -177,7 +177,7 @@ export default function App() {
           <h2>高频键位</h2>
           <div className="ranking-list">
             {snapshot?.topTen.length
-              ? snapshot.topTen.map((entry, index) => <div key={entry.key}><b>{index + 1}</b><span>{entry.key}</span><i><em style={{ width: `${(entry.count / (snapshot.topTen[0]?.count || 1)) * 100}%` }} /></i><strong>{entry.count.toLocaleString()}</strong></div>)
+              ? snapshot.topTen.map((entry, index) => <div key={entry.key}><b>{index + 1}</b><span>{formatKeyLabel(entry.key)}</span><i><em style={{ width: `${(entry.count / (snapshot.topTen[0]?.count || 1)) * 100}%` }} /></i><strong>{entry.count.toLocaleString()}</strong></div>)
               : <p className="no-data">暂无数据</p>}
           </div>
         </article>

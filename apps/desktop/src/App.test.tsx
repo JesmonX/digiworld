@@ -10,6 +10,7 @@ import { FONT_THEME_STORAGE_KEY, FONT_WEIGHT_STORAGE_KEY } from './theme'
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const mocks = vi.hoisted(() => ({
+  catalog: vi.fn(),
   testProxySettings: vi.fn(),
   checkPluginUpdates: vi.fn(),
   installPluginUpdates: vi.fn(),
@@ -28,7 +29,7 @@ vi.mock('./lib/api', () => ({
       }],
       catalogSequence: 1, launchAtStartup: false,
     })),
-    catalog: vi.fn(async () => ({ schemaVersion: 1, sequence: 1, generatedAt: '', plugins: [] })),
+    catalog: mocks.catalog,
     proxySettings: vi.fn(async () => ({ mode: 'system' })),
     onUpdateProgress: vi.fn(async () => () => {}),
     setLaunchAtStartup: vi.fn(async () => {}),
@@ -56,6 +57,8 @@ describe('explicit update consent', () => {
   beforeEach(() => {
     container = document.createElement('div')
     document.body.append(container)
+    mocks.catalog.mockReset()
+    mocks.catalog.mockResolvedValue({ schemaVersion: 1, sequence: 1, generatedAt: '', plugins: [] })
     mocks.testProxySettings.mockReset()
     mocks.checkPluginUpdates.mockReset()
     mocks.installPluginUpdates.mockReset()
@@ -165,6 +168,39 @@ describe('explicit update consent', () => {
     const stylesheet = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8')
     expect(stylesheet).toMatch(/\.main \{[^}]*min-height: 0;/)
     expect(stylesheet).toMatch(/\.content \{[^}]*overflow: auto;/)
+    await act(async () => root.unmount())
+  })
+
+  it('disables installation and notifies user when catalog plugin is not supported on the current platform', async () => {
+    mocks.catalog.mockResolvedValue({
+      schemaVersion: 1,
+      sequence: 1,
+      generatedAt: '',
+      plugins: [{
+        id: 'unsupported.plugin',
+        version: '1.0.0',
+        name: '未适配插件',
+        description: '仅支持 macOS',
+        author: 'JesmonX',
+        minCoreVersion: '0.1.0',
+        permissions: [],
+        artifacts: [{
+          target: 'darwin-x86_64',
+          url: '',
+          sha256: '',
+          signature: '',
+          size: 100,
+        }],
+      }],
+    })
+    const root = createRoot(container)
+    await act(async () => { root.render(<App />); await flush() })
+    await act(async () => button(container, '功能库')?.click())
+    await flush()
+
+    expect(container.textContent).toContain('未适配插件')
+    const disabledBtn = container.querySelector<HTMLButtonElement>('button[disabled]')
+    expect(disabledBtn?.textContent).toContain('暂未适配当前系统')
     await act(async () => root.unmount())
   })
 })

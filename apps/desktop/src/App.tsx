@@ -199,7 +199,7 @@ function App() {
 
           <section className="content">
             {page === 'home' && <Home plugins={state?.plugins ?? []} onCatalog={() => setPage('catalog')} onOpen={id => setPage({ pluginId: id })} />}
-            {page === 'catalog' && <Catalog catalog={catalog} installed={installed} busy={busy} onInstall={setConfirmInstall} onRefresh={() => refreshCatalog(true)} onOpen={id => setPage({ pluginId: id })} />}
+            {page === 'catalog' && <Catalog catalog={catalog} installed={installed} busy={busy} onInstall={setConfirmInstall} onRefresh={() => refreshCatalog(true)} onOpen={id => setPage({ pluginId: id })} currentTarget={state?.target} />}
             {page === 'settings' && state && <SettingsPage state={state} progress={updateProgress} onProgressReset={() => setUpdateProgress(null)} onPluginsUpdated={refreshState} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} fontThemeId={fontThemeId} onFontThemeChange={setFontThemeId} fontWeight={fontWeight} onFontWeightChange={setFontWeight} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
             {pluginOpen && (
               !selectedPlugin ? <Loading label="载入插件" />
@@ -250,7 +250,7 @@ function Home({ plugins, onCatalog, onOpen }: { plugins: PluginSummary[]; onCata
   )
 }
 
-function Catalog({ catalog, installed, busy, onInstall, onRefresh, onOpen }: { catalog: CatalogIndex | null; installed: Map<string, PluginSummary>; busy: string | null; onInstall(plugin: CatalogPlugin): void; onRefresh(): void; onOpen(id: string): void }) {
+function Catalog({ catalog, installed, busy, onInstall, onRefresh, onOpen, currentTarget }: { catalog: CatalogIndex | null; installed: Map<string, PluginSummary>; busy: string | null; onInstall(plugin: CatalogPlugin): void; onRefresh(): void; onOpen(id: string): void; currentTarget?: string | undefined }) {
   if (!catalog) return <Loading label="载入功能库" />
   return (
     <div>
@@ -261,6 +261,7 @@ function Catalog({ catalog, installed, busy, onInstall, onRefresh, onOpen }: { c
       <div className="catalog-grid">
         {catalog.plugins.map(plugin => {
           const current = installed.get(plugin.id)
+          const supported = !currentTarget || plugin.artifacts.length === 0 || plugin.artifacts.some(artifact => artifact.target === currentTarget)
           return (
             <article className="catalog-card" key={plugin.id}>
               <div className="catalog-title"><span className="catalog-icon"><Boxes /></span><small>v{plugin.version}</small></div>
@@ -268,7 +269,9 @@ function Catalog({ catalog, installed, busy, onInstall, onRefresh, onOpen }: { c
               <p>{plugin.description}</p>
               {current
                 ? <button className="secondary full" onClick={() => onOpen(plugin.id)}>打开 <ChevronRight /></button>
-                : <button className="primary full" disabled={busy === plugin.id} onClick={() => onInstall(plugin)}>{busy === plugin.id ? <LoaderCircle className="spin" /> : <Download />}安装</button>}
+                : !supported
+                  ? <button className="secondary full" disabled title={`该插件暂未适配当前系统架构 (${currentTarget})`}>暂未适配当前系统</button>
+                  : <button className="primary full" disabled={busy === plugin.id} onClick={() => onInstall(plugin)}>{busy === plugin.id ? <LoaderCircle className="spin" /> : <Download />}安装</button>}
             </article>
           )
         })}

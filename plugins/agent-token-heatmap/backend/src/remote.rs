@@ -307,15 +307,20 @@ def parse_file(agent, path):
             if candidate: model = candidate
             if agent == 'codex' and value.get('type') == 'event_msg' and (value.get('payload') or {}).get('type') == 'token_count':
                 info = ((value.get('payload') or {}).get('info') or {})
-                raw = info.get('total_token_usage') or info.get('last_token_usage')
-                if isinstance(raw, dict):
-                    current = {'inputTokens': n(raw, 'input_tokens'), 'outputTokens': n(raw, 'output_tokens'), 'cacheReadTokens': n(raw, 'cached_input_tokens'), 'cacheWriteTokens': n(raw, 'cache_write_input_tokens'), 'cacheAvailable': 'cached_input_tokens' in raw or 'cache_write_input_tokens' in raw}
+                last_raw = info.get('last_token_usage')
+                tot_raw = info.get('total_token_usage')
+                if isinstance(last_raw, dict):
+                    usage = {'inputTokens': n(last_raw, 'input_tokens'), 'outputTokens': n(last_raw, 'output_tokens'), 'cacheReadTokens': n(last_raw, 'cached_input_tokens'), 'cacheWriteTokens': n(last_raw, 'cache_write_input_tokens'), 'cacheAvailable': 'cached_input_tokens' in last_raw or 'cache_write_input_tokens' in last_raw}
+                    if isinstance(tot_raw, dict):
+                        previous[model] = {'inputTokens': n(tot_raw, 'input_tokens'), 'outputTokens': n(tot_raw, 'output_tokens'), 'cacheReadTokens': n(tot_raw, 'cached_input_tokens'), 'cacheWriteTokens': n(tot_raw, 'cache_write_input_tokens'), 'cacheAvailable': 'cached_input_tokens' in tot_raw or 'cache_write_input_tokens' in tot_raw}
+                elif isinstance(tot_raw, dict):
+                    current = {'inputTokens': n(tot_raw, 'input_tokens'), 'outputTokens': n(tot_raw, 'output_tokens'), 'cacheReadTokens': n(tot_raw, 'cached_input_tokens'), 'cacheWriteTokens': n(tot_raw, 'cache_write_input_tokens'), 'cacheAvailable': 'cached_input_tokens' in tot_raw or 'cache_write_input_tokens' in tot_raw}
                     prev = previous.get(model)
-                    if info.get('total_token_usage') and prev is not None:
+                    if prev is not None:
                         usage = {key: current[key] if current[key] < prev[key] else current[key] - prev[key] for key in ('inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens')}
                         usage['cacheAvailable'] = current['cacheAvailable']
                     else: usage = current
-                    if info.get('total_token_usage'): previous[model] = current
+                    previous[model] = current
             elif agent == 'claude':
                 raw = message.get('usage') or value.get('usage')
                 stamp = stamp or message.get('timestamp')

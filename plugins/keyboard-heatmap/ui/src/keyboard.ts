@@ -104,3 +104,14 @@ export function getKeyboardLayout(id: KeyboardLayoutId): KeyboardLayout {
 export function layoutKeys(layout: KeyboardLayout): KeyDefinition[] {
   return [...layout.functionRow, ...layout.alphaRows.flat(), ...layout.navRows.flat(), ...layout.numpadKeys]
 }
+
+const fullLayout = getKeyboardLayout('full')
+const keyLabelMap = new Map(layoutKeys(fullLayout).map(key => [key.id, key.label]))
+
+export function formatKeyLabel(keyId: string): string {
+  if (keyId === 'Space') return '空格'
+  const label = keyLabelMap.get(keyId)
+  if (label && label.length > 0) return label
+  return keyId
+}
+
