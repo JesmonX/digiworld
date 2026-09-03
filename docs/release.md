@@ -22,7 +22,7 @@ same Pages deployment publishes the signed plugin catalog.
 
 Every push to `main` automatically builds an Alpha prerelease using the current
 root package version and the workflow run number, for example
-`v0.2.2-alpha.18`. Alpha releases are GitHub prereleases and are not marked as
+`v0.2.4-alpha.18`. Alpha releases are GitHub prereleases and are not marked as
 the latest release. They do not deploy `latest.json` or the plugin catalog to
 GitHub Pages, so ordinary installations remain on the manually published
 Preview update channel. A newer push cancels an older Alpha build that is still
