@@ -34,16 +34,15 @@ button svg { width: 14px; height: 14px; }
 .filter-chip { height: 28px; display: inline-flex; align-items: center; gap: 4px; padding: 0 9px; border: 1px solid var(--dw-border, #dde3ec); border-radius: 6px; color: #4b5565; background: #fafbfc; font-size: 11px; }
 .filter-chip.active { border-color: color-mix(in srgb, var(--dw-accent, #5b5ce2) 32%, var(--dw-border, #dde3ec)); color: var(--dw-accent-strong, #4338ca); background: var(--dw-accent-soft, #ededff); }
 .filter-chip svg { width: 11px; height: 11px; }
-.range-group { margin-left: auto; display: flex; padding: 3px; border-radius: 7px; background: var(--dw-surface-subtle, #f0f3f8); }
+.range-group { display: flex; padding: 3px; border-radius: 7px; background: var(--dw-surface-subtle, #f0f3f8); }
 .range-group button { height: 26px; padding: 0 9px; border: 0; border-radius: 5px; color: var(--dw-text-muted, #667085); background: transparent; font-size: 10px; font-weight: 600; }
 .range-group button.active { color: var(--dw-accent-strong, #4338ca); background: #fff; box-shadow: 0 1px 3px rgba(24,32,46,.11); }
-.summary-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
-.summary-card { min-height: 72px; display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--dw-border, #dde3ec); border-radius: 9px; background: var(--dw-surface, #fff); }
-.summary-card > span { width: 30px; height: 30px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 7px; color: var(--dw-accent, #5b5ce2); background: var(--dw-accent-soft, #ededff); }
-.summary-card svg { width: 15px; height: 15px; }
-.summary-card small, .summary-card strong { display: block; }
-.summary-card small { margin-bottom: 4px; color: var(--dw-text-muted, #667085); font-size: 10px; white-space: nowrap; }
-.summary-card strong { overflow: hidden; font-size: 16px; font-weight: 670; text-overflow: ellipsis; }
+.summary-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1px; overflow: hidden; margin-bottom: 14px; border-block: 1px solid #e7ebf1; background: #e7ebf1; }
+.summary-item { min-width: 0; min-height: 58px; display: flex; flex-direction: column; justify-content: center; padding: 9px 12px; background: #fafbfc; }
+.summary-item small, .summary-item strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.summary-item small { margin-bottom: 4px; color: var(--dw-text-muted, #667085); font-size: 10px; }
+.summary-item strong { font-size: 16px; font-weight: 670; }
+.summary-item:first-child strong { color: var(--dw-accent-strong, #4338ca); }
 .heatmap-card, .breakdown-card, .daily-ranking-card, .model-card, .weekly-card, .quota-card { border: 1px solid var(--dw-border, #dde3ec); border-radius: 10px; background: var(--dw-surface, #fff); }
 .insights-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(285px, .8fr); gap: 10px; margin-bottom: 10px; }
 .weekly-card, .quota-card { min-height: 278px; padding: 14px 15px 12px; }
@@ -68,7 +67,7 @@ button svg { width: 14px; height: 14px; }
 .quota-window strong { font-size: 15px; font-weight: 680; }
 .quota-window span { color: #4b5565; font-size: 10px; }
 .quota-track { height: 7px; margin: 7px 0 6px; overflow: hidden; border-radius: 5px; background: #e9edf3; }
-.quota-track i { display: block; height: 100%; margin-left: auto; border-radius: inherit; background: linear-gradient(90deg, var(--dw-accent, #5b5ce2), var(--dw-accent-secondary, #8b5cf6)); }
+.quota-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--dw-accent, #5b5ce2), var(--dw-accent-secondary, #8b5cf6)); }
 .quota-window small { display: flex; align-items: center; gap: 4px; color: var(--dw-text-muted, #667085); font-size: 9px; }
 .quota-window small svg { width: 11px; height: 11px; }
 .quota-meta { margin-top: 13px; padding-top: 8px; border-top: 1px solid #eef1f5; color: var(--dw-text-muted, #667085); font-size: 9px; }
@@ -79,8 +78,9 @@ button svg { width: 14px; height: 14px; }
 .quota-empty button { height: 28px; padding: 0 9px; border: 1px solid var(--dw-border, #dde3ec); border-radius: 6px; color: var(--dw-accent-strong, #4338ca); background: #fff; font-size: 10px; }
 .quota-empty.error > svg, .quota-empty.error { color: #a6241d; }
 .heatmap-card { padding: 14px 15px 12px; }
-.card-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
+.card-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
 .card-title h2, .breakdown-card h2, .daily-ranking-card h2 { margin: 0 0 3px; font-size: 13px; font-weight: 650; }
+.heatmap-controls { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 .card-title select { height: 31px; padding: 0 27px 0 9px; border: 1px solid var(--dw-border, #dde3ec); border-radius: 6px; color: #3e4a5d; background: #fff; font-size: 11px; }
 .calendar-wrap { position: relative; min-height: 135px; overflow-x: auto; padding: 0 0 23px 24px; }
 .calendar-grid { height: 112px; display: grid; grid-template-rows: repeat(7, 12px); grid-auto-flow: column; grid-auto-columns: 12px; gap: 4px; width: max-content; min-width: 100%; }
@@ -159,4 +159,5 @@ button.icon.danger { color: var(--dw-danger, #d92d20); }
 .dialog-error { margin-bottom: 10px; padding: 8px 10px; border-radius: 7px; color: #a6241d; background: #fff0ef; font-size: 11px; }
 .dialog-success { margin-top: 10px; padding: 8px 10px; border-radius: 7px; color: #176b45; background: #ebf8f1; font-size: 11px; }
 .source-modal > footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 15px; }
-@media (max-width: 950px) { .summary-grid { grid-template-columns: repeat(3, 1fr); } .insights-grid, .lower-grid { grid-template-columns: 1fr; } .quota-setting-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 950px) { .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .insights-grid, .lower-grid { grid-template-columns: 1fr; } .quota-setting-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .card-title { align-items: stretch; flex-direction: column; } .heatmap-controls { justify-content: flex-start; } .range-group { width: 100%; } .range-group button { flex: 1; padding-inline: 4px; } .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, BarChart3, Check, Clock3, Cloud, Cpu, Database, Gauge, HardDrive, Plus, RefreshCw, Server, Settings2, Trash2, X } from 'lucide-react'
+import { AlertTriangle, BarChart3, Check, Clock3, Database, Gauge, HardDrive, Plus, RefreshCw, Server, Settings2, Trash2, X } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import { calendarCells, formatTokens, heatLevel, weeklyUsage, type Metric, type UsageDay, type WeeklyUsagePoint } from './heatmap'
 import './styles.css'
@@ -130,12 +130,12 @@ export default function App() {
     }
   }
 
-  const loadQuota = useCallback(async () => {
+  const loadQuota = useCallback(async (force = false) => {
     const sourceId = settings?.codexQuota.sourceId ?? null
     setQuotaLoading(true)
     setQuota(current => current?.sourceId === sourceId ? current : null)
     try {
-      const next = await bridge.request<CodexQuotaSnapshot>('usage.getCodexQuota')
+      const next = await bridge.request<CodexQuotaSnapshot>('usage.getCodexQuota', { force })
       setQuota(current => next.status === 'unavailable' && current?.sourceId === next.sourceId && (current.status === 'ready' || current.status === 'stale')
         ? { ...current, status: 'stale', error: next.error }
         : next)
@@ -202,25 +202,29 @@ export default function App() {
       <section className="filter-bar">
         <FilterGroup label="Agent">{AGENTS.map(agent => <FilterChip key={agent} active={agents.includes(agent)} label={agentLabel[agent]} onClick={() => toggleAgent(agent)} />)}</FilterGroup>
         <FilterGroup label="设备">{sourceOptions.map(source => <FilterChip key={source.id} active={sources.includes(source.id)} label={source.label} onClick={() => toggleSource(source.id)} />)}</FilterGroup>
-        <div className="range-group">{(['30', '90', '365', 'all'] as Range[]).map(value => <button key={value} className={range === value ? 'active' : ''} onClick={() => setRange(value)}>{value === 'all' ? '全部' : `${value} 天`}</button>)}</div>
-      </section>
-
-      <section className="summary-grid">
-        <Summary icon={<Cpu />} label="总 Token" value={snapshot?.totals.totalTokens} />
-        <Summary icon={<HardDrive />} label="输入" value={snapshot?.totals.inputTokens} />
-        <Summary icon={<Cloud />} label="输出" value={snapshot?.totals.outputTokens} />
-        <Summary icon={<Database />} label="缓存读取" value={snapshot?.totals.cacheReadTokens} />
-        <Summary icon={<Database />} label="缓存写入" value={snapshot?.totals.cacheWriteTokens} />
-        <Summary icon={<Check />} label="缓存率" text={snapshot?.totals.cacheRate == null ? '—' : `${(snapshot.totals.cacheRate * 100).toFixed(1)}%`} />
       </section>
 
       <section className="insights-grid">
         <WeeklyChart points={weekly} />
-        <QuotaCard quota={quota} loading={quotaLoading} configured={Boolean(settings?.codexQuota.sourceId)} onRefresh={() => void loadQuota()} onConfigure={() => setSettingsOpen(true)} />
+        <QuotaCard quota={quota} loading={quotaLoading} configured={Boolean(settings?.codexQuota.sourceId)} onRefresh={() => void loadQuota(true)} onConfigure={() => setSettingsOpen(true)} />
       </section>
 
       <section className="heatmap-card">
-        <div className="card-title"><div><h2>每日热力图</h2><p>{snapshot?.startDay ?? snapshot?.days[0]?.day ?? '—'} 至 {snapshot?.endDay ?? '—'}</p></div><select value={metric} onChange={event => setMetric(event.target.value as Metric)}><option value="totalTokens">总 Token</option><option value="inputTokens">输入</option><option value="outputTokens">输出</option><option value="cacheReadTokens">缓存读取</option></select></div>
+        <div className="card-title">
+          <div><h2>每日热力图</h2><p>{snapshot?.startDay ?? snapshot?.days[0]?.day ?? '—'} 至 {snapshot?.endDay ?? '—'}</p></div>
+          <div className="heatmap-controls">
+            <div className="range-group" aria-label="统计范围">{(['30', '90', '365', 'all'] as Range[]).map(value => <button key={value} className={range === value ? 'active' : ''} onClick={() => setRange(value)}>{value === 'all' ? '全部' : `${value} 天`}</button>)}</div>
+            <select aria-label="热力图指标" value={metric} onChange={event => setMetric(event.target.value as Metric)}><option value="totalTokens">总 Token</option><option value="inputTokens">输入</option><option value="outputTokens">输出</option><option value="cacheReadTokens">缓存读取</option></select>
+          </div>
+        </div>
+        <div className="summary-grid" aria-label="所选范围用量汇总">
+          <Summary label="总 Token" value={snapshot?.totals.totalTokens} />
+          <Summary label="输入" value={snapshot?.totals.inputTokens} />
+          <Summary label="输出" value={snapshot?.totals.outputTokens} />
+          <Summary label="缓存读取" value={snapshot?.totals.cacheReadTokens} />
+          <Summary label="缓存写入" value={snapshot?.totals.cacheWriteTokens} />
+          <Summary label="缓存率" text={snapshot?.totals.cacheRate == null ? '—' : `${(snapshot.totals.cacheRate * 100).toFixed(1)}%`} />
+        </div>
         {snapshot && cells.length ? <div className="calendar-wrap"><div className="weekday-labels"><span>一</span><span>三</span><span>五</span><span>日</span></div><div className="calendar-grid">{cells.map((cell, index) => <i key={cell.day ?? `blank-${index}`} className={`level-${heatLevel(cell.value, max)} ${cell.day ? '' : 'blank'}`} title={cell.day ? `${cell.day} · ${formatTokens(cell.value)}` : undefined} />)}</div><div className="legend"><span>低</span>{[0, 1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>高</span></div></div> : <Empty />}
       </section>
 
@@ -324,7 +328,7 @@ function formatFetchedAt(value: string | null): string {
 
 function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) { return <div className="filter-group"><span>{label}</span>{children}</div> }
 function FilterChip({ active, label, onClick }: { active: boolean; label: string; onClick(): void }) { return <button className={`filter-chip ${active ? 'active' : ''}`} aria-pressed={active} onClick={onClick}>{active && <Check />}{label}</button> }
-function Summary({ icon, label, value, text }: { icon: React.ReactNode; label: string; value?: number | undefined; text?: string }) { return <article className="summary-card"><span>{icon}</span><div><small>{label}</small><strong>{text ?? formatTokens(value ?? 0)}</strong></div></article> }
+function Summary({ label, value, text }: { label: string; value?: number | undefined; text?: string }) { return <div className="summary-item"><small>{label}</small><strong>{text ?? formatTokens(value ?? 0)}</strong></div> }
 function Empty() { return <div className="empty"><Database /><span>暂无数据，点击“手动刷新”开始扫描</span></div> }
 
 function SourceDialog({ settings, refreshRunning, onClose, onSave, onScan, onQuotaTest }: { settings: UsageSettings; refreshRunning: boolean; onClose(): void; onSave(value: UsageSettings): Promise<void>; onScan(source: SshSource): Promise<void>; onQuotaTest(value: UsageSettings): Promise<CodexQuotaSnapshot> }) {

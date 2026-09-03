@@ -81,7 +81,13 @@ fn handle(engine: &UsageEngine, method: &str, params: Value) -> Result<Value> {
             Ok(serde_json::to_value(engine.test_ssh(source)?)?)
         }
         "usage.refreshStatus" => Ok(serde_json::to_value(engine.refresh_status())?),
-        "usage.getCodexQuota" => Ok(serde_json::to_value(engine.codex_quota()?)?),
+        "usage.getCodexQuota" => {
+            let force = params
+                .get("force")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            Ok(serde_json::to_value(engine.codex_quota(force)?)?)
+        }
         "usage.testCodexQuota" => {
             let settings: UsageSettings =
                 serde_json::from_value(params.get("settings").cloned().unwrap_or(params))

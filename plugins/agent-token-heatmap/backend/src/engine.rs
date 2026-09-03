@@ -9,11 +9,27 @@ use anyhow::{Result, bail};
 use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 #[derive(Clone)]
 pub struct UsageEngine {
     database: Arc<Mutex<Database>>,
     refresh: Arc<Mutex<RefreshStatus>>,
+    quota_cache: Arc<Mutex<Option<CachedCodexQuota>>>,
+}
+
+#[derive(Clone)]
+struct CachedCodexQuota {
+    snapshot: CodexQuotaSnapshot,
+    cached_at: Instant,
+}
+
+impl CachedCodexQuota {
+    fn is_fresh(&self, refresh_interval_seconds: Option<u64>, now: Instant) -> bool {
+        refresh_interval_seconds.is_none_or(|seconds| {
+            now.saturating_duration_since(self.cached_at) < Duration::from_secs(seconds)
+        })
+    }
 }
 
 enum RefreshSource {
@@ -26,6 +42,7 @@ impl UsageEngine {
         Ok(Self {
             database: Arc::new(Mutex::new(Database::open(path)?)),
             refresh: Arc::new(Mutex::new(RefreshStatus::default())),
+            quota_cache: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -42,6 +59,7 @@ impl UsageEngine {
             .lock()
             .expect("database lock poisoned")
             .save_settings(&settings)?;
+        *self.quota_cache.lock().expect("quota cache lock poisoned") = None;
         Ok(settings)
     }
 
@@ -51,8 +69,29 @@ impl UsageEngine {
         database.snapshot(&request, &settings)
     }
 
-    pub fn codex_quota(&self) -> Result<CodexQuotaSnapshot> {
-        self.query_codex_quota(self.settings()?)
+    pub fn codex_quota(&self, force: bool) -> Result<CodexQuotaSnapshot> {
+        let settings = self.settings()?;
+        if !force {
+            let cached = self
+                .quota_cache
+                .lock()
+                .expect("quota cache lock poisoned")
+                .clone();
+            if let Some(cached) = cached
+                && cached.is_fresh(
+                    settings.codex_quota.refresh_interval_seconds,
+                    Instant::now(),
+                )
+            {
+                return Ok(cached.snapshot);
+            }
+        }
+        let snapshot = self.query_codex_quota(settings)?;
+        *self.quota_cache.lock().expect("quota cache lock poisoned") = Some(CachedCodexQuota {
+            snapshot: snapshot.clone(),
+            cached_at: Instant::now(),
+        });
+        Ok(snapshot)
     }
 
     pub fn test_codex_quota(&self, mut settings: UsageSettings) -> Result<CodexQuotaSnapshot> {
@@ -329,5 +368,48 @@ mod tests {
         .unwrap();
         assert_eq!(settings.codex_quota.source_id.as_deref(), Some("local"));
         assert_eq!(settings.codex_quota.refresh_interval_seconds, Some(60));
+    }
+
+    #[test]
+    fn quota_cache_uses_the_refresh_interval_and_supports_disabled_refresh() {
+        let cached_at = Instant::now();
+        let cached = CachedCodexQuota {
+            snapshot: CodexQuotaSnapshot::unconfigured(),
+            cached_at,
+        };
+        assert!(cached.is_fresh(Some(60), cached_at + Duration::from_secs(59)));
+        assert!(!cached.is_fresh(Some(60), cached_at + Duration::from_secs(60)));
+        assert!(cached.is_fresh(None, cached_at + Duration::from_secs(86_400)));
+    }
+
+    #[test]
+    fn saving_settings_invalidates_the_quota_cache() {
+        let path = std::env::temp_dir().join(format!(
+            "digiworld-agent-token-quota-cache-{}-{}.db",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let engine = UsageEngine::open(&path).unwrap();
+        *engine
+            .quota_cache
+            .lock()
+            .expect("quota cache lock poisoned") = Some(CachedCodexQuota {
+            snapshot: CodexQuotaSnapshot::unconfigured(),
+            cached_at: Instant::now(),
+        });
+
+        engine.save_settings(UsageSettings::default()).unwrap();
+        assert!(
+            engine
+                .quota_cache
+                .lock()
+                .expect("quota cache lock poisoned")
+                .is_none()
+        );
+        drop(engine);
+        let _ = std::fs::remove_file(path);
     }
 }
