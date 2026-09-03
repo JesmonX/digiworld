@@ -7,16 +7,20 @@ pub enum AgentKind {
     Codex,
     Claude,
     Pi,
+    Zcode,
+    Agy,
 }
 
 impl AgentKind {
-    pub const ALL: [Self; 3] = [Self::Codex, Self::Claude, Self::Pi];
+    pub const ALL: [Self; 5] = [Self::Codex, Self::Claude, Self::Pi, Self::Zcode, Self::Agy];
 
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Codex => "codex",
             Self::Claude => "claude",
             Self::Pi => "pi",
+            Self::Zcode => "zcode",
+            Self::Agy => "agy",
         }
     }
 }

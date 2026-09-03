@@ -19,8 +19,8 @@ metadata under its own privacy terms.
 Diagnostic logs stay on the local computer, omit individual key events and
 credentials, and are exported only when the user explicitly requests it.
 
-The optional Agent Token Heatmap plugin reads Codex, Claude Code, and Pi
-session files only when the user starts a scan. It extracts timestamps and
+The optional Agent Token Heatmap plugin reads Codex, Claude Code, Pi,
+ZCode, and Antigravity (agy) session files only when the user starts a scan. It extracts timestamps and
 input, output, cache-read, and cache-write token counts. It stores aggregated
 daily counts, source identifiers, hashed file paths, and scan fingerprints;
 it does not store prompts, responses, tool payloads, project paths, SSH

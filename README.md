@@ -28,7 +28,7 @@ pnpm dev
 ```
 
 The Agent Token Heatmap plugin reads usage metadata from Codex, Claude Code,
-and Pi session files on the local computer. Optional SSH sources reuse the
+Pi, ZCode, and Antigravity (agy) session files on the local computer. Optional SSH sources reuse the
 system OpenSSH configuration and run an ephemeral Python 3 parser remotely;
 only normalized usage totals are returned.
 

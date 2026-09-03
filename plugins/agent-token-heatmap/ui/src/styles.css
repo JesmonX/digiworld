@@ -114,7 +114,7 @@ i.level-1 { background: color-mix(in srgb, var(--dw-accent, #5b5ce2) 14%, white)
 .breakdown-table b { text-align: right; font-weight: var(--weight-semibold); font-feature-settings: "tnum" 1; }
 .breakdown-table small { text-align: right; }
 .agent-dot { width: 7px; height: 7px; display: block; border-radius: 50%; }
-.agent-dot.codex { background: #111827; } .agent-dot.claude { background: #d97745; } .agent-dot.pi { background: #6d5bd0; }
+.agent-dot.codex { background: #111827; } .agent-dot.claude { background: #d97745; } .agent-dot.pi { background: #6d5bd0; } .agent-dot.zcode { background: #0284c7; } .agent-dot.agy { background: #10b981; }
 .daily-ranking { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .daily-ranking > div { display: grid; grid-template-columns: 18px 78px minmax(45px, 1fr) 62px; align-items: center; gap: 7px; min-height: 20px; font-size: var(--type-caption); }
 .daily-ranking b { color: #8993a3; font-weight: var(--weight-semibold); }

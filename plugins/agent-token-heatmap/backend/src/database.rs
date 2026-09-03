@@ -8,7 +8,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-const PARSER_VERSION: i64 = 2;
+const PARSER_VERSION: i64 = 3;
 const DATABASE_VERSION: i64 = 2;
 
 pub struct Database {
@@ -428,6 +428,8 @@ fn parse_agent(value: &str) -> Option<AgentKind> {
         "codex" => Some(AgentKind::Codex),
         "claude" => Some(AgentKind::Claude),
         "pi" => Some(AgentKind::Pi),
+        "zcode" => Some(AgentKind::Zcode),
+        "agy" => Some(AgentKind::Agy),
         _ => None,
     }
 }

@@ -6,7 +6,7 @@ import './styles.css'
 
 const PLUGIN_ID = 'io.github.jesmonx.digiworld.agent-token-heatmap'
 const bridge = createPluginBridge(PLUGIN_ID)
-const AGENTS = ['codex', 'claude', 'pi'] as const
+const AGENTS = ['codex', 'claude', 'pi', 'zcode', 'agy'] as const
 type Agent = typeof AGENTS[number]
 type Range = '30' | '90' | '365' | 'all'
 
@@ -67,9 +67,19 @@ interface RefreshStatus {
   errors: string[]
 }
 
-const agentLabel: Record<Agent, string> = { codex: 'Codex', claude: 'Claude Code', pi: 'Pi' }
+const agentLabel: Record<Agent, string> = {
+  codex: 'Codex',
+  claude: 'Claude Code',
+  pi: 'Pi',
+  zcode: 'ZCode',
+  agy: 'Antigravity (agy)',
+}
 const defaultRoot: Record<Agent, string> = {
-  codex: '~/.codex/sessions', claude: '~/.claude/projects', pi: '~/.pi/agent/sessions',
+  codex: '~/.codex/sessions',
+  claude: '~/.claude/projects',
+  pi: '~/.pi/agent/sessions',
+  zcode: '~/.zcode/cli',
+  agy: '~/.gemini/antigravity-cli/conversations',
 }
 
 export default function App() {

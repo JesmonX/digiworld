@@ -16,6 +16,8 @@ pub fn default_root(agent: AgentKind) -> PathBuf {
         AgentKind::Codex => home.join(".codex/sessions"),
         AgentKind::Claude => home.join(".claude/projects"),
         AgentKind::Pi => home.join(".pi/agent/sessions"),
+        AgentKind::Zcode => home.join(".zcode/cli"),
+        AgentKind::Agy => home.join(".gemini/antigravity-cli/conversations"),
     }
 }
 
@@ -24,6 +26,8 @@ pub fn default_remote_root(agent: AgentKind) -> &'static str {
         AgentKind::Codex => "~/.codex/sessions",
         AgentKind::Claude => "~/.claude/projects",
         AgentKind::Pi => "~/.pi/agent/sessions",
+        AgentKind::Zcode => "~/.zcode/cli",
+        AgentKind::Agy => "~/.gemini/antigravity-cli/conversations",
     }
 }
 
@@ -48,7 +52,7 @@ pub fn scan_local(
             continue;
         }
         let mut paths = Vec::new();
-        collect_jsonl(&root, &mut paths)?;
+        collect_session_files(&root, &mut paths)?;
         let mut seen = Vec::new();
         for path in paths {
             let relative = path.strip_prefix(&root).unwrap_or(&path);
@@ -75,18 +79,38 @@ pub fn scan_local(
                 seen.push(hash);
                 continue;
             }
-            let content = match fs::read_to_string(&path) {
-                Ok(content) => content,
-                Err(error) => {
-                    batch.warnings.push(format!(
-                        "{} skipped an unreadable session file: {error}",
-                        agent.as_str()
-                    ));
-                    continue;
+
+            let is_sqlite = path
+                .extension()
+                .is_some_and(|ext| ext == "db" || ext == "sqlite");
+
+            let (daily, invalid) = if is_sqlite {
+                match parsers::parse_sqlite(agent, &path) {
+                    Ok(parsed) => parsed,
+                    Err(error) => {
+                        batch.warnings.push(format!(
+                            "{} skipped an unreadable database file: {error}",
+                            agent.as_str()
+                        ));
+                        continue;
+                    }
                 }
+            } else {
+                let content = match fs::read_to_string(&path) {
+                    Ok(content) => content,
+                    Err(error) => {
+                        batch.warnings.push(format!(
+                            "{} skipped an unreadable session file: {error}",
+                            agent.as_str()
+                        ));
+                        continue;
+                    }
+                };
+                parsers::parse(agent, &content)
             };
+
             seen.push(hash.clone());
-            let (daily, invalid) = parsers::parse(agent, &content);
+
             if invalid > 0 {
                 batch.warnings.push(format!(
                     "{} skipped {invalid} malformed record(s)",
@@ -114,22 +138,37 @@ pub fn file_hash(agent: AgentKind, relative: &Path) -> String {
     hex_string(&digest.finalize())
 }
 
-fn collect_jsonl(root: &Path, output: &mut Vec<PathBuf>) -> Result<()> {
+fn collect_session_files(root: &Path, output: &mut Vec<PathBuf>) -> Result<()> {
     for entry in fs::read_dir(root)? {
         let entry = entry?;
         let file_type = entry.file_type()?;
         if file_type.is_symlink() {
             continue;
         }
+        let path = entry.path();
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
         if file_type.is_dir() {
-            collect_jsonl(&entry.path(), output)?;
-        } else if file_type.is_file()
-            && entry
-                .path()
+            if matches!(
+                name_str.as_ref(),
+                "node_modules" | "asset-cache" | ".git" | "tools" | "build" | "dist"
+            ) {
+                continue;
+            }
+            collect_session_files(&path, output)?;
+        } else if file_type.is_file() {
+            if name_str.ends_with("-wal")
+                || name_str.ends_with("-shm")
+                || name_str.ends_with("-journal")
+            {
+                continue;
+            }
+            let is_supported = path
                 .extension()
-                .is_some_and(|value| value == "jsonl")
-        {
-            output.push(entry.path());
+                .is_some_and(|ext| ext == "jsonl" || ext == "db" || ext == "sqlite");
+            if is_supported {
+                output.push(path);
+            }
         }
     }
     Ok(())
@@ -211,5 +250,52 @@ mod tests {
         assert!(batch.seen[&AgentKind::Codex].is_empty());
         assert_eq!(batch.warnings.len(), 1);
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn collect_session_files_filters_and_finds_supported_extensions() {
+        let root = std::env::temp_dir().join(format!(
+            "digiworld-collect-files-{}-{}",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        fs::create_dir_all(root.join("sub")).unwrap();
+        fs::create_dir_all(root.join("node_modules/sub")).unwrap();
+        fs::write(root.join("test.jsonl"), "").unwrap();
+        fs::write(root.join("sub/session.db"), "").unwrap();
+        fs::write(root.join("sub/data.sqlite"), "").unwrap();
+        fs::write(root.join("sub/data.sqlite-wal"), "").unwrap();
+        fs::write(root.join("sub/data.sqlite-shm"), "").unwrap();
+        fs::write(root.join("node_modules/sub/skip.jsonl"), "").unwrap();
+
+        let mut output = Vec::new();
+        collect_session_files(&root, &mut output).unwrap();
+        assert_eq!(output.len(), 3);
+        let names: Vec<String> = output
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        assert!(names.contains(&"test.jsonl".to_string()));
+        assert!(names.contains(&"session.db".to_string()));
+        assert!(names.contains(&"data.sqlite".to_string()));
+        assert!(!names.contains(&"skip.jsonl".to_string()));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn scans_real_agy_conversations_if_present() {
+        let root = default_root(AgentKind::Agy);
+        if !root.exists() {
+            return;
+        }
+        let batch = scan_local(&[AgentKind::Agy], &BTreeMap::new(), &BTreeMap::new()).unwrap();
+        assert!(!batch.files.is_empty());
+        let total_in: u64 = batch
+            .files
+            .iter()
+            .flat_map(|f| &f.daily)
+            .map(|d| d.usage.input_tokens)
+            .sum();
+        assert!(total_in > 0);
     }
 }

@@ -18,7 +18,7 @@ vi.mock('@digiworld/plugin-sdk', () => ({
 }))
 
 const settings = {
-  localAgents: ['codex', 'claude', 'pi'],
+  localAgents: ['codex', 'claude', 'pi', 'zcode', 'agy'],
   localRoots: {},
   sshSources: [],
   codexQuota: { sourceId: 'local', shellPreset: 'auto', preCommand: '', refreshIntervalSeconds: null },

@@ -2,7 +2,7 @@
   "id": "io.github.jesmonx.digiworld.agent-token-heatmap",
   "version": "0.1.4",
   "name": "Agent Token 热力图",
-  "description": "汇总 Codex、Claude Code 与 Pi 的 Token 日用量、近 7 天缓存率趋势，并显示指定账号的 Codex 限额。",
+  "description": "汇总 Codex、Claude Code、Pi、ZCode 与 Antigravity (agy) 的 Token 日用量、近 7 天缓存率趋势，并显示指定账号的 Codex 限额。",
   "author": "JesmonX",
   "license": "MIT",
   "minCoreVersion": "0.2.5",
@@ -11,7 +11,7 @@
   "permissions": [
     {
       "id": "filesystem:agent-session-data",
-      "reason": "读取 Codex、Claude Code 与 Pi 会话文件中的 Token usage 字段。"
+      "reason": "读取 Codex、Claude Code、Pi、ZCode 与 Antigravity (agy) 会话文件中的 Token usage 字段。"
     },
     {
       "id": "process:ssh",
