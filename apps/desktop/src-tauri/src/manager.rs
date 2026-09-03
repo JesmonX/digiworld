@@ -279,11 +279,12 @@ impl PluginManager {
                 on_progress("downloading", &entry.name, downloaded, total)
             })
             .await?;
+        let downloaded_bytes = bytes.len() as u64;
         on_progress(
             "installing",
             &entry.name,
-            bytes.len() as u64,
-            Some(bytes.len() as u64),
+            downloaded_bytes,
+            Some(downloaded_bytes),
         );
         verify_package(&bytes, &artifact.sha256, &artifact.signature)?;
 
@@ -344,8 +345,8 @@ impl PluginManager {
         on_progress(
             "completed",
             &entry.name,
-            bytes.len() as u64,
-            Some(bytes.len() as u64),
+            downloaded_bytes,
+            Some(downloaded_bytes),
         );
         Ok(InstallResult {
             plugin: summary,
