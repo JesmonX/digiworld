@@ -14,6 +14,11 @@ export interface WeeklyUsagePoint extends UsageDay {
   cacheRate: number | undefined
 }
 
+export interface CacheRateScale {
+  minimum: number
+  maximum: number
+}
+
 export interface CalendarCell {
   day?: string
   value: number
@@ -78,6 +83,34 @@ export function weeklyUsage(endDay: string, days: UsageDay[]): WeeklyUsagePoint[
     })
   }
   return result
+}
+
+export function cacheRateScale(rates: Array<number | undefined>): CacheRateScale {
+  const values = rates.flatMap(rate => rate == null || !Number.isFinite(rate) ? [] : [Math.max(0, Math.min(1, rate))])
+  if (!values.length) return { minimum: 0, maximum: 1 }
+
+  const minimum = Math.min(...values)
+  const maximum = Math.max(...values)
+  const center = (minimum + maximum) / 2
+  const span = Math.max(.2, maximum - minimum + .1)
+  let axisMinimum = center - span / 2
+  let axisMaximum = center + span / 2
+  if (axisMinimum < 0) {
+    axisMaximum -= axisMinimum
+    axisMinimum = 0
+  }
+  if (axisMaximum > 1) {
+    axisMinimum -= axisMaximum - 1
+    axisMaximum = 1
+  }
+
+  const tick = .05
+  axisMinimum = Math.max(0, Math.floor((axisMinimum + 1e-9) / tick) * tick)
+  axisMaximum = Math.min(1, Math.ceil((axisMaximum - 1e-9) / tick) * tick)
+  return {
+    minimum: Math.round(axisMinimum * 100) / 100,
+    maximum: Math.round(axisMaximum * 100) / 100,
+  }
 }
 
 function parseDay(day: string): Date {

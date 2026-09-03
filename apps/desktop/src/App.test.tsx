@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import { FONT_THEME_STORAGE_KEY } from './theme'
+import { FONT_THEME_STORAGE_KEY, FONT_WEIGHT_STORAGE_KEY } from './theme'
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -148,6 +150,19 @@ describe('explicit update consent', () => {
 
     expect(container.querySelector<HTMLElement>('.app-window')?.style.getPropertyValue('--font-sans')).toContain('LXGW WenKai')
     expect(localStorage.getItem(FONT_THEME_STORAGE_KEY)).toBe('wenkai')
+
+    const weight = container.querySelector<HTMLInputElement>('input[aria-label="字体粗细"]')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(weight, '600')
+      weight.dispatchEvent(new Event('input', { bubbles: true }))
+      await flush()
+    })
+    expect(container.querySelector<HTMLElement>('.app-window')?.style.getPropertyValue('--weight-regular')).toBe('600')
+    expect(localStorage.getItem(FONT_WEIGHT_STORAGE_KEY)).toBe('600')
+
+    const stylesheet = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8')
+    expect(stylesheet).toMatch(/\.main \{[^}]*min-height: 0;/)
+    expect(stylesheet).toMatch(/\.content \{[^}]*overflow: auto;/)
     await act(async () => root.unmount())
   })
 })

@@ -13,8 +13,8 @@ import {
 } from './lib/api'
 import {
   ACCENT_THEMES, FONT_THEMES, accentThemeStyle, fontThemeStyle, getAccentTheme,
-  getFontTheme, loadAccentThemeId, loadFontThemeId, pluginTheme, saveAccentThemeId,
-  saveFontThemeId, type AccentThemeId, type FontThemeId,
+  getFontTheme, loadAccentThemeId, loadFontThemeId, loadFontWeight, pluginTheme, saveAccentThemeId,
+  saveFontThemeId, saveFontWeight, fontWeightStyle, type AccentThemeId, type FontThemeId, type FontWeight,
 } from './theme'
 import './styles.css'
 
@@ -73,12 +73,14 @@ function App() {
   const [updateProgress, setUpdateProgress] = useState<UpdateProgress | null>(null)
   const [accentThemeId, setAccentThemeId] = useState<AccentThemeId>(loadAccentThemeId)
   const [fontThemeId, setFontThemeId] = useState<FontThemeId>(loadFontThemeId)
+  const [fontWeight, setFontWeight] = useState<FontWeight>(loadFontWeight)
   const accentTheme = getAccentTheme(accentThemeId)
   const fontTheme = getFontTheme(fontThemeId)
-  const activePluginTheme = useMemo(() => pluginTheme(accentTheme, fontTheme), [accentTheme, fontTheme])
+  const activePluginTheme = useMemo(() => pluginTheme(accentTheme, fontTheme, fontWeight), [accentTheme, fontTheme, fontWeight])
 
   useEffect(() => saveAccentThemeId(accentThemeId), [accentThemeId])
   useEffect(() => saveFontThemeId(fontThemeId), [fontThemeId])
+  useEffect(() => saveFontWeight(fontWeight), [fontWeight])
 
   const refreshState = useCallback(async () => setState(await api.appState()), [])
   const refreshCatalog = useCallback(async (force = false) => setCatalog(await api.catalog(force)), [])
@@ -162,7 +164,7 @@ function App() {
   const pluginOpen = typeof page !== 'string'
 
   return (
-    <div className={`app-window ${pluginOpen ? 'plugin-open' : ''}`} style={{ ...accentThemeStyle(accentTheme), ...fontThemeStyle(fontTheme) }}>
+    <div className={`app-window ${pluginOpen ? 'plugin-open' : ''}`} style={{ ...accentThemeStyle(accentTheme), ...fontThemeStyle(fontTheme), ...fontWeightStyle(fontWeight) }}>
       <WindowChrome />
       <div className="app-shell">
         <aside className="sidebar">
@@ -198,7 +200,7 @@ function App() {
           <section className="content">
             {page === 'home' && <Home plugins={state?.plugins ?? []} onCatalog={() => setPage('catalog')} onOpen={id => setPage({ pluginId: id })} />}
             {page === 'catalog' && <Catalog catalog={catalog} installed={installed} busy={busy} onInstall={setConfirmInstall} onRefresh={() => refreshCatalog(true)} onOpen={id => setPage({ pluginId: id })} />}
-            {page === 'settings' && state && <SettingsPage state={state} progress={updateProgress} onProgressReset={() => setUpdateProgress(null)} onPluginsUpdated={refreshState} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} fontThemeId={fontThemeId} onFontThemeChange={setFontThemeId} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
+            {page === 'settings' && state && <SettingsPage state={state} progress={updateProgress} onProgressReset={() => setUpdateProgress(null)} onPluginsUpdated={refreshState} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} fontThemeId={fontThemeId} onFontThemeChange={setFontThemeId} fontWeight={fontWeight} onFontWeightChange={setFontWeight} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
             {pluginOpen && (
               !selectedPlugin ? <Loading label="载入插件" />
                 : selectedPlugin.enabled
@@ -279,7 +281,7 @@ type UpdateDialog =
   | { kind: 'plugins'; updates: PluginUpdateInfo[] }
   | { kind: 'core'; update: CoreUpdateInfo }
 
-function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, accentThemeId, onAccentThemeChange, fontThemeId, onFontThemeChange, onChange }: {
+function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, accentThemeId, onAccentThemeChange, fontThemeId, onFontThemeChange, fontWeight, onFontWeightChange, onChange }: {
   state: AppState
   progress: UpdateProgress | null
   onProgressReset(): void
@@ -288,6 +290,8 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
   onAccentThemeChange(id: AccentThemeId): void
   fontThemeId: FontThemeId
   onFontThemeChange(id: FontThemeId): void
+  fontWeight: FontWeight
+  onFontWeightChange(weight: FontWeight): void
   onChange(enabled: boolean): Promise<void>
 }) {
   const [proxy, setProxy] = useState<ProxySettings>({ mode: 'system' })
@@ -450,6 +454,17 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
               <small>{theme.description}</small>
             </button>
           ))}
+        </div>
+      </article>
+      <article className="settings-card weight-card">
+        <div className="theme-copy">
+          <h3><Type />字体粗细</h3>
+          <p>同步调整主界面与插件正文，同时保留标题的信息层级</p>
+        </div>
+        <div className="weight-control">
+          <div><span>标准</span><span>清晰</span><span>粗重</span></div>
+          <input aria-label="字体粗细" type="range" min="400" max="600" step="100" value={fontWeight} onChange={event => onFontWeightChange(Number(event.target.value) as FontWeight)} />
+          <output>{fontWeight}</output>
         </div>
       </article>
       <article className="settings-card"><div><h3>开机启动</h3><p>在后台启动已启用的插件</p></div><button aria-label="切换开机启动" className={`switch ${state.launchAtStartup ? 'on' : ''}`} onClick={() => void onChange(!state.launchAtStartup)}><span /></button></article>

@@ -35,11 +35,18 @@ const snapshot = {
     totalTokens: 1_200,
     cacheRate: .6,
   },
-  days: [{
-    day: '2026-09-03', inputTokens: 1_000, outputTokens: 200,
-    cacheReadTokens: 600, cacheWriteTokens: 50, totalTokens: 1_200,
-    cacheAvailable: true,
-  }],
+  days: [
+    {
+      day: '2026-09-02', inputTokens: 800, outputTokens: 200,
+      cacheReadTokens: 576, cacheWriteTokens: 40, totalTokens: 1_000,
+      cacheAvailable: true,
+    },
+    {
+      day: '2026-09-03', inputTokens: 1_000, outputTokens: 200,
+      cacheReadTokens: 750, cacheWriteTokens: 50, totalTokens: 1_200,
+      cacheAvailable: true,
+    },
+  ],
   breakdown: [],
   modelBreakdown: [],
 }
@@ -92,6 +99,10 @@ describe('token usage layout', () => {
     expect(heatmap.querySelector('.range-group')).not.toBeNull()
     expect(heatmap.querySelector('.summary-grid')?.children).toHaveLength(6)
     expect(mocks.request).toHaveBeenCalledWith('usage.getCodexQuota', { force: false })
+
+    const cacheAxisLabels = Array.from(container.querySelectorAll('.weekly-chart .chart-axis-label')).filter((_, index) => index % 2 === 1).map(label => label.textContent)
+    expect(cacheAxisLabels).toEqual(['85%', '73%', '60%'])
+    expect(Array.from(container.querySelectorAll('.cache-point-label')).map(label => label.textContent)).toEqual(['72.0%', '75.0%'])
 
     const quotaFill = container.querySelector<HTMLElement>('.quota-track i')!
     expect(quotaFill.style.width).toBe('68%')

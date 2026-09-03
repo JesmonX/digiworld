@@ -37,6 +37,7 @@ describe('PluginFrame theme', () => {
       kind: 'theme', payload: blue,
     }), '*')
     expect(blue['font-sans']).toContain('LXGW WenKai')
+    expect(blue['weight-regular']).toBe('500')
 
     await act(async () => root.unmount())
   })

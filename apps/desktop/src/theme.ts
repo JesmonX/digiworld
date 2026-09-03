@@ -3,6 +3,7 @@ import type { PluginTheme } from '@digiworld/plugin-sdk'
 
 export type AccentThemeId = 'violet' | 'blue' | 'teal' | 'orange' | 'rose'
 export type FontThemeId = 'plex' | 'wenkai' | 'system'
+export type FontWeight = 400 | 500 | 600
 
 export interface AccentTheme {
   id: AccentThemeId
@@ -33,9 +34,9 @@ export const FONT_THEMES: FontTheme[] = [
   {
     id: 'plex',
     label: 'Plex 灵动',
-    description: '清晰现代，一级标题更有张力',
+    description: '清晰现代，正文与标题保持统一',
     fontSans: '"Digiworld Plex Sans SC", "Segoe UI Variable Text", "Microsoft YaHei UI", sans-serif',
-    fontDisplay: '"Digiworld Smiley Sans", "Digiworld Plex Sans SC", "Microsoft YaHei UI", sans-serif',
+    fontDisplay: '"Digiworld Plex Sans SC", "Segoe UI Variable Display", "Microsoft YaHei UI", sans-serif',
   },
   {
     id: 'wenkai',
@@ -55,8 +56,10 @@ export const FONT_THEMES: FontTheme[] = [
 
 export const DEFAULT_ACCENT_THEME_ID: AccentThemeId = 'violet'
 export const DEFAULT_FONT_THEME_ID: FontThemeId = 'plex'
+export const DEFAULT_FONT_WEIGHT: FontWeight = 500
 export const THEME_STORAGE_KEY = 'digiworld.accent-theme.v1'
 export const FONT_THEME_STORAGE_KEY = 'digiworld.font-theme.v1'
+export const FONT_WEIGHT_STORAGE_KEY = 'digiworld.font-weight.v1'
 
 export function getAccentTheme(id: AccentThemeId): AccentTheme {
   return ACCENT_THEMES.find(theme => theme.id === id) ?? ACCENT_THEMES[0]!
@@ -100,6 +103,23 @@ export function saveFontThemeId(id: FontThemeId, storage?: Pick<Storage, 'setIte
   }
 }
 
+export function loadFontWeight(storage?: Pick<Storage, 'getItem'>): FontWeight {
+  try {
+    const value = Number((storage ?? window.localStorage).getItem(FONT_WEIGHT_STORAGE_KEY))
+    return value === 400 || value === 500 || value === 600 ? value : DEFAULT_FONT_WEIGHT
+  } catch {
+    return DEFAULT_FONT_WEIGHT
+  }
+}
+
+export function saveFontWeight(weight: FontWeight, storage?: Pick<Storage, 'setItem'>): void {
+  try {
+    (storage ?? window.localStorage).setItem(FONT_WEIGHT_STORAGE_KEY, String(weight))
+  } catch {
+    // A typography preference should never prevent the desktop UI from working.
+  }
+}
+
 export function accentThemeStyle(theme: AccentTheme): CSSProperties {
   return {
     '--accent': theme.accent,
@@ -116,7 +136,17 @@ export function fontThemeStyle(theme: FontTheme): CSSProperties {
   } as CSSProperties
 }
 
-export function pluginTheme(theme: AccentTheme, font: FontTheme = getFontTheme(DEFAULT_FONT_THEME_ID)): PluginTheme {
+export function fontWeightStyle(weight: FontWeight): CSSProperties {
+  return {
+    '--weight-regular': weight,
+    '--weight-medium': weight === 400 ? 500 : weight,
+    '--weight-semibold': weight === 600 ? 700 : 600,
+    '--weight-bold': weight === 600 ? 800 : 700,
+  } as CSSProperties
+}
+
+export function pluginTheme(theme: AccentTheme, font: FontTheme = getFontTheme(DEFAULT_FONT_THEME_ID), weight: FontWeight = DEFAULT_FONT_WEIGHT): PluginTheme {
+  const weights = fontWeightStyle(weight) as Record<string, number>
   return {
     'color-scheme': 'light',
     'bg': '#f5f7fb',
@@ -134,5 +164,9 @@ export function pluginTheme(theme: AccentTheme, font: FontTheme = getFontTheme(D
     'danger': '#d92d20',
     'font-sans': font.fontSans,
     'font-display': font.fontDisplay,
+    'weight-regular': String(weights['--weight-regular']),
+    'weight-medium': String(weights['--weight-medium']),
+    'weight-semibold': String(weights['--weight-semibold']),
+    'weight-bold': String(weights['--weight-bold']),
   }
 }

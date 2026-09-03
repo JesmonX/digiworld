@@ -81,6 +81,10 @@ export interface PluginTheme {
   'danger': string
   'font-sans': string
   'font-display': string
+  'weight-regular'?: string
+  'weight-medium'?: string
+  'weight-semibold'?: string
+  'weight-bold'?: string
 }
 
 export type RpcId = string | number

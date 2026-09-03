@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, BarChart3, Check, Clock3, Database, Gauge, HardDrive, Plus, RefreshCw, Server, Settings2, Trash2, X } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
-import { calendarCells, formatTokens, heatLevel, weeklyUsage, type Metric, type UsageDay, type WeeklyUsagePoint } from './heatmap'
+import { cacheRateScale, calendarCells, formatTokens, heatLevel, weeklyUsage, type Metric, type UsageDay, type WeeklyUsagePoint } from './heatmap'
 import './styles.css'
 
 const PLUGIN_ID = 'io.github.jesmonx.digiworld.agent-token-heatmap'
@@ -261,6 +261,8 @@ function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
   const step = plotWidth / Math.max(points.length, 1)
   const barWidth = Math.min(46, step * .54)
   const maximum = Math.max(1, ...points.map(point => point.totalTokens))
+  const { minimum: cacheAxisMinimum, maximum: cacheAxisMaximum } = cacheRateScale(points.map(point => point.cacheRate))
+  const cacheAxisRange = Math.max(.05, cacheAxisMaximum - cacheAxisMinimum)
   const segments: WeeklyUsagePoint[][] = []
   for (const point of points) {
     if (point.cacheRate == null) continue
@@ -271,14 +273,14 @@ function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
     else previous.push(point)
   }
   const xFor = (point: WeeklyUsagePoint) => left + (points.indexOf(point) + .5) * step
-  const yForRate = (rate: number) => top + (1 - Math.max(0, Math.min(1, rate))) * plotHeight
+  const yForRate = (rate: number) => top + (cacheAxisMaximum - Math.max(cacheAxisMinimum, Math.min(cacheAxisMaximum, rate))) / cacheAxisRange * plotHeight
 
   return <article className="weekly-card">
     <div className="panel-heading"><div><h2>近 7 天趋势</h2><p>总 Token 与缓存读取率</p></div><div className="chart-legend"><span><i className="bar-key" />Token</span><span><i className="line-key" />缓存率</span></div></div>
     {points.length ? <svg className="weekly-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="近七天 Token 用量柱形图和缓存率折线图">
       {[0, .5, 1].map(ratio => {
         const y = top + ratio * plotHeight
-        return <g key={ratio}><line x1={left} x2={width - right} y1={y} y2={y} className="chart-grid-line" /><text x={left - 8} y={y + 4} textAnchor="end" className="chart-axis-label">{formatTokens(maximum * (1 - ratio))}</text><text x={width - right + 8} y={y + 4} className="chart-axis-label">{Math.round((1 - ratio) * 100)}%</text></g>
+        return <g key={ratio}><line x1={left} x2={width - right} y1={y} y2={y} className="chart-grid-line" /><text x={left - 8} y={y + 4} textAnchor="end" className="chart-axis-label">{formatTokens(maximum * (1 - ratio))}</text><text x={width - right + 8} y={y + 4} className="chart-axis-label">{Math.round((cacheAxisMaximum - cacheAxisRange * ratio) * 100)}%</text></g>
       })}
       {points.map((point, index) => {
         const x = left + (index + .5) * step
@@ -287,7 +289,12 @@ function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
         return <g key={point.day}><title>{`${point.day} · ${formatTokens(point.totalTokens)} Token · 缓存率 ${cache}`}</title><rect x={x - barWidth / 2} y={top + plotHeight - barHeight} width={barWidth} height={barHeight} rx="4" className="token-bar" /><text x={x} y={height - 17} textAnchor="middle" className="chart-day-label">{point.day.slice(5).replace('-', '/')}</text></g>
       })}
       {segments.map((segment, index) => segment.length > 1 && <polyline key={index} points={segment.map(point => `${xFor(point)},${yForRate(point.cacheRate!)}`).join(' ')} className="cache-line" />)}
-      {points.filter(point => point.cacheRate != null).map(point => <circle key={point.day} cx={xFor(point)} cy={yForRate(point.cacheRate!)} r="4" className="cache-point"><title>{`${point.day} 缓存率 ${(point.cacheRate! * 100).toFixed(1)}%`}</title></circle>)}
+      {points.filter(point => point.cacheRate != null).map(point => {
+        const x = xFor(point)
+        const y = yForRate(point.cacheRate!)
+        const label = `${(point.cacheRate! * 100).toFixed(1)}%`
+        return <g key={point.day} className="cache-marker"><circle cx={x} cy={y} r="4" className="cache-point"><title>{`${point.day} 缓存率 ${label}`}</title></circle><text x={x} y={y < top + 15 ? y + 17 : y - 9} textAnchor="middle" className="cache-point-label">{label}</text></g>
+      })}
     </svg> : <Empty />}
   </article>
 }

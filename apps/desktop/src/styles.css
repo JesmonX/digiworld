@@ -64,7 +64,7 @@ nav { display: flex; flex-direction: column; gap: 4px; }
 .plugin-open .nav-item b { display: none; }
 .plugin-open .state-dot { position: absolute; top: 8px; right: 8px; width: 6px; height: 6px; }
 
-.main { min-width: 0; display: flex; flex-direction: column; background: var(--canvas); }
+.main { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--canvas); }
 .topbar { flex: 0 0 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; border-bottom: 1px solid var(--border); background: rgba(255, 255, 255, .82); }
 .topbar h1 { margin: 0; color: var(--text); font-family: var(--font-display); font-size: 21px; font-weight: var(--weight-semibold); letter-spacing: 0; }
 .plugin-management { display: flex; align-items: center; gap: 8px; }
@@ -148,6 +148,11 @@ nav { display: flex; flex-direction: column; gap: 4px; }
 .font-option-heading svg { width: 14px; height: 14px; color: var(--accent-strong); stroke-width: 2.4; }
 .font-sample { min-width: 0; overflow: hidden; color: var(--text); font-family: var(--font-preview-display); font-size: 17px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 .font-options button small { font-family: var(--font-preview); font-size: var(--type-caption); line-height: 1.4; }
+.weight-card { align-items: flex-start; gap: 28px; }
+.weight-control { width: min(330px, 46%); display: grid; grid-template-columns: minmax(0, 1fr) 42px; align-items: center; gap: 7px 12px; }
+.weight-control > div { grid-column: 1; display: flex; justify-content: space-between; color: var(--muted); font-size: var(--type-body-sm); font-weight: var(--weight-medium); }
+.weight-control input { width: 100%; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.weight-control output { grid-column: 2; grid-row: 1 / span 2; color: var(--accent-strong); font-size: var(--type-body); font-weight: var(--weight-semibold); text-align: right; font-feature-settings: "tnum" 1; }
 .theme-options button svg { width: 13px; height: 13px; margin-left: auto; color: var(--theme-swatch); stroke-width: 2.5; }
 .settings-card.proxy-card { align-items: flex-end; }
 .settings-card.update-card > div { min-width: 0; padding-right: 16px; }
@@ -218,4 +223,6 @@ nav { display: flex; flex-direction: column; gap: 4px; }
 @media (max-width: 760px) {
   .theme-options { grid-template-columns: repeat(3, minmax(82px, 1fr)); }
   .font-options { grid-template-columns: 1fr; }
+  .weight-card { flex-direction: column; gap: 14px; }
+  .weight-control { width: 100%; }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calendarCells, formatTokens, heatLevel, weeklyUsage } from './heatmap'
+import { cacheRateScale, calendarCells, formatTokens, heatLevel, weeklyUsage } from './heatmap'
 
 describe('calendar heatmap', () => {
   it('aligns Monday-first weeks and fills missing dates', () => {
@@ -38,5 +38,11 @@ describe('calendar heatmap', () => {
     ])
     expect(points[5]!.cacheRate).toBe(.6)
     expect(points[6]!.cacheRate).toBeUndefined()
+  })
+
+  it('zooms the cache-rate axis around nearby values with rounded padding', () => {
+    expect(cacheRateScale([.72, .75])).toEqual({ minimum: .6, maximum: .85 })
+    expect(cacheRateScale([.75])).toEqual({ minimum: .65, maximum: .85 })
+    expect(cacheRateScale([undefined, Number.NaN])).toEqual({ minimum: 0, maximum: 1 })
   })
 })

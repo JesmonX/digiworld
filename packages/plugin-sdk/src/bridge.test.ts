@@ -17,6 +17,8 @@ describe('plugin presentation helpers', () => {
       accent: '#5b5ce2',
       'font-sans': '"Digiworld LXGW WenKai", serif',
       'font-display': '"Digiworld LXGW WenKai", serif',
+      'weight-regular': '500',
+      'weight-semibold': '600',
     }, root)
 
     expect(root.style.colorScheme).toBe('light')
@@ -24,6 +26,8 @@ describe('plugin presentation helpers', () => {
     expect(properties.get('--dw-accent')).toBe('#5b5ce2')
     expect(properties.get('--dw-font-sans')).toBe('"Digiworld LXGW WenKai", serif')
     expect(properties.get('--dw-font-display')).toBe('"Digiworld LXGW WenKai", serif')
+    expect(properties.get('--dw-weight-regular')).toBe('500')
+    expect(properties.get('--dw-weight-semibold')).toBe('600')
   })
 
   it('suppresses and restores the native context menu', () => {
