@@ -1,7 +1,7 @@
 # Release policy
 
-The `Windows Preview and Alpha releases (no Authenticode)` workflow is the
-zero-cost release path. It produces:
+The `Windows Preview releases (no Authenticode)` workflow is the zero-cost
+release path. It produces:
 
 - an Ed25519-signed `.dwpkg` plugin archive;
 - a Tauri updater bundle and `latest.json` signed by the Tauri updater key;
@@ -15,18 +15,16 @@ published SHA-256 list and download only from the official GitHub release.
 
 The signed updater manifest is deployed to
 `https://jesmonx.github.io/digiworld/updates/latest.json`. Preview releases are
-distributed as unsigned Preview builds. Until a separate stable channel exists,
-the workflow also marks the newest Preview as GitHub's latest release so clients
-through 0.2.1 can bootstrap from their legacy `/releases/latest/` endpoint. The
-same Pages deployment publishes the signed plugin catalog.
+distributed as unsigned prereleases and are not marked as GitHub's stable
+latest release. The same Pages deployment publishes the signed plugin catalog.
 
-Every push to `main` automatically builds an Alpha prerelease using the current
-root package version and the workflow run number, for example
-`v0.2.4-alpha.18`. Alpha releases are GitHub prereleases and are not marked as
-the latest release. They do not deploy `latest.json` or the plugin catalog to
-GitHub Pages, so ordinary installations remain on the manually published
-Preview update channel. A newer push cancels an older Alpha build that is still
-in progress.
+Every push to `main` directly builds a Preview release. Its version is the
+higher of the root package version and all remote stable SemVer tags, with the
+patch component incremented once. For example, source version `0.2.6` and
+latest tag `v0.2.5` produce `v0.2.7`; the next successful release produces
+`v0.2.8`. Alpha suffixes and workflow run numbers are not used. Each successful
+build deploys `latest.json` and the plugin catalog to GitHub Pages. A newer push
+cancels an older Preview build that is still in progress.
 
 The workflow requires the following values in the `production-release`
 Environment:
@@ -50,7 +48,8 @@ DIGIWORLD_UPDATER_PUBLIC_KEY
 keys and base64-encoded 32-byte Ed25519 seeds. The recommended value is a
 single-line base64 encoding of an Ed25519 PEM private key.
 
-The workflow input also updates the checked-out Tauri version and updater
-public key for that build; it does not modify the repository. When a
-public-trust signing provider is available, Authenticode signing will be added
-as a separate step without changing the plugin or updater keys.
+The resolved Preview version also updates the checked-out Tauri version and
+updater public key for that build; it does not modify the repository. Manual
+workflow runs use the same automatic patch increment policy. When a public-trust
+signing provider is available, Authenticode signing will be added as a separate
+step without changing the plugin or updater keys.

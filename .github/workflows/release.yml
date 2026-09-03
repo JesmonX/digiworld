@@ -1,14 +1,9 @@
-name: Windows Preview and Alpha releases (no Authenticode)
+name: Windows Preview releases (no Authenticode)
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      version:
-        description: SemVer without v prefix
-        required: true
-        type: string
 
 permissions:
   contents: write
@@ -16,8 +11,8 @@ permissions:
   pages: write
 
 concurrency:
-  group: windows-release-${{ github.event_name == 'push' && github.ref || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'push' }}
+  group: windows-preview-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -31,38 +26,6 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v7
-      - name: Resolve release metadata
-        id: release
-        shell: pwsh
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          REQUESTED_VERSION: ${{ inputs.version }}
-          RUN_NUMBER: ${{ github.run_number }}
-        run: |
-          if ($env:EVENT_NAME -eq 'workflow_dispatch') {
-            $version = $env:REQUESTED_VERSION
-            $name = "Digiworld v$version Preview"
-            $prerelease = 'false'
-            $makeLatest = 'true'
-          } else {
-            $baseVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
-            if ($baseVersion -notmatch '^\d+\.\d+\.\d+$') {
-              throw "Automatic Alpha releases require a stable package.json version, got: $baseVersion"
-            }
-            $version = "$baseVersion-alpha.$($env:RUN_NUMBER)"
-            $name = "Digiworld v$version Alpha"
-            $prerelease = 'true'
-            $makeLatest = 'false'
-          }
-          if ($version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
-            throw "Invalid release version: $version"
-          }
-          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "tag=v$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "name=$name" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "prerelease=$prerelease" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "make_latest=$makeLatest" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-          "DIGIWORLD_RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - uses: pnpm/action-setup@v6
         with:
           version: 11.21.0
@@ -70,6 +33,9 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      - name: Resolve next Preview version
+        id: release
+        run: node scripts/resolve-preview-version.mjs
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
       - name: Refuse an unsigned release
@@ -114,7 +80,6 @@ jobs:
       - name: Build updater manifest
         run: node scripts/build-update-manifest.mjs
       - name: Stage updater manifest for GitHub Pages
-        if: github.event_name == 'workflow_dispatch'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path updates | Out-Null
@@ -151,7 +116,6 @@ jobs:
             SHA256SUMS.txt
             PREVIEW-UNSIGNED.txt
       - uses: actions/upload-artifact@v7
-        if: github.event_name == 'workflow_dispatch'
         with:
           name: release-update-site
           path: |
@@ -173,7 +137,6 @@ jobs:
 
   deploy-catalog:
     needs: build
-    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
