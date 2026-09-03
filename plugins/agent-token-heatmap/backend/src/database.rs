@@ -8,7 +8,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-const PARSER_VERSION: i64 = 3;
+const PARSER_VERSION: i64 = 4;
 const DATABASE_VERSION: i64 = 2;
 
 pub struct Database {

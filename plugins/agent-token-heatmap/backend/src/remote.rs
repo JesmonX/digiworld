@@ -249,7 +249,7 @@ def agy_proto(data):
     if inp == 0 and out == 0 and cache == 0: return None
     names = {1318: 'gemini-3.8-flash', 1016: 'gemini-3.5-flash', 1026: 'claude-opus-4-6', 1050: 'gemini-3.1-pro', 0: 'gemini'}
     model = names.get(m_id, f'model-{m_id}')
-    return t_sec, model, {'inputTokens': inp, 'outputTokens': out, 'cacheReadTokens': cache, 'cacheWriteTokens': 0, 'cacheAvailable': True}
+    return t_sec, model, {'inputTokens': inp + cache, 'outputTokens': out, 'cacheReadTokens': cache, 'cacheWriteTokens': 0, 'cacheAvailable': True}
 
 def parse_sqlite(agent, path):
     rows, invalid = {}, 0
@@ -349,7 +349,7 @@ def parse_file(agent, path):
                 cand = n(raw, 'candidates_token_count') or n(raw, 'candidatesTokenCount') or n(raw, 'output_tokens') or n(raw, 'output')
                 cached = n(raw, 'cached_content_token_count') or n(raw, 'cachedContentTokenCount') or n(raw, 'cache_read_tokens') or n(raw, 'cacheRead')
                 if prompt or cand or cached:
-                    usage = {'inputTokens': prompt, 'outputTokens': cand, 'cacheReadTokens': cached, 'cacheWriteTokens': 0, 'cacheAvailable': bool(cached)}
+                    usage = {'inputTokens': prompt + cached, 'outputTokens': cand, 'cacheReadTokens': cached, 'cacheWriteTokens': 0, 'cacheAvailable': bool(cached)}
             if usage: add(rows, stamp, model, usage)
     return [value for key, value in sorted(rows.items())], invalid
 
@@ -444,6 +444,48 @@ mod tests {
                 .sum::<u64>(),
             36
         );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn python_helper_counts_agy_cached_tokens_as_input() {
+        let root = std::env::temp_dir().join(format!(
+            "digiworld-remote-agy-{}-{}",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        fs::write(
+            root.join("session.jsonl"),
+            r#"{"created_at":"2026-09-02T01:00:00Z","model":"gemini-3.8-flash","usage":{"prompt_token_count":100,"candidates_token_count":40,"cached_content_token_count":60}}"#,
+        )
+        .unwrap();
+        let request = serde_json::json!({
+            "agents": ["agy"],
+            "roots": {"agy": root.to_string_lossy()},
+            "known": {},
+            "offsetMinutes": 0,
+        });
+        let mut child = Command::new("python3")
+            .args(["-c", REMOTE_HELPER])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(&serde_json::to_vec(&request).unwrap())
+            .unwrap();
+        let output = child.wait_with_output().unwrap();
+        assert!(output.status.success());
+        let batch: ScanBatch = serde_json::from_slice(&output.stdout).unwrap();
+        let usage = &batch.files[0].daily[0].usage;
+        assert_eq!(usage.input_tokens, 160);
+        assert_eq!(usage.output_tokens, 40);
+        assert_eq!(usage.cache_read_tokens, 60);
+        assert!(usage.cache_read_tokens <= usage.input_tokens);
         fs::remove_dir_all(root).unwrap();
     }
 

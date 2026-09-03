@@ -103,7 +103,8 @@ fn parse_codex(
             previous_by_model.insert(model.to_string(), current);
         }
         last_usage
-    } else if let Some(current) = total {
+    } else {
+        let current = total?;
         let previous = previous_by_model.get(model).copied();
         let delta = previous
             .map(|old| NativeUsage {
@@ -132,8 +133,6 @@ fn parse_codex(
             .unwrap_or(current);
         previous_by_model.insert(model.to_string(), current);
         delta
-    } else {
-        return None;
     };
     Some((
         timestamp(value)?,
@@ -287,7 +286,10 @@ fn parse_agy(value: &Value) -> Option<(String, TokenUsage)> {
     Some((
         stamp,
         TokenUsage {
-            input_tokens: prompt,
+            // Antigravity stores uncached prompt tokens separately from cached
+            // prompt tokens. Keep input_tokens as the complete prompt size so
+            // cache rate remains a subset of input and total usage is complete.
+            input_tokens: prompt.saturating_add(cached),
             output_tokens: candidates,
             cache_read_tokens: cached,
             cache_write_tokens: 0,
@@ -535,7 +537,8 @@ fn parse_agy_proto_step(data: &[u8]) -> Option<(i64, String, TokenUsage)> {
         stamp,
         model,
         TokenUsage {
-            input_tokens,
+            // Protobuf tag 2 is the uncached input and tag 5 is cached input.
+            input_tokens: input_tokens.saturating_add(cache_read),
             output_tokens,
             cache_read_tokens: cache_read,
             cache_write_tokens: 0,
@@ -735,9 +738,10 @@ mod tests {
         assert_eq!(a_warn, 0);
         assert_eq!(a_rows.len(), 1);
         assert_eq!(a_rows[0].model, "gemini-3.8-flash");
-        assert_eq!(a_rows[0].usage.input_tokens, 100);
+        assert_eq!(a_rows[0].usage.input_tokens, 160);
         assert_eq!(a_rows[0].usage.output_tokens, 40);
         assert_eq!(a_rows[0].usage.cache_read_tokens, 60);
+        assert!(a_rows[0].usage.cache_read_tokens <= a_rows[0].usage.input_tokens);
     }
 
     #[test]
@@ -838,9 +842,10 @@ mod tests {
         assert_eq!(warnings, 0);
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].model, "gemini-3.8-flash");
-        assert_eq!(rows[0].usage.input_tokens, 200);
+        assert_eq!(rows[0].usage.input_tokens, 280);
         assert_eq!(rows[0].usage.output_tokens, 50);
         assert_eq!(rows[0].usage.cache_read_tokens, 80);
+        assert!(rows[0].usage.cache_read_tokens <= rows[0].usage.input_tokens);
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }

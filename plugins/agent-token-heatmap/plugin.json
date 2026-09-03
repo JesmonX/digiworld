@@ -1,6 +1,6 @@
 {
   "id": "io.github.jesmonx.digiworld.agent-token-heatmap",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "name": "Agent Token 热力图",
   "description": "汇总 Codex、Claude Code、Pi、ZCode 与 Antigravity (agy) 的 Token 日用量、近 7 天缓存率趋势，并显示指定账号的 Codex 限额。",
   "author": "JesmonX",
