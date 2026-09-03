@@ -1,6 +1,6 @@
 {
   "name": "@digiworld/plugin-keyboard-heatmap-ui",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@digiworld/plugin-sdk": "workspace:*",
+    "@digiworld/typography": "workspace:*",
     "lucide-react": "^0.468.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"

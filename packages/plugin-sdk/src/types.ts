@@ -80,6 +80,7 @@ export interface PluginTheme {
   'accent-soft': string
   'danger': string
   'font-sans': string
+  'font-display': string
 }
 
 export type RpcId = string | number

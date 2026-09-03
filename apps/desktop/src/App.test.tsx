@@ -3,6 +3,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
+import { FONT_THEME_STORAGE_KEY } from './theme'
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -60,6 +61,7 @@ describe('explicit update consent', () => {
     mocks.installCoreUpdate.mockReset()
     mocks.testProxySettings.mockResolvedValue({ ok: true, latencyMs: 1, message: '' })
     mocks.installPluginUpdates.mockResolvedValue([])
+    localStorage.clear()
   })
 
   afterEach(() => {
@@ -133,6 +135,19 @@ describe('explicit update consent', () => {
 
     await act(async () => button(container, '同意并更新')?.click())
     expect(mocks.installCoreUpdate).toHaveBeenCalledWith('0.2.3')
+    await act(async () => root.unmount())
+  })
+
+  it('applies and persists a font preset across the shell', async () => {
+    const root = createRoot(container)
+    await act(async () => { root.render(<App />); await flush() })
+    await act(async () => button(container, '设置')?.click())
+
+    const wenkai = container.querySelector<HTMLButtonElement>('button[aria-label="霞鹜文楷"]')
+    await act(async () => { wenkai?.click(); await flush() })
+
+    expect(container.querySelector<HTMLElement>('.app-window')?.style.getPropertyValue('--font-sans')).toContain('LXGW WenKai')
+    expect(localStorage.getItem(FONT_THEME_STORAGE_KEY)).toBe('wenkai')
     await act(async () => root.unmount())
   })
 })

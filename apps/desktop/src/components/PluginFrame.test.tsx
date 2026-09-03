@@ -2,7 +2,7 @@
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getAccentTheme, pluginTheme } from '../theme'
+import { getAccentTheme, getFontTheme, pluginTheme } from '../theme'
 import { PluginFrame } from './PluginFrame'
 
 describe('PluginFrame theme', () => {
@@ -18,7 +18,7 @@ describe('PluginFrame theme', () => {
   it('sends the current theme when ready and after a live theme change', async () => {
     const root = createRoot(container)
     const violet = pluginTheme(getAccentTheme('violet'))
-    const blue = pluginTheme(getAccentTheme('blue'))
+    const blue = pluginTheme(getAccentTheme('blue'), getFontTheme('wenkai'))
     await act(async () => root.render(<PluginFrame pluginId="sample" html="<main />" theme={violet} />))
 
     const iframe = container.querySelector('iframe')!
@@ -36,6 +36,7 @@ describe('PluginFrame theme', () => {
     expect(postMessage).toHaveBeenLastCalledWith(expect.objectContaining({
       kind: 'theme', payload: blue,
     }), '*')
+    expect(blue['font-sans']).toContain('LXGW WenKai')
 
     await act(async () => root.unmount())
   })

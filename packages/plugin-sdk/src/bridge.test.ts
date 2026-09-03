@@ -11,11 +11,19 @@ describe('plugin presentation helpers', () => {
       },
     } as unknown as HTMLElement
 
-    applyPluginTheme({ 'color-scheme': 'light', text: '#172033', accent: '#5b5ce2' }, root)
+    applyPluginTheme({
+      'color-scheme': 'light',
+      text: '#172033',
+      accent: '#5b5ce2',
+      'font-sans': '"Digiworld LXGW WenKai", serif',
+      'font-display': '"Digiworld LXGW WenKai", serif',
+    }, root)
 
     expect(root.style.colorScheme).toBe('light')
     expect(properties.get('--dw-text')).toBe('#172033')
     expect(properties.get('--dw-accent')).toBe('#5b5ce2')
+    expect(properties.get('--dw-font-sans')).toBe('"Digiworld LXGW WenKai", serif')
+    expect(properties.get('--dw-font-display')).toBe('"Digiworld LXGW WenKai", serif')
   })
 
   it('suppresses and restores the native context menu', () => {

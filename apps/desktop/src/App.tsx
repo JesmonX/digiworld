@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Boxes, Check, ChevronRight, CircleAlert, Download, Gauge, Library,
   LoaderCircle, Network, Palette, Pause, RefreshCw, Settings, ShieldCheck,
+  Type,
 } from 'lucide-react'
 import { suppressContextMenu, type CatalogIndex, type CatalogPlugin, type PluginSummary } from '@digiworld/plugin-sdk'
 import { PluginFrame } from './components/PluginFrame'
@@ -11,8 +12,9 @@ import {
   type ProxySettings, type UpdateProgress,
 } from './lib/api'
 import {
-  ACCENT_THEMES, accentThemeStyle, getAccentTheme, loadAccentThemeId, pluginTheme,
-  saveAccentThemeId, type AccentThemeId,
+  ACCENT_THEMES, FONT_THEMES, accentThemeStyle, fontThemeStyle, getAccentTheme,
+  getFontTheme, loadAccentThemeId, loadFontThemeId, pluginTheme, saveAccentThemeId,
+  saveFontThemeId, type AccentThemeId, type FontThemeId,
 } from './theme'
 import './styles.css'
 
@@ -70,10 +72,13 @@ function App() {
   const [confirmInstall, setConfirmInstall] = useState<CatalogPlugin | null>(null)
   const [updateProgress, setUpdateProgress] = useState<UpdateProgress | null>(null)
   const [accentThemeId, setAccentThemeId] = useState<AccentThemeId>(loadAccentThemeId)
+  const [fontThemeId, setFontThemeId] = useState<FontThemeId>(loadFontThemeId)
   const accentTheme = getAccentTheme(accentThemeId)
-  const activePluginTheme = useMemo(() => pluginTheme(accentTheme), [accentTheme])
+  const fontTheme = getFontTheme(fontThemeId)
+  const activePluginTheme = useMemo(() => pluginTheme(accentTheme, fontTheme), [accentTheme, fontTheme])
 
   useEffect(() => saveAccentThemeId(accentThemeId), [accentThemeId])
+  useEffect(() => saveFontThemeId(fontThemeId), [fontThemeId])
 
   const refreshState = useCallback(async () => setState(await api.appState()), [])
   const refreshCatalog = useCallback(async (force = false) => setCatalog(await api.catalog(force)), [])
@@ -157,7 +162,7 @@ function App() {
   const pluginOpen = typeof page !== 'string'
 
   return (
-    <div className={`app-window ${pluginOpen ? 'plugin-open' : ''}`} style={accentThemeStyle(accentTheme)}>
+    <div className={`app-window ${pluginOpen ? 'plugin-open' : ''}`} style={{ ...accentThemeStyle(accentTheme), ...fontThemeStyle(fontTheme) }}>
       <WindowChrome />
       <div className="app-shell">
         <aside className="sidebar">
@@ -193,7 +198,7 @@ function App() {
           <section className="content">
             {page === 'home' && <Home plugins={state?.plugins ?? []} onCatalog={() => setPage('catalog')} onOpen={id => setPage({ pluginId: id })} />}
             {page === 'catalog' && <Catalog catalog={catalog} installed={installed} busy={busy} onInstall={setConfirmInstall} onRefresh={() => refreshCatalog(true)} onOpen={id => setPage({ pluginId: id })} />}
-            {page === 'settings' && state && <SettingsPage state={state} progress={updateProgress} onProgressReset={() => setUpdateProgress(null)} onPluginsUpdated={refreshState} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
+            {page === 'settings' && state && <SettingsPage state={state} progress={updateProgress} onProgressReset={() => setUpdateProgress(null)} onPluginsUpdated={refreshState} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} fontThemeId={fontThemeId} onFontThemeChange={setFontThemeId} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
             {pluginOpen && (
               !selectedPlugin ? <Loading label="载入插件" />
                 : selectedPlugin.enabled
@@ -274,13 +279,15 @@ type UpdateDialog =
   | { kind: 'plugins'; updates: PluginUpdateInfo[] }
   | { kind: 'core'; update: CoreUpdateInfo }
 
-function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, accentThemeId, onAccentThemeChange, onChange }: {
+function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, accentThemeId, onAccentThemeChange, fontThemeId, onFontThemeChange, onChange }: {
   state: AppState
   progress: UpdateProgress | null
   onProgressReset(): void
   onPluginsUpdated(): Promise<void>
   accentThemeId: AccentThemeId
   onAccentThemeChange(id: AccentThemeId): void
+  fontThemeId: FontThemeId
+  onFontThemeChange(id: FontThemeId): void
   onChange(enabled: boolean): Promise<void>
 }) {
   const [proxy, setProxy] = useState<ProxySettings>({ mode: 'system' })
@@ -417,6 +424,30 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
               <span />
               <small>{theme.label}</small>
               {accentThemeId === theme.id && <Check />}
+            </button>
+          ))}
+        </div>
+      </article>
+      <article className="settings-card font-card">
+        <div className="theme-copy">
+          <h3><Type />界面字体</h3>
+          <p>字体会同步应用到主界面、插件、图表数字与键盘按键</p>
+        </div>
+        <div className="font-options" role="radiogroup" aria-label="界面字体">
+          {FONT_THEMES.map(theme => (
+            <button
+              key={theme.id}
+              type="button"
+              className={fontThemeId === theme.id ? 'active' : ''}
+              role="radio"
+              aria-checked={fontThemeId === theme.id}
+              aria-label={theme.label}
+              style={{ '--font-preview': theme.fontSans, '--font-preview-display': theme.fontDisplay } as React.CSSProperties}
+              onClick={() => onFontThemeChange(theme.id)}
+            >
+              <span className="font-option-heading"><strong>{theme.label}</strong>{fontThemeId === theme.id && <Check />}</span>
+              <span className="font-sample">数字世界 Digiworld 2026</span>
+              <small>{theme.description}</small>
             </button>
           ))}
         </div>
