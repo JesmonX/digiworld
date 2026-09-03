@@ -14,6 +14,8 @@ use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
+use tauri::AppHandle;
+use tauri_plugin_notification::NotificationExt;
 use tokio::sync::{Mutex, RwLock};
 
 const MAX_EXTRACTED_BYTES: u64 = 256 * 1024 * 1024;
@@ -28,10 +30,11 @@ pub struct PluginManager {
     proxy: RwLock<ProxySettings>,
     processes: Mutex<HashMap<String, Arc<Mutex<PluginProcess>>>>,
     catalog_cache: Mutex<Option<CatalogIndex>>,
+    app: AppHandle,
 }
 
 impl PluginManager {
-    pub async fn new(root: PathBuf) -> Result<Arc<Self>> {
+    pub async fn new(root: PathBuf, app: AppHandle) -> Result<Arc<Self>> {
         let plugins_dir = root.join("plugins");
         let data_dir = root.join("plugin-data");
         tokio::fs::create_dir_all(&plugins_dir).await?;
@@ -52,6 +55,7 @@ impl PluginManager {
             proxy: RwLock::new(proxy),
             processes: Mutex::new(HashMap::new()),
             catalog_cache: Mutex::new(None),
+            app,
         }))
     }
 
@@ -529,13 +533,48 @@ impl PluginManager {
             ));
         }
         let proxy = self.proxy.read().await.clone();
-        let mut process = PluginProcess::spawn(
+        let (mut process, mut events) = PluginProcess::spawn(
             &executable,
             &self.data_dir.join(&manifest.id),
             has_network_permission(manifest).then_some(&proxy),
         )
         .await?;
         process.health().await?;
+        let app = self.app.clone();
+        let may_notify = manifest
+            .permissions
+            .iter()
+            .any(|permission| permission.id == "notifications");
+        let plugin_id = manifest.id.clone();
+        tauri::async_runtime::spawn(async move {
+            while let Some(event) = events.recv().await {
+                if event.method != "host.notification" {
+                    tracing::warn!(plugin = %plugin_id, method = %event.method, "ignored unsupported plugin event");
+                    continue;
+                }
+                if !may_notify {
+                    tracing::warn!(plugin = %plugin_id, "plugin attempted a notification without permission");
+                    continue;
+                }
+                let title = event
+                    .params
+                    .get("title")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
+                let body = event
+                    .params
+                    .get("body")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
+                if title.is_empty() || title.chars().count() > 120 || body.chars().count() > 512 {
+                    tracing::warn!(plugin = %plugin_id, "ignored invalid plugin notification");
+                    continue;
+                }
+                if let Err(error) = app.notification().builder().title(title).body(body).show() {
+                    tracing::warn!(plugin = %plugin_id, %error, "failed to show plugin notification");
+                }
+            }
+        });
         self.processes
             .lock()
             .await

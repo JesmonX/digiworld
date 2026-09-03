@@ -467,6 +467,7 @@ pub fn run() {
 
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_autostart::Builder::new()
@@ -489,7 +490,8 @@ pub fn run() {
         .setup(|app| {
             let root = app.path().app_local_data_dir()?.join("Digiworld");
             std::fs::create_dir_all(&root)?;
-            let manager = tauri::async_runtime::block_on(PluginManager::new(root))?;
+            let manager =
+                tauri::async_runtime::block_on(PluginManager::new(root, app.handle().clone()))?;
             app.manage(manager.clone());
             create_tray(app)?;
 

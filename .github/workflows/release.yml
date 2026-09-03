@@ -59,6 +59,8 @@ jobs:
       - run: cargo build --release -p digiworld-keyboard-heatmap
       - run: pnpm --filter @digiworld/plugin-agent-token-heatmap-ui build
       - run: cargo build --release -p digiworld-agent-token-heatmap
+      - run: pnpm --filter @digiworld/plugin-mail-assistant-ui build
+      - run: cargo build --release -p digiworld-mail-assistant
       - name: Package signed keyboard plugin
         shell: pwsh
         env:
@@ -71,6 +73,12 @@ jobs:
           DIGIWORLD_TARGET: windows-x86_64
           DIGIWORLD_RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: pnpm package:agent-tokens
+      - name: Package signed Mail Assistant plugin
+        shell: pwsh
+        env:
+          DIGIWORLD_TARGET: windows-x86_64
+          DIGIWORLD_RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: pnpm package:mail
       - name: Build signed plugin catalog
         env:
           DIGIWORLD_CATALOG_SEQUENCE: ${{ github.run_number }}

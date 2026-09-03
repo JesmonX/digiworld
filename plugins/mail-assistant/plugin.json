@@ -1,0 +1,33 @@
+{
+  "id": "io.github.jesmonx.digiworld.mail-assistant",
+  "version": "0.1.0",
+  "name": "邮件助手",
+  "description": "通过只读 IMAP 汇总多个邮箱的收件箱，在本机离线阅读、搜索并接收新邮件通知。",
+  "author": "JesmonX",
+  "license": "MIT",
+  "minCoreVersion": "0.2.12",
+  "ui": "ui/index.html",
+  "background": "on-enable",
+  "permissions": [
+    {
+      "id": "background",
+      "reason": "在 Digiworld 驻留后台时定期检查新邮件。"
+    },
+    {
+      "id": "notifications",
+      "reason": "通过 Digiworld 显示按账号聚合的新邮件通知。"
+    },
+    {
+      "id": "network:imap",
+      "reason": "使用 Digiworld 的代理策略连接用户配置的 IMAP 收件服务器。"
+    },
+    {
+      "id": "plugin-storage",
+      "reason": "在本机保存邮件索引、纯文本正文、同步游标和非敏感账号设置。"
+    },
+    {
+      "id": "secret:mail-credentials",
+      "reason": "在操作系统凭据库中保存邮箱应用专用密码或客户端授权码。"
+    }
+  ]
+}

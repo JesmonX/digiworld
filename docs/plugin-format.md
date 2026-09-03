@@ -22,6 +22,12 @@ Backends run as child processes and speak newline-delimited
 JSON-RPC 2.0 over inherited anonymous pipes. Messages are serialized per plugin,
 limited to 4 MiB, and time out after 15 seconds.
 
+Backends may also emit JSON-RPC notifications without an `id`. The host currently
+accepts `host.notification` with string `title` and `body` fields. It is ignored
+unless the plugin declared the `notifications` permission; titles are limited to
+120 characters and bodies to 512 characters. Notifications and request responses
+may be interleaved on stdout.
+
 Native official backends run with the current user's operating-system rights.
 The permission screen is consent and transparency, not an OS sandbox.
 

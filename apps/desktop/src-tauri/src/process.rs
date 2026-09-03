@@ -5,7 +5,8 @@ use serde_json::{Value, json};
 use std::path::Path;
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::process::{Child, ChildStdin, ChildStdout, Command};
+use tokio::process::{Child, ChildStdin, Command};
+use tokio::sync::mpsc;
 
 #[cfg(windows)]
 use windows::Win32::{
@@ -19,12 +20,19 @@ use windows::Win32::{
 
 const MAX_RPC_LINE: usize = 4 * 1024 * 1024;
 
+#[derive(Debug)]
+pub struct PluginEvent {
+    pub method: String,
+    pub params: Value,
+}
+
 pub struct PluginProcess {
     #[cfg(windows)]
     _job: WindowsJob,
     child: Child,
     stdin: ChildStdin,
-    stdout: BufReader<ChildStdout>,
+    responses: mpsc::UnboundedReceiver<Value>,
+    reader: tokio::task::JoinHandle<()>,
     next_id: u64,
     needs_restart: bool,
 }
@@ -83,7 +91,7 @@ impl PluginProcess {
         executable: &Path,
         data_dir: &Path,
         proxy: Option<&ProxySettings>,
-    ) -> Result<Self> {
+    ) -> Result<(Self, mpsc::UnboundedReceiver<PluginEvent>)> {
         tokio::fs::create_dir_all(data_dir).await?;
         let mut command = Command::new(executable);
         command
@@ -112,6 +120,41 @@ impl PluginProcess {
             .stdout
             .take()
             .ok_or_else(|| DigiworldError::Plugin("plugin stdout unavailable".into()))?;
+        let (response_tx, responses) = mpsc::unbounded_channel();
+        let (event_tx, events) = mpsc::unbounded_channel();
+        let reader = tokio::spawn(async move {
+            let mut lines = BufReader::new(stdout).lines();
+            while let Ok(Some(line)) = lines.next_line().await {
+                if line.len() > MAX_RPC_LINE {
+                    tracing::warn!("ignored oversized plugin output");
+                    continue;
+                }
+                let value: Value = match serde_json::from_str(&line) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        tracing::warn!(%error, "ignored malformed plugin output");
+                        continue;
+                    }
+                };
+                if value.get("id").is_some() {
+                    if response_tx.send(value).is_err() {
+                        break;
+                    }
+                    continue;
+                }
+                let Some(method) = value.get("method").and_then(Value::as_str) else {
+                    tracing::warn!("ignored plugin output without id or method");
+                    continue;
+                };
+                let event = PluginEvent {
+                    method: method.to_string(),
+                    params: value.get("params").cloned().unwrap_or(Value::Null),
+                };
+                if event_tx.send(event).is_err() {
+                    break;
+                }
+            }
+        });
         if let Some(stderr) = child.stderr.take() {
             let name = executable
                 .file_name()
@@ -125,15 +168,19 @@ impl PluginProcess {
                 }
             });
         }
-        Ok(Self {
-            #[cfg(windows)]
-            _job: job,
-            child,
-            stdin,
-            stdout: BufReader::new(stdout),
-            next_id: 0,
-            needs_restart: false,
-        })
+        Ok((
+            Self {
+                #[cfg(windows)]
+                _job: job,
+                child,
+                stdin,
+                responses,
+                reader,
+                next_id: 0,
+                needs_restart: false,
+            },
+            events,
+        ))
     }
 
     pub async fn request(&mut self, method: &str, params: Value) -> Result<Value> {
@@ -154,34 +201,25 @@ impl PluginProcess {
         self.stdin.write_all(b"\n").await?;
         self.stdin.flush().await?;
 
-        let mut response = String::new();
-        let read = match tokio::time::timeout(
-            std::time::Duration::from_secs(15),
-            self.stdout.read_line(&mut response),
-        )
-        .await
-        {
-            Ok(read) => read?,
-            Err(_) => {
-                self.needs_restart = true;
-                let _ = self.child.start_kill();
-                let _ = self.child.wait().await;
-                return Err(DigiworldError::Plugin(format!(
-                    "plugin request timed out; the process is being restarted: {method}"
-                )));
-            }
-        };
-        if read == 0 {
-            return Err(DigiworldError::Plugin(
-                "plugin process closed its output".into(),
-            ));
-        }
-        if response.len() > MAX_RPC_LINE {
-            return Err(DigiworldError::Plugin(
-                "plugin response exceeds 4 MiB".into(),
-            ));
-        }
-        let value: Value = serde_json::from_str(&response)?;
+        let value =
+            match tokio::time::timeout(std::time::Duration::from_secs(15), self.responses.recv())
+                .await
+            {
+                Ok(Some(value)) => value,
+                Ok(None) => {
+                    return Err(DigiworldError::Plugin(
+                        "plugin process closed its output".into(),
+                    ));
+                }
+                Err(_) => {
+                    self.needs_restart = true;
+                    let _ = self.child.start_kill();
+                    let _ = self.child.wait().await;
+                    return Err(DigiworldError::Plugin(format!(
+                        "plugin request timed out; the process is being restarted: {method}"
+                    )));
+                }
+            };
         if value.get("id").and_then(Value::as_u64) != Some(id) {
             return Err(DigiworldError::Plugin(
                 "plugin returned an unexpected response id".into(),
@@ -219,5 +257,6 @@ impl PluginProcess {
         {
             let _ = self.child.kill().await;
         }
+        self.reader.abort();
     }
 }

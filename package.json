@@ -12,6 +12,7 @@
     "lint": "pnpm -r --if-present lint",
     "package:keyboard": "node scripts/package-plugin.mjs keyboard-heatmap",
     "package:agent-tokens": "node scripts/package-plugin.mjs agent-token-heatmap",
+    "package:mail": "node scripts/package-plugin.mjs mail-assistant",
     "catalog:build": "node scripts/build-catalog.mjs"
   },
   "devDependencies": {

@@ -4,6 +4,7 @@ members = [
   "apps/desktop/src-tauri",
   "plugins/keyboard-heatmap/backend",
   "plugins/agent-token-heatmap/backend",
+  "plugins/mail-assistant/backend",
 ]
 
 [workspace.package]

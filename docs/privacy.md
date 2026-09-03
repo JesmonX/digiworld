@@ -34,6 +34,15 @@ authentication tokens, account identifiers, or quota responses. The
 pre-command is stored as plain text in local plugin storage; users should refer
 to scripts or environment variables instead of placing secrets in this field.
 
+The optional Mail Assistant connects only to IMAP accounts explicitly added by
+the user. Application passwords and client authorization codes are stored in the
+operating-system credential store and are never written to Digiworld's SQLite
+databases or logs. The plugin stores account settings, message headers, up to
+1 MiB of decoded plain-text body per message, attachment names, types, sizes,
+and sync cursors in local plugin storage so the Inbox can be searched and read
+offline. It does not retain attachment contents, render remote HTML resources,
+send mail, or modify server flags, folders, and messages.
+
 For an SSH source, Digiworld reuses the system OpenSSH client, SSH config,
 known-hosts policy, ssh-agent, and keys. An ephemeral Python 3 parser runs in
 memory on the selected Unix device and returns only normalized usage records,

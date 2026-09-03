@@ -46,6 +46,9 @@ function permissionLabel(id: string): string {
     'process:ssh': '使用系统 SSH',
     'process:shell': '运行已配置的系统 Shell',
     'network:openai': '访问 OpenAI Codex 服务',
+    'network:imap': '访问 IMAP 邮箱服务',
+    'notifications': '显示系统通知',
+    'secret:mail-credentials': '保存邮箱授权码',
   }
   return labels[id] ?? id
 }
