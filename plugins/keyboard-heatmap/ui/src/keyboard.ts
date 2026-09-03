@@ -45,7 +45,7 @@ export const navRows: KeyDefinition[][] = [
   [k('Insert', 'Ins'), k('Home', 'Home'), k('PageUp', 'PgUp')],
   [k('Delete', 'Del'), k('End', 'End'), k('PageDown', 'PgDn')],
   [],
-  [k('ArrowUp', '↑', 1, 1)],
+  [k('ArrowUp', '↑')],
   [k('ArrowLeft', '←'), k('ArrowDown', '↓'), k('ArrowRight', '→')],
 ]
 
@@ -65,7 +65,7 @@ const compactNavRows: KeyDefinition[][] = [
   [k('Delete', 'Del'), k('PageUp', 'PgUp')],
   [k('PageDown', 'PgDn')],
   [],
-  [k('ArrowUp', '↑', 1, 1)],
+  [k('ArrowUp', '↑')],
   [k('ArrowLeft', '←'), k('ArrowDown', '↓'), k('ArrowRight', '→')],
 ]
 
