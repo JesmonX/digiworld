@@ -3,7 +3,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getAccentTheme, getFontTheme, pluginTheme } from '../theme'
-import { PluginFrame } from './PluginFrame'
+import { PluginFrame, withHostTypography } from './PluginFrame'
 
 describe('PluginFrame theme', () => {
   let container: HTMLDivElement
@@ -11,6 +11,18 @@ describe('PluginFrame theme', () => {
   beforeEach(() => {
     container = document.createElement('div')
     document.body.append(container)
+  })
+
+  it('supplies host-owned fonts without requiring them in plugin bundles', () => {
+    const source = withHostTypography(
+      '<!doctype html><html><head></head><body></body></html>',
+      '@font-face { font-family: "Digiworld Plex Sans SC"; }',
+    )
+
+    expect(source).toContain('<style data-digiworld-host-typography>')
+    expect(source).toContain('@font-face')
+    expect(source).toContain('Digiworld Plex Sans SC')
+    expect(source).toContain('<body></body>')
   })
 
   afterEach(() => container.remove())

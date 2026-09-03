@@ -1,7 +1,8 @@
 # Digiworld typography assets
 
-Bundled fonts are kept local so the desktop shell and isolated plugin frames
-render consistently without network access.
+Bundled fonts are kept in the desktop shell so it and isolated plugin frames
+render consistently without network access. The host injects these font-face
+declarations into plugin frames; plugin packages must not bundle font files.
 
 - IBM Plex Sans SC: upstream `IBM/plex`, SIL Open Font License 1.1.
 - Smiley Sans 2.0.1: upstream `atelier-anchor/smiley-sans`, SIL Open Font License 1.1.

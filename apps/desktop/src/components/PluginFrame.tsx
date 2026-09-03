@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import type { HostToPluginMessage, PluginTheme, PluginToHostMessage } from '@digiworld/plugin-sdk'
+import hostTypographyCss from '@digiworld/typography/fonts.css?inline'
 import { api } from '../lib/api'
 
 interface PluginFrameProps {
@@ -8,10 +9,17 @@ interface PluginFrameProps {
   theme: PluginTheme
 }
 
+export function withHostTypography(html: string, typographyCss: string = hostTypographyCss): string {
+  const style = `<style data-digiworld-host-typography>${typographyCss}</style>`
+  return /<head(?:\s[^>]*)?>/i.test(html)
+    ? html.replace(/<head(?:\s[^>]*)?>/i, match => `${match}${style}`)
+    : `${style}${html}`
+}
+
 export function PluginFrame({ pluginId, html, theme }: PluginFrameProps) {
   const frame = useRef<HTMLIFrameElement>(null)
   const ready = useRef(false)
-  const source = useMemo(() => html, [html])
+  const source = useMemo(() => withHostTypography(html), [html])
 
   useEffect(() => {
     ready.current = false
