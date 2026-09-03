@@ -106,7 +106,8 @@ describe('explicit update consent', () => {
   it('checks plugin updates without installing until the user confirms', async () => {
     mocks.checkPluginUpdates.mockResolvedValue([{
       id: 'example.plugin', name: '示例插件', currentVersion: '1.0.0', version: '1.1.0',
-      minCoreVersion: '0.2.0', compatible: true, permissionsChanged: false,
+      minCoreVersion: '0.2.0', compatible: true, permissionsChanged: true,
+      addedPermissions: [{ id: 'process:shell', reason: '运行用户选择的命令' }],
     }])
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
@@ -116,6 +117,7 @@ describe('explicit update consent', () => {
     expect(mocks.checkPluginUpdates).toHaveBeenCalledOnce()
     expect(mocks.installPluginUpdates).not.toHaveBeenCalled()
     expect(container.textContent).toContain('1.0.0 → 1.1.0')
+    expect(container.textContent).toContain('运行已配置的系统 Shell：运行用户选择的命令')
 
     await act(async () => { button(container, '同意并更新 1 项')?.click(); await flush() })
     expect(mocks.installPluginUpdates).toHaveBeenCalledWith([{ id: 'example.plugin', version: '1.1.0' }])

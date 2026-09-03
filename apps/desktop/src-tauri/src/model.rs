@@ -138,6 +138,7 @@ pub struct PluginUpdateInfo {
     pub min_core_version: String,
     pub compatible: bool,
     pub permissions_changed: bool,
+    pub added_permissions: Vec<PermissionRequest>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

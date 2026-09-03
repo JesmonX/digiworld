@@ -124,8 +124,17 @@ pub fn configure_plugin_command(command: &mut tokio::process::Command, settings:
         }
         ProxyMode::Custom => {
             let value = settings.url.as_deref().unwrap_or_default();
-            for name in PROXY_ENVIRONMENT {
-                command.env(name, value);
+            if value.starts_with("socks5://") || value.starts_with("socks5h://") {
+                for name in ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"] {
+                    command.env_remove(name);
+                }
+                for name in ["ALL_PROXY", "all_proxy"] {
+                    command.env(name, value);
+                }
+            } else {
+                for name in PROXY_ENVIRONMENT {
+                    command.env(name, value);
+                }
             }
         }
     }

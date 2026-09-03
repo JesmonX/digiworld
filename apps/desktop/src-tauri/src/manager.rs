@@ -160,6 +160,16 @@ impl PluginManager {
                 min_core_version: entry.min_core_version.clone(),
                 compatible,
                 permissions_changed: current.permissions != entry.permissions,
+                added_permissions: entry
+                    .permissions
+                    .iter()
+                    .filter(|permission| {
+                        !current.permissions.iter().any(|installed| {
+                            installed.id == permission.id && installed.reason == permission.reason
+                        })
+                    })
+                    .cloned()
+                    .collect(),
             });
         }
         Ok(updates)
@@ -444,7 +454,32 @@ impl PluginManager {
             .get(plugin_id)
             .cloned()
             .ok_or_else(|| DigiworldError::Plugin(format!("plugin is not running: {plugin_id}")))?;
-        process.lock().await.request(method, payload).await
+        let (result, needs_restart) = {
+            let mut process = process.lock().await;
+            let result = process.request(method, payload).await;
+            (result, process.needs_restart())
+        };
+        if needs_restart {
+            let removed = {
+                let mut processes = self.processes.lock().await;
+                let should_remove = processes
+                    .get(plugin_id)
+                    .is_some_and(|current| Arc::ptr_eq(current, &process));
+                if should_remove {
+                    processes.remove(plugin_id);
+                }
+                should_remove
+            };
+            if removed
+                && let Some(manifest) = self.store.manifest(plugin_id)?
+                && let Err(error) = self.start(&manifest).await
+            {
+                let _ = self
+                    .store
+                    .set_state(plugin_id, "failed", Some(&error.to_string()));
+            }
+        }
+        result
     }
 
     pub async fn stop_all(&self) {

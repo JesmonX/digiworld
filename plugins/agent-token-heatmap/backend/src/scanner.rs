@@ -1,6 +1,6 @@
 use crate::model::{AgentKind, FileUsage, ScanBatch};
 use crate::parsers;
-use anyhow::{Context, Result};
+use anyhow::Result;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fs;
@@ -53,7 +53,16 @@ pub fn scan_local(
         for path in paths {
             let relative = path.strip_prefix(&root).unwrap_or(&path);
             let hash = file_hash(agent, relative);
-            let metadata = fs::metadata(&path)?;
+            let metadata = match fs::metadata(&path) {
+                Ok(metadata) => metadata,
+                Err(error) => {
+                    batch.warnings.push(format!(
+                        "{} skipped an unreadable session file: {error}",
+                        agent.as_str()
+                    ));
+                    continue;
+                }
+            };
             let size = metadata.len();
             let modified = metadata
                 .modified()
@@ -61,13 +70,22 @@ pub fn scan_local(
                 .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
                 .map(|value| value.as_secs() as i64)
                 .unwrap_or(0);
-            seen.push(hash.clone());
             let fingerprint = format!("{size}:{modified}");
             if known.get(&agent).and_then(|items| items.get(&hash)) == Some(&fingerprint) {
+                seen.push(hash);
                 continue;
             }
-            let content = fs::read_to_string(&path)
-                .with_context(|| format!("read {} session data", agent.as_str()))?;
+            let content = match fs::read_to_string(&path) {
+                Ok(content) => content,
+                Err(error) => {
+                    batch.warnings.push(format!(
+                        "{} skipped an unreadable session file: {error}",
+                        agent.as_str()
+                    ));
+                    continue;
+                }
+            };
+            seen.push(hash.clone());
             let (daily, invalid) = parsers::parse(agent, &content);
             if invalid > 0 {
                 batch.warnings.push(format!(
@@ -172,5 +190,26 @@ mod tests {
         .unwrap();
         assert!(!batch.seen.contains_key(&AgentKind::Codex));
         assert_eq!(batch.warnings.len(), 1);
+    }
+
+    #[test]
+    fn unreadable_session_files_do_not_abort_a_scan() {
+        let root = std::env::temp_dir().join(format!(
+            "digiworld-invalid-session-{}-{}",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("invalid.jsonl"), [0xff, 0xfe]).unwrap();
+        let batch = scan_local(
+            &[AgentKind::Codex],
+            &BTreeMap::from([(AgentKind::Codex, root.to_string_lossy().into_owned())]),
+            &BTreeMap::new(),
+        )
+        .unwrap();
+        assert!(batch.files.is_empty());
+        assert!(batch.seen[&AgentKind::Codex].is_empty());
+        assert_eq!(batch.warnings.len(), 1);
+        fs::remove_dir_all(root).unwrap();
     }
 }

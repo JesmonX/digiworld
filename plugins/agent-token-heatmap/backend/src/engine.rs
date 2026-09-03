@@ -130,7 +130,7 @@ impl UsageEngine {
     }
 
     pub fn refresh_status(&self) -> RefreshStatus {
-        self.refresh.lock().expect("refresh lock poisoned").clone()
+        lock_unpoisoned(&self.refresh).clone()
     }
 
     pub fn start_refresh(&self, only_source: Option<&str>) -> Result<RefreshStatus> {
@@ -161,7 +161,8 @@ impl UsageEngine {
         settings: UsageSettings,
         sources: Vec<RefreshSource>,
     ) -> Result<RefreshStatus> {
-        if self.refresh.lock().expect("refresh lock poisoned").running {
+        let mut status = lock_unpoisoned(&self.refresh);
+        if status.running {
             bail!("a usage refresh is already running");
         }
         let job_id = format!("refresh-{}", chrono::Utc::now().timestamp_millis());
@@ -173,19 +174,18 @@ impl UsageEngine {
             current_source: None,
             errors: Vec::new(),
         };
-        *self.refresh.lock().expect("refresh lock poisoned") = initial.clone();
+        *status = initial.clone();
+        drop(status);
         let database = self.database.clone();
         let refresh = self.refresh.clone();
         std::thread::spawn(move || {
+            let _reset = RefreshReset(refresh.clone());
             for source in sources {
                 let (source_id, label) = match &source {
                     RefreshSource::Local => ("local".to_string(), "本机".to_string()),
                     RefreshSource::Ssh(source) => (source.id.clone(), source.label.clone()),
                 };
-                refresh
-                    .lock()
-                    .expect("refresh lock poisoned")
-                    .current_source = Some(label.clone());
+                lock_unpoisoned(&refresh).current_source = Some(label.clone());
                 let known = database
                     .lock()
                     .expect("database lock poisoned")
@@ -217,14 +217,27 @@ impl UsageEngine {
                         record_error(&database, &refresh, &source_id, &label, &error.to_string())
                     }
                 }
-                refresh.lock().expect("refresh lock poisoned").completed += 1;
+                lock_unpoisoned(&refresh).completed += 1;
             }
-            let mut status = refresh.lock().expect("refresh lock poisoned");
-            status.running = false;
-            status.current_source = None;
         });
         Ok(initial)
     }
+}
+
+struct RefreshReset(Arc<Mutex<RefreshStatus>>);
+
+impl Drop for RefreshReset {
+    fn drop(&mut self) {
+        let mut status = lock_unpoisoned(&self.0);
+        status.running = false;
+        status.current_source = None;
+    }
+}
+
+fn lock_unpoisoned<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 fn record_error(
@@ -239,9 +252,7 @@ fn record_error(
         .lock()
         .expect("database lock poisoned")
         .mark_error(source_id, &safe);
-    refresh
-        .lock()
-        .expect("refresh lock poisoned")
+    lock_unpoisoned(refresh)
         .errors
         .push(format!("{label}: {safe}"));
 }

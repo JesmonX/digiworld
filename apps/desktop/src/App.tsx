@@ -317,6 +317,7 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
     try {
       if (action === 'save') {
         setProxy(await api.setProxySettings(proxy))
+        await onPluginsUpdated()
         setProxyMessage('代理设置已保存')
       } else {
         const result = await withDeadline(
@@ -538,7 +539,13 @@ function UpdateDialogView({ dialog, busy, progress, error, onCancel, onConfirm }
           <div className="update-list">
             {dialog.updates.map(update => (
               <div key={update.id} className={!update.compatible ? 'incompatible' : ''}>
-                <span><strong>{update.name}</strong><small>{update.currentVersion} → {update.version}</small></span>
+                <span><strong>{update.name}</strong><small>{update.currentVersion} → {update.version}</small>
+                  {update.permissionsChanged && update.addedPermissions.length > 0 && (
+                    <span className="permission-changes">
+                      {update.addedPermissions.map(permission => <small key={`${permission.id}:${permission.reason}`}><b>{permissionLabel(permission.id)}</b>：{permission.reason}</small>)}
+                    </span>
+                  )}
+                </span>
                 <span className="update-flags">
                   {update.permissionsChanged && <small>权限有变化</small>}
                   {!update.compatible && <small>需 Digiworld {update.minCoreVersion}</small>}

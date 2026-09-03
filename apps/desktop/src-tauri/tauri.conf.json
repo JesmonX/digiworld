@@ -25,7 +25,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; frame-src 'self' blob: data:; img-src 'self' asset: data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' blob:; connect-src ipc: http://ipc.localhost",
+      "csp": "default-src 'self'; frame-src 'self' blob: data:; font-src 'self' asset: http://tauri.localhost http://localhost:1420 data:; img-src 'self' asset: data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' blob:; connect-src ipc: http://ipc.localhost",
       "dangerousDisableAssetCspModification": [
         "script-src",
         "style-src"

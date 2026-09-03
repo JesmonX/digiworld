@@ -380,6 +380,7 @@ async fn install_core_update(
         },
     );
     *cache.update.lock().await = None;
+    manager.stop_all().await;
     app.restart();
 }
 
@@ -516,7 +517,13 @@ pub fn run() {
                                 let _ = window.hide();
                             }
                         } else {
-                            handle.exit(0);
+                            api.prevent_close();
+                            let manager = close_manager.clone();
+                            let exit_handle = handle.clone();
+                            tauri::async_runtime::spawn(async move {
+                                manager.stop_all().await;
+                                exit_handle.exit(0);
+                            });
                         }
                     }
                 });

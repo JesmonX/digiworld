@@ -106,13 +106,16 @@ fn run_helper(host: &str, request: &[u8]) -> Result<ScanBatch> {
         stderr.read_to_end(&mut value).map(|_| value)
     });
     let started = Instant::now();
+    let mut timed_out = false;
     let status = loop {
         if let Some(status) = child.try_wait()? {
             break status;
         }
         if started.elapsed() > Duration::from_secs(120) {
             let _ = child.kill();
-            bail!("SSH usage scan timed out after 120 seconds");
+            let status = child.wait()?;
+            timed_out = true;
+            break status;
         }
         thread::sleep(Duration::from_millis(50));
     };
@@ -122,6 +125,9 @@ fn run_helper(host: &str, request: &[u8]) -> Result<ScanBatch> {
     let stderr = stderr_reader
         .join()
         .map_err(|_| anyhow::anyhow!("SSH stderr reader failed"))??;
+    if timed_out {
+        bail!("SSH usage scan timed out after 120 seconds");
+    }
     if !status.success() {
         let message = String::from_utf8_lossy(&stderr);
         bail!(
@@ -158,6 +164,10 @@ def day(value):
     if not value:
         return datetime.datetime.now(offset).strftime('%Y-%m-%d')
     try:
+        if isinstance(value, (int, float)) or (isinstance(value, str) and value.strip().isdigit()):
+            stamp = float(value)
+            if stamp > 1e11: stamp /= 1000.0
+            return datetime.datetime.fromtimestamp(stamp, offset).strftime('%Y-%m-%d')
         parsed = datetime.datetime.fromisoformat(str(value).replace('Z', '+00:00'))
         if parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=datetime.timezone.utc)
@@ -258,7 +268,11 @@ mod tests {
         let session = root.join("private-project.jsonl");
         fs::write(
             &session,
-            r#"{"timestamp":"2026-09-02T01:00:00Z","message":{"model":"glm-5.3","content":"TOP_SECRET","usage":{"input":10,"output":3,"cacheRead":20,"cacheWrite":2}}}"#,
+            concat!(
+                r#"{"timestamp":"2026-09-02T01:00:00Z","message":{"model":"glm-5.3","content":"TOP_SECRET","usage":{"input":10,"output":3,"cacheRead":20,"cacheWrite":2}}}"#,
+                "\n",
+                r#"{"timestamp":1719878400000,"message":{"model":"glm-5.3","usage":{"input":4,"output":1}}}"#,
+            ),
         )
         .unwrap();
         let request = serde_json::json!({
@@ -285,9 +299,21 @@ mod tests {
         assert!(!text.contains("TOP_SECRET"));
         assert!(!text.contains("private-project"));
         let batch: ScanBatch = serde_json::from_str(&text).unwrap();
-        assert_eq!(batch.files[0].daily[0].usage.input_tokens, 32);
-        assert_eq!(batch.files[0].daily[0].usage.output_tokens, 3);
-        assert_eq!(batch.files[0].daily[0].model, "glm-5.3");
+        assert_eq!(batch.files[0].daily.len(), 2);
+        assert!(
+            batch.files[0]
+                .daily
+                .iter()
+                .any(|row| row.day == "2024-07-02")
+        );
+        assert_eq!(
+            batch.files[0]
+                .daily
+                .iter()
+                .map(|row| row.usage.input_tokens)
+                .sum::<u64>(),
+            36
+        );
         fs::remove_dir_all(root).unwrap();
     }
 }

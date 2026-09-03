@@ -109,7 +109,7 @@ export default function App() {
     link.href = url
     link.download = data.filename
     link.click()
-    URL.revokeObjectURL(url)
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000)
   }
 
   const importData = async (file: File) => {

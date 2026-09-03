@@ -43,6 +43,7 @@ export interface PluginUpdateInfo {
   minCoreVersion: string
   compatible: boolean
   permissionsChanged: boolean
+  addedPermissions: Array<{ id: string; reason: string }>
 }
 
 export interface UpdateProgress {

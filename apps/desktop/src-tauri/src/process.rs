@@ -7,13 +7,75 @@ use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 
+#[cfg(windows)]
+use windows::Win32::{
+    Foundation::{CloseHandle, HANDLE},
+    System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
+        SetInformationJobObject,
+    },
+};
+
 const MAX_RPC_LINE: usize = 4 * 1024 * 1024;
 
 pub struct PluginProcess {
+    #[cfg(windows)]
+    _job: WindowsJob,
     child: Child,
     stdin: ChildStdin,
     stdout: BufReader<ChildStdout>,
     next_id: u64,
+    needs_restart: bool,
+}
+
+#[cfg(windows)]
+struct WindowsJob(HANDLE);
+
+#[cfg(windows)]
+unsafe impl Send for WindowsJob {}
+
+#[cfg(windows)]
+impl Drop for WindowsJob {
+    fn drop(&mut self) {
+        // SAFETY: this object exclusively owns the handle returned by CreateJobObjectW.
+        let _ = unsafe { CloseHandle(self.0) };
+    }
+}
+
+#[cfg(windows)]
+fn assign_kill_on_close_job(child: &Child) -> Result<WindowsJob> {
+    use windows::core::PCWSTR;
+
+    // SAFETY: all pointers reference initialized values for the duration of each call.
+    unsafe {
+        let job = CreateJobObjectW(None, PCWSTR::null()).map_err(|error| {
+            DigiworldError::Plugin(format!("create plugin job object: {error}"))
+        })?;
+        let mut information = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+        information.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        if let Err(error) = SetInformationJobObject(
+            job,
+            JobObjectExtendedLimitInformation,
+            (&raw const information).cast(),
+            std::mem::size_of_val(&information) as u32,
+        ) {
+            let _ = CloseHandle(job);
+            return Err(DigiworldError::Plugin(format!(
+                "configure plugin job object: {error}"
+            )));
+        }
+        let process = child
+            .raw_handle()
+            .ok_or_else(|| DigiworldError::Plugin("plugin process handle is unavailable".into()))?;
+        if let Err(error) = AssignProcessToJobObject(job, HANDLE(process.cast())) {
+            let _ = CloseHandle(job);
+            return Err(DigiworldError::Plugin(format!(
+                "assign plugin process to job object: {error}"
+            )));
+        }
+        Ok(WindowsJob(job))
+    }
 }
 
 impl PluginProcess {
@@ -40,6 +102,8 @@ impl PluginProcess {
         let mut child = command.spawn().map_err(|error| {
             DigiworldError::Plugin(format!("failed to start {}: {error}", executable.display()))
         })?;
+        #[cfg(windows)]
+        let job = assign_kill_on_close_job(&child)?;
         let stdin = child
             .stdin
             .take()
@@ -62,10 +126,13 @@ impl PluginProcess {
             });
         }
         Ok(Self {
+            #[cfg(windows)]
+            _job: job,
             child,
             stdin,
             stdout: BufReader::new(stdout),
             next_id: 0,
+            needs_restart: false,
         })
     }
 
@@ -88,12 +155,22 @@ impl PluginProcess {
         self.stdin.flush().await?;
 
         let mut response = String::new();
-        let read = tokio::time::timeout(
+        let read = match tokio::time::timeout(
             std::time::Duration::from_secs(15),
             self.stdout.read_line(&mut response),
         )
         .await
-        .map_err(|_| DigiworldError::Plugin(format!("plugin request timed out: {method}")))??;
+        {
+            Ok(read) => read?,
+            Err(_) => {
+                self.needs_restart = true;
+                let _ = self.child.start_kill();
+                let _ = self.child.wait().await;
+                return Err(DigiworldError::Plugin(format!(
+                    "plugin request timed out; the process is being restarted: {method}"
+                )));
+            }
+        };
         if read == 0 {
             return Err(DigiworldError::Plugin(
                 "plugin process closed its output".into(),
@@ -128,6 +205,10 @@ impl PluginProcess {
             return Err(DigiworldError::Plugin("plugin health check failed".into()));
         }
         Ok(())
+    }
+
+    pub fn needs_restart(&self) -> bool {
+        self.needs_restart
     }
 
     pub async fn stop(&mut self) {

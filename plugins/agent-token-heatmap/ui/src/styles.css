@@ -117,7 +117,7 @@ i.level-1 { background: color-mix(in srgb, var(--dw-accent, #5b5ce2) 14%, white)
 .agent-dot.codex { background: #111827; } .agent-dot.claude { background: #d97745; } .agent-dot.pi { background: #6d5bd0; }
 .daily-ranking { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .daily-ranking > div { display: grid; grid-template-columns: 18px 78px minmax(45px, 1fr) 62px; align-items: center; gap: 7px; min-height: 20px; font-size: var(--type-caption); }
-.daily-ranking b { color: #8993a3; font-weight: 600; }
+.daily-ranking b { color: #8993a3; font-weight: var(--weight-semibold); }
 .daily-ranking span { color: #4b5565; white-space: nowrap; }
 .daily-ranking i { height: 4px; overflow: hidden; border-radius: 3px; background: #e9edf3; }
 .daily-ranking em { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--dw-accent, #5b5ce2), var(--dw-accent-secondary, #8b5cf6)); }

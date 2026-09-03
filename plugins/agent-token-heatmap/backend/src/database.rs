@@ -96,6 +96,10 @@ impl Database {
             DATABASE_VERSION => {}
             other => anyhow::bail!("unsupported token database schema version: {other}"),
         }
+        connection.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_daily_usage_day_source_agent
+             ON daily_file_usage(day, source_id, agent);",
+        )?;
         Ok(Self { connection })
     }
 
@@ -237,12 +241,18 @@ impl Database {
             )
             .collect();
 
+        let start_day = start.map(|day| day.format("%Y-%m-%d").to_string());
+        let end_day = end.format("%Y-%m-%d").to_string();
         let mut statement = self.connection.prepare(
-            "SELECT source_id, agent, day, model, input_tokens, output_tokens,
-                    cache_read_tokens, cache_write_tokens, cache_available
-             FROM daily_file_usage ORDER BY day",
+            "SELECT source_id, agent, day, model,
+                    SUM(input_tokens), SUM(output_tokens),
+                    SUM(cache_read_tokens), SUM(cache_write_tokens), MAX(cache_available)
+             FROM daily_file_usage
+             WHERE day <= ?1 AND (?2 IS NULL OR day >= ?2)
+             GROUP BY source_id, agent, day, model
+             ORDER BY day",
         )?;
-        let rows = statement.query_map([], |row| {
+        let rows = statement.query_map(params![end_day, start_day], |row| {
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
@@ -270,12 +280,6 @@ impl Database {
             {
                 continue;
             }
-            if start
-                .is_some_and(|start| day.as_str() < start.format("%Y-%m-%d").to_string().as_str())
-                || day.as_str() > end.format("%Y-%m-%d").to_string().as_str()
-            {
-                continue;
-            }
             totals.add_assign(&usage);
             by_day.entry(day).or_default().add_assign(&usage);
             breakdown
@@ -292,8 +296,8 @@ impl Database {
         let cache_rate = (totals.cache_available && totals.input_tokens > 0)
             .then_some(totals.cache_read_tokens as f64 / totals.input_tokens as f64);
         Ok(UsageSnapshot {
-            start_day: start.map(|day| day.format("%Y-%m-%d").to_string()),
-            end_day: end.format("%Y-%m-%d").to_string(),
+            start_day,
+            end_day,
             totals: UsageTotals {
                 usage: totals,
                 total_tokens,
