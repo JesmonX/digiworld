@@ -255,8 +255,12 @@ fn parse_zcode(value: &Value) -> Option<(String, TokenUsage)> {
 
 fn parse_agy(value: &Value) -> Option<(String, TokenUsage)> {
     let usage = value.get("usage").unwrap_or(value);
-    let stamp = timestamp(value)
-        .or_else(|| value.get("created_at").and_then(Value::as_str).map(str::to_string))?;
+    let stamp = timestamp(value).or_else(|| {
+        value
+            .get("created_at")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+    })?;
     let prompt = number(usage, "prompt_token_count")
         .max(number(usage, "promptTokenCount"))
         .max(number(usage, "input_tokens"))
@@ -402,7 +406,11 @@ fn parse_zcode_sqlite(path: &Path) -> Result<(Vec<DailyUsage>, usize)> {
             .unwrap_or_else(|| "unknown".into());
         let day = started_at
             .and_then(|raw| {
-                let secs = if raw > 100_000_000_000 { raw / 1000 } else { raw };
+                let secs = if raw > 100_000_000_000 {
+                    raw / 1000
+                } else {
+                    raw
+                };
                 Utc.timestamp_opt(secs, 0)
                     .single()
                     .map(|t| t.with_timezone(&Local).format("%Y-%m-%d").to_string())
@@ -422,14 +430,22 @@ fn parse_zcode_sqlite(path: &Path) -> Result<(Vec<DailyUsage>, usize)> {
 
 fn parse_sqlite_timestamp(row: &rusqlite::Row, idx: usize) -> Option<i64> {
     if let Ok(num) = row.get::<_, i64>(idx) {
-        return Some(if num > 100_000_000_000 { num / 1000 } else { num });
+        return Some(if num > 100_000_000_000 {
+            num / 1000
+        } else {
+            num
+        });
     }
     if let Ok(s) = row.get::<_, String>(idx) {
         if let Ok(parsed) = DateTime::parse_from_rfc3339(&s) {
             return Some(parsed.timestamp());
         }
         if let Ok(num) = s.parse::<i64>() {
-            return Some(if num > 100_000_000_000 { num / 1000 } else { num });
+            return Some(if num > 100_000_000_000 {
+                num / 1000
+            } else {
+                num
+            });
         }
     }
     None
@@ -544,34 +560,20 @@ fn read_varint(data: &[u8], offset: &mut usize) -> Option<u64> {
 fn skip_wire_field(wire_type: u8, data: &[u8], offset: &mut usize) -> bool {
     match wire_type {
         0 => read_varint(data, offset).is_some(),
-        1 => {
-            if *offset + 8 <= data.len() {
-                *offset += 8;
-                true
-            } else {
-                false
-            }
+        1 if *offset + 8 <= data.len() => {
+            *offset += 8;
+            true
         }
-        2 => {
-            if let Some(len) = read_varint(data, offset) {
-                let len = len as usize;
-                if *offset + len <= data.len() {
-                    *offset += len;
-                    true
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        }
-        5 => {
-            if *offset + 4 <= data.len() {
-                *offset += 4;
+        2 => match read_varint(data, offset) {
+            Some(len) if *offset + (len as usize) <= data.len() => {
+                *offset += len as usize;
                 true
-            } else {
-                false
             }
+            _ => false,
+        },
+        5 if *offset + 4 <= data.len() => {
+            *offset += 4;
+            true
         }
         _ => false,
     }
@@ -795,8 +797,8 @@ mod tests {
             let mut usage_sub = Vec::new();
             usage_sub.extend_from_slice(&[0x08, 0xa6, 0x0a]); // tag 1: 1318
             usage_sub.extend_from_slice(&[0x10, 0xc8, 0x01]); // tag 2: 200
-            usage_sub.extend_from_slice(&[0x18, 0x32]);       // tag 3: 50
-            usage_sub.extend_from_slice(&[0x28, 0x50]);       // tag 5: 80
+            usage_sub.extend_from_slice(&[0x18, 0x32]); // tag 3: 50
+            usage_sub.extend_from_slice(&[0x28, 0x50]); // tag 5: 80
 
             let mut metadata = Vec::new();
             metadata.push(0x32); // tag 6 (6 << 3 | 2)
@@ -807,11 +809,8 @@ mod tests {
             metadata.push(usage_sub.len() as u8);
             metadata.extend_from_slice(&usage_sub);
 
-            conn.execute(
-                "INSERT INTO steps VALUES (1, ?1)",
-                [&metadata],
-            )
-            .unwrap();
+            conn.execute("INSERT INTO steps VALUES (1, ?1)", [&metadata])
+                .unwrap();
         }
 
         let (rows, warnings) = parse_sqlite(AgentKind::Agy, &db_path).unwrap();
