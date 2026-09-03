@@ -1,7 +1,7 @@
 # Release policy
 
-The `Windows Preview release (no Authenticode)` workflow is the zero-cost
-release path. It produces:
+The `Windows Preview and Alpha releases (no Authenticode)` workflow is the
+zero-cost release path. It produces:
 
 - an Ed25519-signed `.dwpkg` plugin archive;
 - a Tauri updater bundle and `latest.json` signed by the Tauri updater key;
@@ -19,6 +19,14 @@ distributed as unsigned Preview builds. Until a separate stable channel exists,
 the workflow also marks the newest Preview as GitHub's latest release so clients
 through 0.2.1 can bootstrap from their legacy `/releases/latest/` endpoint. The
 same Pages deployment publishes the signed plugin catalog.
+
+Every push to `main` automatically builds an Alpha prerelease using the current
+root package version and the workflow run number, for example
+`v0.2.2-alpha.18`. Alpha releases are GitHub prereleases and are not marked as
+the latest release. They do not deploy `latest.json` or the plugin catalog to
+GitHub Pages, so ordinary installations remain on the manually published
+Preview update channel. A newer push cancels an older Alpha build that is still
+in progress.
 
 The workflow requires the following values in the `production-release`
 Environment:

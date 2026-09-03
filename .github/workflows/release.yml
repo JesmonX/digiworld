@@ -1,6 +1,8 @@
-name: Windows Preview release (no Authenticode)
+name: Windows Preview and Alpha releases (no Authenticode)
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       version:
@@ -13,12 +15,15 @@ permissions:
   id-token: write
   pages: write
 
+concurrency:
+  group: windows-release-${{ github.event_name == 'push' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
+
 jobs:
   build:
     runs-on: windows-latest
     environment: production-release
     env:
-      DIGIWORLD_RELEASE_VERSION: ${{ inputs.version }}
       DIGIWORLD_PLUGIN_SIGNING_KEY_B64: ${{ secrets.DIGIWORLD_PLUGIN_SIGNING_KEY_B64 }}
       DIGIWORLD_PLUGIN_PUBLIC_KEY_B64: ${{ vars.DIGIWORLD_PLUGIN_PUBLIC_KEY_B64 }}
       DIGIWORLD_UPDATER_PUBLIC_KEY: ${{ vars.DIGIWORLD_UPDATER_PUBLIC_KEY }}
@@ -26,6 +31,38 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v7
+      - name: Resolve release metadata
+        id: release
+        shell: pwsh
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          if ($env:EVENT_NAME -eq 'workflow_dispatch') {
+            $version = $env:REQUESTED_VERSION
+            $name = "Digiworld v$version Preview"
+            $prerelease = 'false'
+            $makeLatest = 'true'
+          } else {
+            $baseVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
+            if ($baseVersion -notmatch '^\d+\.\d+\.\d+$') {
+              throw "Automatic Alpha releases require a stable package.json version, got: $baseVersion"
+            }
+            $version = "$baseVersion-alpha.$($env:RUN_NUMBER)"
+            $name = "Digiworld v$version Alpha"
+            $prerelease = 'true'
+            $makeLatest = 'false'
+          }
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
+            throw "Invalid release version: $version"
+          }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "tag=v$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "name=$name" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "prerelease=$prerelease" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "make_latest=$makeLatest" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "DIGIWORLD_RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - uses: pnpm/action-setup@v6
         with:
           version: 11.21.0
@@ -60,13 +97,13 @@ jobs:
         shell: pwsh
         env:
           DIGIWORLD_TARGET: windows-x86_64
-          DIGIWORLD_RELEASE_TAG: v${{ inputs.version }}
+          DIGIWORLD_RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: pnpm package:keyboard
       - name: Package signed Agent Token plugin
         shell: pwsh
         env:
           DIGIWORLD_TARGET: windows-x86_64
-          DIGIWORLD_RELEASE_TAG: v${{ inputs.version }}
+          DIGIWORLD_RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: pnpm package:agent-tokens
       - name: Build signed plugin catalog
         env:
@@ -77,6 +114,7 @@ jobs:
       - name: Build updater manifest
         run: node scripts/build-update-manifest.mjs
       - name: Stage updater manifest for GitHub Pages
+        if: github.event_name == 'workflow_dispatch'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path updates | Out-Null
@@ -113,6 +151,7 @@ jobs:
             SHA256SUMS.txt
             PREVIEW-UNSIGNED.txt
       - uses: actions/upload-artifact@v7
+        if: github.event_name == 'workflow_dispatch'
         with:
           name: release-update-site
           path: |
@@ -121,12 +160,10 @@ jobs:
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v${{ inputs.version }}
-          name: Digiworld v${{ inputs.version }} Preview
-          # Keep the unsigned "Preview" product label, but publish this as the
-          # latest release so Digiworld <= 0.2.1 can bootstrap from its legacy
-          # /releases/latest/download/latest.json endpoint.
-          prerelease: false
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: ${{ steps.release.outputs.name }}
+          prerelease: ${{ steps.release.outputs.prerelease }}
+          make_latest: ${{ steps.release.outputs.make_latest }}
           generate_release_notes: true
           files: |
             dist/plugins/*
@@ -136,6 +173,7 @@ jobs:
 
   deploy-catalog:
     needs: build
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
