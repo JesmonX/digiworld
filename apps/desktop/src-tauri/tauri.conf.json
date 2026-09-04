@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Digiworld",
-  "version": "0.2.14",
+  "version": "0.2.15",
   "identifier": "io.github.jesmonx.digiworld",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -34,7 +34,9 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "createUpdaterArtifacts": true,
     "publisher": "JesmonX",
     "shortDescription": "A lightweight, local-first modular desktop toolkit.",
@@ -56,7 +58,7 @@
       "endpoints": [
         "https://jesmonx.github.io/digiworld/updates/latest.json"
       ],
-      "pubkey": "REPLACE_WITH_TAURI_UPDATER_PUBLIC_KEY",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk1NDczMzFGRjRDMTNDNUQKUldSZFBNSDBIek5IbGYxdThGb2tkVjBXeHFaaTNtMHVIb0xKbmplTzJJVTZoeWpldnpLb0JhTWMK",
       "windows": {
         "installMode": "passive"
       }
