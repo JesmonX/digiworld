@@ -288,7 +288,7 @@ function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
 
   return <article className="weekly-card">
     <div className="panel-heading"><div><h2>近 7 天趋势</h2><p>按模型堆叠 Token 与缓存读取率</p></div><div className="chart-legend">{modelCategories.length ? modelCategories.map((category, index) => <span key={category.key} title={`${category.label} · ${formatTokens(category.totalTokens)}`}><i className={`model-key model-key-${index}`} />{category.label}<small>{formatTokens(category.totalTokens)}</small></span>) : <span><i className="bar-key" />Token</span>}<span><i className="line-key" />缓存率</span></div></div>
-    {points.length ? <svg className="weekly-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="近七天 Token 用量柱形图和缓存率折线图">
+    {points.length ? <svg className="weekly-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="近七天按模型堆叠的 Token 用量柱形图和缓存率折线图">
       {[0, .5, 1].map(ratio => {
         const y = top + ratio * plotHeight
         return <g key={ratio}><line x1={left} x2={width - right} y1={y} y2={y} className="chart-grid-line" /><text x={left - 8} y={y + 4} textAnchor="end" className="chart-axis-label">{formatTokens(maximum * (1 - ratio))}</text><text x={width - right + 8} y={y + 4} className="chart-axis-label">{Math.round((cacheAxisMaximum - cacheAxisRange * ratio) * 100)}%</text></g>
