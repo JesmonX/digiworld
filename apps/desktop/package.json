@@ -1,6 +1,6 @@
 {
   "name": "@digiworld/desktop",
-  "version": "0.2.24",
+  "version": "0.2.25",
   "private": true,
   "type": "module",
   "scripts": {
