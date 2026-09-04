@@ -400,10 +400,10 @@ impl PluginManager {
             }
             return Err(error);
         }
-        if rollback.exists() {
-            if let Err(error) = tokio::fs::remove_dir_all(&rollback).await {
-                tracing::warn!(plugin = %plugin_id, %error, "installed plugin but could not remove rollback directory");
-            }
+        if rollback.exists()
+            && let Err(error) = tokio::fs::remove_dir_all(&rollback).await
+        {
+            tracing::warn!(plugin = %plugin_id, %error, "installed plugin but could not remove rollback directory");
         }
         let summary = self.summary(plugin_id)?;
         on_progress(
