@@ -31,7 +31,7 @@ await writeFile(cargoPath, nextCargo)
 
 const cargoLock = await readFile(cargoLockPath, 'utf8')
 const nextCargoLock = cargoLock.replace(
-  /(\[\[package\]\]\nname = "digiworld"\nversion = ")[^"]+"/,
+  /(\[\[package\]\]\r?\nname = "digiworld"\r?\nversion = ")[^"]+"/,
   `$1${version}"`,
 )
 if (nextCargoLock === cargoLock) throw new Error('Could not update digiworld in Cargo.lock')

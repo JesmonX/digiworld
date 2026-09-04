@@ -16,7 +16,7 @@ const packages = await Promise.all(packagePaths.map(async relative => ({
 const cargo = await readFile(path.join(root, 'Cargo.toml'), 'utf8')
 const cargoVersion = cargo.match(/\[workspace\.package\][\s\S]*?\nversion\s*=\s*"([^"]+)"/)?.[1]
 const cargoLock = await readFile(path.join(root, 'Cargo.lock'), 'utf8')
-const cargoLockVersion = cargoLock.match(/\[\[package\]\]\nname = "digiworld"\nversion = "([^"]+)"/)?.[1]
+const cargoLockVersion = cargoLock.match(/\[\[package\]\]\r?\nname = "digiworld"\r?\nversion = "([^"]+)"/)?.[1]
 const tauriVersion = JSON.parse(
   await readFile(path.join(root, 'apps/desktop/src-tauri/tauri.conf.json'), 'utf8'),
 ).version
