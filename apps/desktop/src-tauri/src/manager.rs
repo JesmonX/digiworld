@@ -22,7 +22,6 @@ const MAX_EXTRACTED_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_UI_BYTES: u64 = 8 * 1024 * 1024;
 
 pub struct PluginManager {
-    root: PathBuf,
     plugins_dir: PathBuf,
     data_dir: PathBuf,
     store: Store,
@@ -47,7 +46,6 @@ impl PluginManager {
             .and_then(|value| network::normalized(value).ok())
             .unwrap_or_default();
         Ok(Arc::new(Self {
-            root,
             plugins_dir,
             data_dir,
             store,
@@ -522,10 +520,6 @@ impl PluginManager {
             .into_iter()
             .find(|plugin| plugin.id == id)
             .ok_or_else(|| DigiworldError::Plugin(format!("plugin not found: {id}")))
-    }
-
-    pub fn root(&self) -> &Path {
-        &self.root
     }
 
     async fn start(&self, manifest: &PluginManifest) -> Result<()> {
