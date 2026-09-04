@@ -181,6 +181,7 @@ describe('explicit update consent', () => {
     const stylesheet = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8')
     expect(stylesheet).toMatch(/\.main \{[^}]*min-height: 0;/)
     expect(stylesheet).toMatch(/\.content \{[^}]*overflow: auto;/)
+    expect(stylesheet).toMatch(/\.page-transition \{[^}]*height: 100%;/)
     await act(async () => root.unmount())
   })
 
