@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, Download, Flame, Keyboard, Pause, Play, RotateCcw, Upload } from 'lucide-react'
+import { Check, ChevronDown, Flame, Keyboard, Pause, Play } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import {
   formatKeyLabel, getKeyboardLayout, keyboardLayouts, layoutKeys, type KeyboardLayoutId, type KeyDefinition,
@@ -19,15 +19,12 @@ interface Snapshot {
   counts: Record<string, number>
   topTen: RankingEntry[]
 }
-interface ExportPayload { content: string; filename: string; mime: string }
-
 export default function App() {
   const [scope, setScope] = useState<'today' | 'all'>('today')
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const [layoutId, setLayoutId] = useState<KeyboardLayoutId>('full')
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const importInput = useRef<HTMLInputElement>(null)
   const layoutPickerRef = useRef<HTMLDivElement>(null)
   const layoutTriggerRef = useRef<HTMLButtonElement>(null)
 
@@ -96,28 +93,6 @@ export default function App() {
     await refresh()
   }
 
-  const clear = async () => {
-    if (!window.confirm(scope === 'today' ? '清除今天的统计？' : '清除全部统计？此操作不可撤销。')) return
-    await bridge.request('heatmap.clear', { scope })
-    await refresh()
-  }
-
-  const exportData = async (format: 'json' | 'csv') => {
-    const data = await bridge.request<ExportPayload>('heatmap.export', { format })
-    const url = URL.createObjectURL(new Blob([data.content], { type: data.mime }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = data.filename
-    link.click()
-    window.setTimeout(() => URL.revokeObjectURL(url), 1_000)
-  }
-
-  const importData = async (file: File) => {
-    const mode = window.confirm('合并备份？选择“取消”将替换现有数据。') ? 'merge' : 'replace'
-    await bridge.request('heatmap.import', { content: await file.text(), mode })
-    await refresh()
-  }
-
   return (
     <div className="heatmap-app">
       <header className="plugin-header">
@@ -180,16 +155,6 @@ export default function App() {
               ? snapshot.topTen.map((entry, index) => <div key={entry.key}><b>{index + 1}</b><span>{formatKeyLabel(entry.key)}</span><i><em style={{ width: `${(entry.count / (snapshot.topTen[0]?.count || 1)) * 100}%` }} /></i><strong>{entry.count.toLocaleString()}</strong></div>)
               : <p className="no-data">暂无数据</p>}
           </div>
-        </article>
-        <article className="data-card">
-          <h2>数据管理</h2>
-          <div className="data-actions">
-            <button onClick={() => void exportData('json')}><Download />JSON 备份</button>
-            <button onClick={() => void exportData('csv')}><Download />CSV</button>
-            <button onClick={() => importInput.current?.click()}><Upload />导入</button>
-            <button className="danger" onClick={() => void clear()}><RotateCcw />清除数据</button>
-          </div>
-          <input ref={importInput} type="file" accept="application/json,.json" hidden onChange={event => { const file = event.target.files?.[0]; if (file) void importData(file); event.currentTarget.value = '' }} />
         </article>
       </section>
     </div>

@@ -55,6 +55,7 @@ describe('mail assistant status and search', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+    vi.restoreAllMocks()
     container.remove()
   })
 
@@ -102,7 +103,7 @@ describe('mail assistant status and search', () => {
     await act(async () => root.unmount())
   })
 
-  it('correctly displays unread only when both serverSeen and locallyViewed are false, and allows toggling', async () => {
+  it('marks every message in the selected account read without a single-message action', async () => {
     const root = createRoot(container)
     mocks.request.mockImplementation(async (method: string) => {
       if (method === 'mail.sync.status') return { accounts: [account], syncingAccountIds: [] }
@@ -127,9 +128,10 @@ describe('mail assistant status and search', () => {
         snippet: '未读', serverSeen: false, locallyViewed: true, size: 10, hasBody: true,
         recipients: 'me@example.com', body: '正文内容', bodyTruncated: false, attachments: [],
       }
-      if (method === 'mail.messages.mark_read') return { ok: true }
+      if (method === 'mail.messages.mark_all_read') return { ok: true, updated: 1 }
       throw new Error(`unexpected method: ${method}`)
     })
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
     vi.useFakeTimers()
     await act(async () => {
       root.render(<App />)
@@ -145,26 +147,24 @@ describe('mail assistant status and search', () => {
     expect(firstRow.classList.contains('new')).toBe(true)
     expect(secondRow.classList.contains('new')).toBe(false)
 
-    // Click on unread message to open
+    const accountButton = Array.from(container.querySelectorAll<HTMLButtonElement>('.accounts > button'))
+      .find(item => item.textContent?.includes('工作邮箱'))
+    expect(accountButton).not.toBeUndefined()
     await act(async () => {
-      firstRow.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      accountButton?.click()
+      await vi.advanceTimersByTimeAsync(200)
+    })
+    expect(container.textContent).toContain('全部标为已读')
+    expect(container.querySelector('.toggle-read')).toBeNull()
+    expect(container.textContent).not.toContain('标为未读')
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('.mark-all')?.click()
       await Promise.resolve()
     })
-    expect(firstRow.classList.contains('new')).toBe(false)
-
-    // Toggle button should now show '标为未读'
-    const toggleBtn = container.querySelector<HTMLButtonElement>('.toggle-read')!
-    expect(toggleBtn).not.toBeNull()
-    expect(toggleBtn.textContent).toBe('标为未读')
-
-    // Click toggle button to mark as unread
-    await act(async () => {
-      toggleBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-      await Promise.resolve()
-    })
-    expect(mocks.request).toHaveBeenCalledWith('mail.messages.mark_read', { id: 1, read: false })
-    expect(toggleBtn.textContent).toBe('标为已读')
-    expect(firstRow.classList.contains('new')).toBe(true)
+    expect(mocks.request).toHaveBeenCalledWith('mail.messages.mark_all_read', { accountId: 'mail-1' })
+    expect(container.querySelectorAll('.mail-row.new')).toHaveLength(0)
+    expect(container.textContent).toContain('1 封缓存邮件标为已读')
 
     await act(async () => root.unmount())
   })

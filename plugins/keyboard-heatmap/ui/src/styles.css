@@ -41,7 +41,7 @@ button:focus-visible { outline: 2px solid color-mix(in srgb, var(--dw-accent, #5
 .pause-button.paused { color: #a15c00; border-color: #efcf9e; background: #fff9ee; }
 .plugin-error { margin-bottom: 10px; padding: 9px 11px; border: 1px solid #efc3c0; border-radius: 7px; color: #a6241d; background: #fff5f4; font-size: var(--type-body-sm); }
 
-.keyboard-card, .ranking-card, .data-card { border: 1px solid var(--dw-border, #dde3ec); border-radius: 10px; background: var(--dw-surface, #ffffff); }
+.keyboard-card, .ranking-card { border: 1px solid var(--dw-border, #dde3ec); border-radius: 10px; background: var(--dw-surface, #ffffff); }
 .keyboard-card { padding: 15px 16px 16px; }
 .layout-picker { position: relative; z-index: 4; display: inline-block; margin-bottom: 14px; }
 .layout-picker-trigger { min-width: 126px; height: 42px; display: flex; align-items: center; gap: 8px; padding: 6px 9px; border: 1px solid var(--dw-border, #dde3ec); border-radius: 7px; color: #465266; background: #fafbfc; text-align: left; cursor: pointer; }
@@ -64,7 +64,7 @@ button:focus-visible { outline: 2px solid color-mix(in srgb, var(--dw-accent, #5
 .layout-menu > button > svg { width: 13px; margin-left: auto; color: var(--dw-accent-strong, #4338ca); stroke-width: 2.6; }
 .keyboard-scroll { overflow-x: auto; }
 .board-toolbar { min-width: var(--board-min-width); display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.board-toolbar h2, .ranking-card h2, .data-card h2 { margin: 0; color: var(--dw-text, #172033); font-size: 15px; font-weight: var(--weight-semibold); }
+.board-toolbar h2, .ranking-card h2 { margin: 0; color: var(--dw-text, #172033); font-size: 15px; font-weight: var(--weight-semibold); }
 .board-toolbar h2 { display: flex; align-items: center; gap: 7px; }
 .board-toolbar h2 svg { width: 15px; color: var(--dw-accent, #5b5ce2); }
 .legend { display: flex; align-items: center; gap: 4px; color: var(--dw-text-muted, #667085); font-size: var(--type-caption); }
@@ -105,9 +105,9 @@ button:focus-visible { outline: 2px solid color-mix(in srgb, var(--dw-accent, #5
 .numpad-section { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(5, 42px); gap: 4px; }
 .numpad-section .key { width: 100%; height: 100%; margin: 0; }
 
-.lower-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(260px, .65fr); gap: 10px; margin-top: 10px; }
-.ranking-card, .data-card { padding: 16px; }
-.ranking-card h2, .data-card h2 { margin-bottom: 12px; }
+.lower-grid { margin-top: 10px; }
+.ranking-card { padding: 16px; }
+.ranking-card h2 { margin-bottom: 12px; }
 .ranking-list { display: flex; flex-direction: column; gap: 6px; }
 .ranking-list > div { display: grid; grid-template-columns: 22px minmax(82px, .7fr) 1fr 72px; align-items: center; gap: 9px; min-height: 22px; font-size: var(--type-body-sm); }
 .ranking-list b { color: #7f8a9b; font-size: var(--type-caption); font-weight: var(--weight-semibold); }
@@ -116,19 +116,10 @@ button:focus-visible { outline: 2px solid color-mix(in srgb, var(--dw-accent, #5
 .ranking-list em { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--dw-accent, #5b5ce2), var(--dw-accent-secondary, #8b5cf6)); }
 .ranking-list strong { color: var(--dw-text, #172033); text-align: right; font-size: var(--type-body-sm); font-weight: var(--weight-semibold); font-feature-settings: "tnum" 1; }
 .no-data { margin: 4px 0; color: var(--dw-text-muted, #667085); font-size: var(--type-body-sm); }
-.data-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
-.data-actions button { display: flex; align-items: center; gap: 7px; min-height: 38px; padding: 0 11px; border: 1px solid var(--dw-border, #dde3ec); border-radius: 7px; color: #3e4a5d; font-size: var(--type-body); font-weight: var(--weight-semibold); text-align: left; background: #fafbfc; cursor: pointer; }
-.data-actions button:hover { border-color: color-mix(in srgb, var(--dw-accent, #5b5ce2) 32%, var(--dw-border, #dde3ec)); color: var(--dw-accent-strong, #4338ca); background: color-mix(in srgb, var(--dw-accent-soft, #ededff) 48%, white); }
-.data-actions button.danger { color: var(--dw-danger, #d92d20); }
-.data-actions svg { width: 14px; height: 14px; }
 
 @media (max-height: 720px) {
   .key-row { height: 40px; }
   .nav-section .key-row:nth-child(3) { height: 40px; }
   .numpad-section { grid-template-rows: repeat(5, 40px); }
   .plugin-header { margin-bottom: 8px; }
-}
-
-@media (max-width: 900px) {
-  .lower-grid { grid-template-columns: 1fr; }
 }

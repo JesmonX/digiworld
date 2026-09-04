@@ -84,5 +84,4 @@ export const api = {
   installCoreUpdate: (version: string) => invoke<void>('install_core_update', { version }),
   onUpdateProgress: (handler: (progress: UpdateProgress) => void): Promise<UnlistenFn> =>
     listen<UpdateProgress>('update-progress', event => handler(event.payload)),
-  exportDiagnostics: () => invoke<string>('export_diagnostics'),
 }

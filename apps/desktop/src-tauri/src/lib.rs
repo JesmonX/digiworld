@@ -384,28 +384,6 @@ async fn install_core_update(
     app.restart();
 }
 
-#[tauri::command]
-async fn export_diagnostics(manager: State<'_, Arc<PluginManager>>) -> Result<String> {
-    let directory = manager.root().join("diagnostics");
-    tokio::fs::create_dir_all(&directory).await?;
-    let path = directory.join(format!(
-        "digiworld-diagnostics-{}.json",
-        chrono::Utc::now().format("%Y%m%d-%H%M%S")
-    ));
-    let proxy = manager.proxy_settings().await;
-    let payload = serde_json::json!({
-        "generatedAt": chrono::Utc::now().to_rfc3339(),
-        "coreVersion": env!("CARGO_PKG_VERSION"),
-        "platform": std::env::consts::OS,
-        "target": target_key(),
-        "proxyMode": proxy.mode,
-        "plugins": manager.summaries()?,
-        "privacy": "No keyboard counts, key events, credentials, or user files are included."
-    });
-    tokio::fs::write(&path, serde_json::to_vec_pretty(&payload)?).await?;
-    Ok(path.display().to_string())
-}
-
 fn open_main(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -548,7 +526,6 @@ pub fn run() {
             test_proxy_settings,
             check_core_update,
             install_core_update,
-            export_diagnostics,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Digiworld");

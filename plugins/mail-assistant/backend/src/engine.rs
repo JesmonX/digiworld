@@ -25,6 +25,7 @@ type Notify = dyn Fn(String, String) + Send + Sync;
 pub struct MailEngine {
     database: Database,
     syncing: Mutex<HashSet<String>>,
+    mark_all_read_pending: Mutex<HashSet<String>>,
     last_started: Mutex<HashMap<String, Instant>>,
     shutdown: AtomicBool,
     notify: Arc<Notify>,
@@ -35,6 +36,7 @@ impl MailEngine {
         let engine = Arc::new(Self {
             database: Database::open(path)?,
             syncing: Mutex::new(HashSet::new()),
+            mark_all_read_pending: Mutex::new(HashSet::new()),
             last_started: Mutex::new(HashMap::new()),
             shutdown: AtomicBool::new(false),
             notify,
@@ -191,6 +193,10 @@ impl MailEngine {
             }
             return Err(error);
         }
+        self.mark_all_read_pending
+            .lock()
+            .expect("mark-all-read lock poisoned")
+            .remove(id);
         Ok(())
     }
 
@@ -219,7 +225,8 @@ impl MailEngine {
             started.push(id.clone());
             let engine = self.clone();
             std::thread::spawn(move || {
-                if let Err(error) = engine.sync_account(&id) {
+                let result = engine.sync_account(&id);
+                if let Err(error) = &result {
                     let message = redact_error(&error.to_string());
                     let _ = engine.database.fail_sync(&id, &message, 5);
                 }
@@ -228,6 +235,15 @@ impl MailEngine {
                     .lock()
                     .expect("sync lock poisoned")
                     .remove(&id);
+                if result.is_ok()
+                    && engine
+                        .mark_all_read_pending
+                        .lock()
+                        .expect("mark-all-read lock poisoned")
+                        .contains(&id)
+                {
+                    let _ = engine.start_sync(Some(&id));
+                }
             });
         }
         started
@@ -261,8 +277,22 @@ impl MailEngine {
         self.database.message(id)
     }
 
-    pub fn mark_read(&self, id: i64, read: bool) -> Result<()> {
-        self.database.toggle_read(id, read)
+    pub fn mark_all_read(self: &Arc<Self>, account_id: &str) -> Result<u64> {
+        self.database.account(account_id)?;
+        let updated = self.database.mark_all_read(account_id)?;
+        self.mark_all_read_pending
+            .lock()
+            .expect("mark-all-read lock poisoned")
+            .insert(account_id.to_string());
+        let _ = self.start_sync(Some(account_id));
+        Ok(updated)
+    }
+
+    fn has_pending_mark_all_read(&self, account_id: &str) -> bool {
+        self.mark_all_read_pending
+            .lock()
+            .expect("mark-all-read lock poisoned")
+            .contains(account_id)
     }
 
     fn sync_account(&self, id: &str) -> Result<()> {
@@ -291,23 +321,43 @@ impl MailEngine {
                         >= 24
                 });
         let mut session = connect(&input, &secret)?;
-        let mailbox = session
-            .select("INBOX")
-            .or_else(|_| session.examine("INBOX"))
-            .context("无法打开 INBOX")?;
+        let (mailbox, writable) = match session.select("INBOX") {
+            Ok(mailbox) => (mailbox, true),
+            Err(error) if self.has_pending_mark_all_read(id) => {
+                return Err(anyhow!("无法以可写方式打开 INBOX: {error}"));
+            }
+            Err(_) => (session.examine("INBOX").context("无法打开 INBOX")?, false),
+        };
         let uid_validity = mailbox.uid_validity.unwrap_or(0);
         if stored_validity.is_some_and(|value| value != uid_validity) {
             self.database.reset_for_uid_validity(id, uid_validity)?;
         }
         let effective_baseline = baseline_complete && stored_validity == Some(uid_validity);
 
-        // 1. Sync seen flags from server
-        if let Ok(unseen_list) = session.uid_search("UNSEEN") {
-            let unseen_uids: HashSet<u32> = unseen_list.into_iter().collect();
-            let _ = self.database.update_seen_flags(id, uid_validity, &unseen_uids);
+        // 1. Push the explicit selected-account bulk read request to the server.
+        if self.has_pending_mark_all_read(id) {
+            if !writable {
+                return Err(anyhow!("当前 IMAP 连接为只读，无法同步全部已读"));
+            }
+            session
+                .uid_store("1:*", "+FLAGS (\\Seen)")
+                .context("同步全部已读状态失败")?;
+            self.database.mark_all_server_seen(id, uid_validity)?;
+            self.mark_all_read_pending
+                .lock()
+                .expect("mark-all-read lock poisoned")
+                .remove(id);
         }
 
-        // 2. Push locally read messages to server
+        // 2. Sync seen flags from server
+        if let Ok(unseen_list) = session.uid_search("UNSEEN") {
+            let unseen_uids: HashSet<u32> = unseen_list.into_iter().collect();
+            let _ = self
+                .database
+                .update_seen_flags(id, uid_validity, &unseen_uids);
+        }
+
+        // 3. Push locally viewed messages to server
         if let Ok(pending_read) = self.database.pending_locally_read_uids(id, uid_validity)
             && !pending_read.is_empty()
         {
@@ -334,7 +384,10 @@ impl MailEngine {
             self.database.reconcile_uids(id, uid_validity, &uids)?;
         }
 
-        let existing_uids = self.database.existing_uids(id, uid_validity).unwrap_or_default();
+        let existing_uids = self
+            .database
+            .existing_uids(id, uid_validity)
+            .unwrap_or_default();
         let uids_to_index: Vec<u32> = uids
             .iter()
             .copied()
@@ -398,9 +451,16 @@ impl MailEngine {
             self.database.progress(id, indexed, "indexing")?;
         }
 
+        let mut body_uids = uids.clone();
+        let mut body_uid_set: HashSet<u32> = body_uids.iter().copied().collect();
+        for uid in self.database.incomplete_body_uids(id, uid_validity)? {
+            if body_uid_set.insert(uid) {
+                body_uids.push(uid);
+            }
+        }
         self.database.progress(id, 0, "downloading")?;
         let mut downloaded = 0_u64;
-        for uid in &uids {
+        for uid in &body_uids {
             if self.database.has_body(id, uid_validity, *uid)? {
                 downloaded += 1;
                 continue;
@@ -414,41 +474,55 @@ impl MailEngine {
                     .unwrap_or_default(),
                 Err(_) => BodyPlan::default(),
             };
-            let body_result = fetch_text_body(&mut session, *uid, &plan);
-            let (body, truncated, attachments) = match body_result {
-                Ok((body, truncated)) => (body, truncated, plan.attachments),
-                Err(_) => {
-                    match session.uid_fetch(
-                        uid.to_string(),
-                        format!("BODY.PEEK[TEXT]<0.{MAX_BODY_BYTES}>"),
-                    ) {
-                        Ok(fetches) => {
-                            let raw = fetches
-                                .iter()
-                                .next()
-                                .and_then(|f| f.text())
-                                .unwrap_or_default();
-                            let text = parser::decode_text_part(raw, "text/plain", None, "8bit");
-                            let trunc = text.chars().count() > MAX_BODY_BYTES;
-                            (
-                                text.chars().take(MAX_BODY_BYTES).collect(),
-                                trunc,
-                                Vec::new(),
-                            )
-                        }
-                        Err(err) => {
-                            tracing::warn!("读取邮件 UID {uid} 正文失败: {err}");
-                            (String::new(), false, Vec::new())
-                        }
+            let body_result = match fetch_text_body(&mut session, *uid, &plan) {
+                Ok(value) => Ok(value),
+                Err(primary_error) => match session.uid_fetch(
+                    uid.to_string(),
+                    format!("BODY.PEEK[TEXT]<0.{MAX_BODY_BYTES}>"),
+                ) {
+                    Ok(fetches) => {
+                        let raw = fetches
+                            .iter()
+                            .next()
+                            .and_then(|f| f.text())
+                            .unwrap_or_default();
+                        let text = parser::decode_text_part(raw, "text/plain", None, "8bit");
+                        let truncated = text.chars().count() > MAX_BODY_BYTES;
+                        Ok((text.chars().take(MAX_BODY_BYTES).collect(), truncated))
                     }
-                }
+                    Err(fallback_error) => {
+                        tracing::warn!(
+                            "读取邮件 UID {uid} 正文失败: {primary_error}; fallback: {fallback_error}"
+                        );
+                        Err(fallback_error)
+                    }
+                },
             };
-            let mut parsed = empty_message();
-            parsed.body = body;
-            parsed.body_truncated = truncated;
-            parsed.attachments = attachments;
-            self.database
-                .upsert_message(id, uid_validity, *uid, 0, false, &parsed, true)?;
+            if let Ok((body, truncated)) = body_result {
+                let updated = self.database.update_message_body(
+                    id,
+                    uid_validity,
+                    *uid,
+                    &body,
+                    truncated,
+                    &plan.attachments,
+                )?;
+                if !updated {
+                    let mut parsed = empty_message();
+                    parsed.body = body;
+                    parsed.body_truncated = truncated;
+                    parsed.attachments = plan.attachments.clone();
+                    self.database.upsert_message(
+                        id,
+                        uid_validity,
+                        *uid,
+                        0,
+                        false,
+                        &parsed,
+                        true,
+                    )?;
+                }
+            }
             downloaded += 1;
             self.database.progress(id, downloaded, "downloading")?;
         }

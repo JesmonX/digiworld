@@ -2,8 +2,8 @@
 
 Digiworld is a lightweight, local-first desktop shell for installing official,
 signed feature plugins on demand. Official plugins include a privacy-preserving
-Windows keyboard heatmap, a cross-agent Token usage heatmap, and a read-only
-IMAP mail assistant.
+Windows keyboard heatmap, a cross-agent Token usage heatmap, and an IMAP mail
+assistant.
 
 ## Status
 
@@ -46,8 +46,10 @@ declare a `network:*` permission.
 The optional Mail Assistant connects to Gmail, QQ, 163, or a custom TLS IMAP
 server. It keeps application passwords and client authorization codes in the
 operating-system credential store, caches a searchable plain-text copy of the
-Inbox locally, never changes server message state, and does not download
-attachment contents. Background checks use the same Digiworld proxy policy.
+Inbox locally, and does not download attachment contents. For a selected
+account, the explicit “全部标为已读” action synchronizes the IMAP `\Seen`
+flag in the background; it does not send, delete, or move messages. Background
+checks use the same Digiworld proxy policy.
 
 Plugin and core update checks are explicit: Digiworld displays the available
 versions and asks for confirmation before downloading. Confirmed downloads and

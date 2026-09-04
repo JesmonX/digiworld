@@ -260,20 +260,21 @@ export default function App() {
 }
 
 function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
-  const width = 700
-  const height = 230
-  const left = 52
-  const right = 48
-  const top = 24
-  const bottom = 42
+  const width = 820
+  const height = 300
+  const left = 68
+  const right = 68
+  const top = 30
+  const bottom = 54
   const plotWidth = width - left - right
   const plotHeight = height - top - bottom
   const step = plotWidth / Math.max(points.length, 1)
-  const barWidth = Math.min(46, step * .54)
+  const barWidth = Math.min(56, step * .62)
   const maximum = Math.max(1, ...points.map(point => point.totalTokens))
   const modelCategories = weeklyModelCategories(points)
   const { minimum: cacheAxisMinimum, maximum: cacheAxisMaximum } = cacheRateScale(points.map(point => point.cacheRate))
   const cacheAxisRange = Math.max(.05, cacheAxisMaximum - cacheAxisMinimum)
+  const ticks = [0, .25, .5, .75, 1]
   const segments: WeeklyUsagePoint[][] = []
   for (const point of points) {
     if (point.cacheRate == null) continue
@@ -287,12 +288,15 @@ function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
   const yForRate = (rate: number) => top + (cacheAxisMaximum - Math.max(cacheAxisMinimum, Math.min(cacheAxisMaximum, rate))) / cacheAxisRange * plotHeight
 
   return <article className="weekly-card">
-    <div className="panel-heading"><div><h2>近 7 天趋势</h2><p>按模型堆叠 Token 与缓存读取率</p></div><div className="chart-legend">{modelCategories.length ? modelCategories.map((category, index) => <span key={category.key} title={`${category.label} · ${formatTokens(category.totalTokens)}`}><i className={`model-key model-key-${index}`} />{category.label}<small>{formatTokens(category.totalTokens)}</small></span>) : <span><i className="bar-key" />Token</span>}<span><i className="line-key" />缓存率</span></div></div>
+    <div className="panel-heading"><div><h2>近 7 天趋势</h2></div><div className="chart-legend" aria-label="图例"><span className="legend-label">模型</span>{modelCategories.length ? modelCategories.map((category, index) => <span className="legend-item" key={category.key} title={`${category.label} · ${formatTokens(category.totalTokens)}`}><i className={`model-key model-key-${index}`} /><b>{category.label}</b><small>{formatTokens(category.totalTokens)}</small></span>) : <span className="legend-item"><i className="bar-key" /><b>Token</b></span>}<span className="legend-divider" /><span className="legend-item"><i className="line-key" /><b>缓存率</b></span></div></div>
     {points.length ? <svg className="weekly-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="近七天按模型堆叠的 Token 用量柱形图和缓存率折线图">
-      {[0, .5, 1].map(ratio => {
+      <text x={left} y={top - 13} className="chart-axis-title">Token</text>
+      <text x={width - right} y={top - 13} textAnchor="end" className="chart-axis-title">缓存率</text>
+      {ticks.map(ratio => {
         const y = top + ratio * plotHeight
-        return <g key={ratio}><line x1={left} x2={width - right} y1={y} y2={y} className="chart-grid-line" /><text x={left - 8} y={y + 4} textAnchor="end" className="chart-axis-label">{formatTokens(maximum * (1 - ratio))}</text><text x={width - right + 8} y={y + 4} className="chart-axis-label">{Math.round((cacheAxisMaximum - cacheAxisRange * ratio) * 100)}%</text></g>
+        return <g key={ratio}><line x1={left} x2={width - right} y1={y} y2={y} className="chart-grid-line" /><text x={left - 10} y={y + 4} textAnchor="end" className="chart-axis-label">{formatTokens(maximum * (1 - ratio))}</text><text x={width - right + 10} y={y + 4} className="chart-axis-label">{Math.round((cacheAxisMaximum - cacheAxisRange * ratio) * 100)}%</text></g>
       })}
+      <line x1={left} x2={width - right} y1={top + plotHeight} y2={top + plotHeight} className="chart-axis-line" />
       {points.map((point, index) => {
         const x = left + (index + .5) * step
         const scale = plotHeight / maximum
@@ -305,21 +309,22 @@ function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
           })
           .filter(Boolean)
           .join('、')
-        return <g key={point.day}><title>{`${point.day} · ${formatTokens(point.totalTokens)} Token${modelSummary ? ` · ${modelSummary}` : ''} · 缓存率 ${cache}`}</title>{modelCategories.map((category, categoryIndex) => {
+        return <g key={point.day}><title>{`${point.day} · ${formatTokens(point.totalTokens)} Token${modelSummary ? ` · ${modelSummary}` : ''} · 缓存率 ${cache}`}</title><g className="token-bar">{modelCategories.map((category, categoryIndex) => {
           const value = category.values[index] ?? 0
           if (value <= 0) return null
           const segmentHeight = value * scale
           const y = top + plotHeight - offset - segmentHeight
           offset += segmentHeight
-          return <rect key={`${point.day}-${category.key}`} x={x - barWidth / 2} y={y} width={barWidth} height={segmentHeight} rx="2" className={`token-segment model-${categoryIndex}`}><title>{`${point.day} · ${category.label} · ${formatTokens(value)} Token (${point.totalTokens > 0 ? (value / point.totalTokens * 100).toFixed(1) : '0.0'}%)`}</title></rect>
-        })}<text x={x} y={height - 17} textAnchor="middle" className="chart-day-label">{point.day.slice(5).replace('-', '/')}</text></g>
+          return <rect key={`${point.day}-${category.key}`} x={x - barWidth / 2} y={y} width={barWidth} height={segmentHeight} rx="3" className={`token-segment model-${categoryIndex}`}><title>{`${point.day} · ${category.label} · ${formatTokens(value)} Token (${point.totalTokens > 0 ? (value / point.totalTokens * 100).toFixed(1) : '0.0'}%)`}</title></rect>
+        })}</g><text x={x} y={height - 18} textAnchor="middle" className="chart-day-label">{point.day.slice(5).replace('-', '/')}</text></g>
       })}
       {segments.map((segment, index) => segment.length > 1 && <polyline key={index} points={segment.map(point => `${xFor(point)},${yForRate(point.cacheRate!)}`).join(' ')} className="cache-line" />)}
-      {points.filter(point => point.cacheRate != null).map(point => {
+      {points.filter(point => point.cacheRate != null).map((point, index) => {
         const x = xFor(point)
         const y = yForRate(point.cacheRate!)
         const label = `${(point.cacheRate! * 100).toFixed(1)}%`
-        return <g key={point.day} className="cache-marker"><circle cx={x} cy={y} r="4" className="cache-point"><title>{`${point.day} 缓存率 ${label}`}</title></circle><text x={x} y={y < top + 15 ? y + 17 : y - 9} textAnchor="middle" className="cache-point-label">{label}</text></g>
+        const labelBelow = y < top + 27 || (index % 2 === 1 && y < top + 52)
+        return <g key={point.day} className="cache-marker"><circle cx={x} cy={y} r="5" className="cache-point"><title>{`${point.day} 缓存率 ${label}`}</title></circle><text x={x} y={labelBelow ? y + 20 : y - 11} textAnchor="middle" className="cache-point-label">{label}</text></g>
       })}
     </svg> : <Empty />}
   </article>

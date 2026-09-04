@@ -5,7 +5,7 @@
   "plugins": [
     {
       "id": "io.github.jesmonx.digiworld.agent-token-heatmap",
-      "version": "0.1.6",
+      "version": "0.1.7",
       "name": "Agent Token 热力图",
       "description": "汇总 Codex、Claude Code、Pi、ZCode 与 Antigravity (agy) 的 Token 日用量、近 7 天按模型堆叠趋势、缓存率，并显示指定账号的 Codex 限额。",
       "author": "JesmonX",
@@ -21,7 +21,7 @@
     },
     {
       "id": "io.github.jesmonx.digiworld.keyboard-heatmap",
-      "version": "0.1.4",
+      "version": "0.1.5",
       "name": "键盘热力图",
       "description": "在 104、87、84、68 和 61 键主流配列中查看实体键位热力图，只保存每日聚合次数。",
       "author": "JesmonX",
@@ -35,15 +35,15 @@
     },
     {
       "id": "io.github.jesmonx.digiworld.mail-assistant",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "name": "邮件助手",
-      "description": "通过只读 IMAP 汇总多个邮箱的收件箱，在本机离线阅读、搜索并接收新邮件通知。",
+      "description": "通过 IMAP 汇总多个邮箱的收件箱，在本机缓存、阅读和搜索，并可将选定邮箱全部标为已读。",
       "author": "JesmonX",
       "minCoreVersion": "0.2.12",
       "permissions": [
         { "id": "background", "reason": "在 Digiworld 驻留后台时定期检查新邮件。" },
         { "id": "notifications", "reason": "通过 Digiworld 显示按账号聚合的新邮件通知。" },
-        { "id": "network:imap", "reason": "使用 Digiworld 的代理策略连接用户配置的 IMAP 收件服务器。" },
+        { "id": "network:imap", "reason": "使用 Digiworld 的代理策略连接用户配置的 IMAP 收件服务器，并同步用户明确请求的已读状态。" },
         { "id": "plugin-storage", "reason": "在本机保存邮件索引、纯文本正文、同步游标和非敏感账号设置。" },
         { "id": "secret:mail-credentials", "reason": "在操作系统凭据库中保存邮箱应用专用密码或客户端授权码。" }
       ],

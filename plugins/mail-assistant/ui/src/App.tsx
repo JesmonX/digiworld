@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  AlertCircle, ChevronDown, Inbox, LoaderCircle, Mail, Paperclip, Plus, RefreshCw,
+  AlertCircle, ChevronDown, Inbox, LoaderCircle, Mail, MailCheck, Paperclip, Plus, RefreshCw,
   Search, Settings, Trash2, X,
 } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
@@ -52,6 +52,7 @@ export default function App() {
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [actionNotice, setActionNotice] = useState('')
   const messageRequest = useRef(0)
 
   const refreshStatus = useCallback(async () => {
@@ -111,13 +112,22 @@ export default function App() {
     } catch (reason) { setError(errorText(reason)) }
   }
 
-  const toggleRead = async (message: MailDetail) => {
-    const nextRead = !message.serverSeen && !message.locallyViewed
+  const markAllRead = async () => {
+    if (!currentAccount || !window.confirm(`将“${currentAccount.label}”中的全部邮件标为已读？`)) return
+    const id = currentAccount.id
+    setBusy('mark-all-read'); setError(''); setActionNotice('正在将本地缓存中的邮件标为已读…')
+    setMessages(items => items.map(item => item.accountId === id ? { ...item, locallyViewed: true } : item))
+    setSelected(current => current && current.accountId === id ? { ...current, locallyViewed: true } : current)
     try {
-      await bridge.request('mail.messages.mark_read', { id: message.id, read: nextRead })
-      setSelected(current => current && current.id === message.id ? { ...current, locallyViewed: nextRead, serverSeen: nextRead } : current)
-      setMessages(items => items.map(item => item.id === message.id ? { ...item, locallyViewed: nextRead, serverSeen: nextRead } : item))
-    } catch (reason) { setError(errorText(reason)) }
+      const result = await bridge.request<{ ok: boolean; updated: number }>('mail.messages.mark_all_read', { accountId: id })
+      setActionNotice(result.updated > 0
+        ? `已将“${currentAccount.label}”中的 ${result.updated} 封缓存邮件标为已读，正在同步服务器`
+        : `“${currentAccount.label}”中的邮件已全部标为已读，正在同步服务器`)
+      await refreshStatus()
+    } catch (reason) {
+      setError(errorText(reason))
+      await loadMessages().catch(() => undefined)
+    } finally { setBusy('') }
   }
 
   const changePoll = async (minutes: number) => {
@@ -169,15 +179,17 @@ export default function App() {
       <label className="poll"><Settings size={15} /><span>每</span><select value={pollMinutes} onChange={event => void changePoll(Number(event.target.value))}>
         {[5, 10, 15, 30].map(value => <option key={value} value={value}>{value} 分钟</option>)}
       </select></label>
+      {currentAccount && <button className="secondary mark-all" onClick={() => void markAllRead()} disabled={!!busy || syncing.includes(currentAccount.id)}><MailCheck size={15} />{busy === 'mark-all-read' ? '标记中…' : '全部标为已读'}</button>}
       <button className="secondary" onClick={() => void syncNow()} disabled={busy === 'sync'}>{busy === 'sync' ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}刷新</button>
       <button className="primary" onClick={() => editAccount()}><Plus size={16} />添加账号</button>
     </header>
 
     {error && <div className="error"><AlertCircle size={16} /><span>{error}</span><button onClick={() => setError('')}><X size={15} /></button></div>}
+    {actionNotice && <div className="notice" role="status">{actionNotice}</div>}
     <section className="workspace">
       <aside className="accounts">
         <button className={!accountId ? 'active' : ''} onClick={() => setAccountId('')}><Inbox size={17} /><span>全部收件箱</span></button>
-        {accounts.map(account => <button key={account.id} className={accountId === account.id ? 'active' : ''} onClick={() => setAccountId(account.id)} onDoubleClick={() => editAccount(account)}>
+        {accounts.map(account => <button key={account.id} className={accountId === account.id ? 'active' : ''} onClick={() => { setAccountId(account.id); setActionNotice('') }} onDoubleClick={() => editAccount(account)}>
           <Mail size={17} /><span><strong>{account.label}</strong><small title={account.lastError}>{syncing.includes(account.id) ? `${account.syncPhase === 'indexing' ? '索引' : '正文'} ${account.indexed}/${account.total}` : account.lastError || account.email}</small></span>
           {syncing.includes(account.id) ? <LoaderCircle className="spin" size={14} /> : account.lastError ? <span aria-label="同步失败" title={account.lastError}><AlertCircle className="warn" size={14} /></span> : null}
         </button>)}
@@ -199,12 +211,7 @@ export default function App() {
       <article className="detail">
         {!selected ? <Empty icon={<Mail />} title="选择一封邮件" text="正文以纯文本显示，不加载远程图片。" /> : <>
           <div className="detail-head">
-            <div className="detail-title-bar">
-              <h2>{selected.subject || '（无主题）'}</h2>
-              <button className="secondary toggle-read" onClick={() => void toggleRead(selected)}>
-                {(!selected.serverSeen && !selected.locallyViewed) ? '标为已读' : '标为未读'}
-              </button>
-            </div>
+            <h2>{selected.subject || '（无主题）'}</h2>
             <div><strong>{selected.sender || '未知发件人'}</strong><time>{fmtDate(selected.receivedAt)}</time></div>
             <p>收件人：{selected.recipients || '未提供'}</p>
           </div>

@@ -1,5 +1,5 @@
-use crate::database::{Backup, Database, Snapshot};
-use anyhow::{Context, Result};
+use crate::database::{Database, Snapshot};
+use anyhow::Result;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -133,40 +133,6 @@ impl StatsEngine {
             .lock()
             .expect("database lock poisoned")
             .set_setting("keyboard_layout", layout)
-    }
-
-    pub fn clear(&self, scope: &str) -> Result<()> {
-        self.flush()?;
-        self.database
-            .lock()
-            .expect("database lock poisoned")
-            .clear(scope)
-    }
-
-    pub fn json_backup(&self) -> Result<String> {
-        self.flush()?;
-        serde_json::to_string_pretty(
-            &self
-                .database
-                .lock()
-                .expect("database lock poisoned")
-                .backup()?,
-        )
-        .context("serialize backup")
-    }
-
-    pub fn csv(&self) -> Result<String> {
-        self.flush()?;
-        self.database.lock().expect("database lock poisoned").csv()
-    }
-
-    pub fn import(&self, content: &str, mode: &str) -> Result<()> {
-        self.flush()?;
-        let backup: Backup = serde_json::from_str(content).context("parse backup")?;
-        self.database
-            .lock()
-            .expect("database lock poisoned")
-            .import(backup, mode)
     }
 
     pub fn shutdown(&self) -> Result<()> {

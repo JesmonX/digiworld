@@ -107,56 +107,6 @@ fn handle(engine: &StatsEngine, method: &str, params: Value) -> Result<Value> {
             engine.set_layout(layout)?;
             Ok(json!({ "layout": layout }))
         }
-        "heatmap.clear" => {
-            let scope = params
-                .get("scope")
-                .and_then(Value::as_str)
-                .unwrap_or("today");
-            engine.clear(scope)?;
-            Ok(json!({ "cleared": scope }))
-        }
-        "heatmap.export" => {
-            let format = params
-                .get("format")
-                .and_then(Value::as_str)
-                .unwrap_or("json");
-            let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
-            match format {
-                "json" => Ok(
-                    json!({ "content": engine.json_backup()?, "filename": format!("digiworld-heatmap-{stamp}.json"), "mime": "application/json" }),
-                ),
-                "csv" => Ok(
-                    json!({ "content": engine.csv()?, "filename": format!("digiworld-heatmap-{stamp}.csv"), "mime": "text/csv" }),
-                ),
-                _ => bail!("unsupported export format"),
-            }
-        }
-        "heatmap.import" => {
-            let content = params
-                .get("content")
-                .and_then(Value::as_str)
-                .context("content must be a string")?;
-            if content.len() > 32 * 1024 * 1024 {
-                bail!("backup exceeds 32 MiB");
-            }
-            let mode = params
-                .get("mode")
-                .and_then(Value::as_str)
-                .unwrap_or("merge");
-            if mode == "replace" {
-                let backup_dir = std::env::temp_dir().join("digiworld-heatmap-backups");
-                std::fs::create_dir_all(&backup_dir)?;
-                std::fs::write(
-                    backup_dir.join(format!(
-                        "before-import-{}.json",
-                        chrono::Utc::now().format("%Y%m%d-%H%M%S")
-                    )),
-                    engine.json_backup()?,
-                )?;
-            }
-            engine.import(content, mode)?;
-            Ok(json!({ "imported": true, "mode": mode }))
-        }
         _ => bail!("unknown method: {method}"),
     }
 }

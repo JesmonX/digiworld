@@ -103,10 +103,14 @@ describe('token usage layout', () => {
     expect(mocks.request).toHaveBeenCalledWith('usage.getCodexQuota', { force: false })
 
     const cacheAxisLabels = Array.from(container.querySelectorAll('.weekly-chart .chart-axis-label')).filter((_, index) => index % 2 === 1).map(label => label.textContent)
-    expect(cacheAxisLabels).toEqual(['85%', '73%', '60%'])
+    expect(cacheAxisLabels).toEqual(['85%', '79%', '73%', '66%', '60%'])
     expect(Array.from(container.querySelectorAll('.cache-point-label')).map(label => label.textContent)).toEqual(['72.0%', '75.0%'])
     expect(container.querySelector('.chart-legend')?.textContent).toContain('gpt-5.6-sol1.2K')
     expect(container.querySelector('.chart-legend')?.textContent).toContain('gpt-5.6-mini1K')
+    expect(container.querySelector('.chart-legend')?.textContent).toContain('模型')
+    expect(container.querySelector('.chart-legend')?.textContent).toContain('缓存率')
+    expect(container.querySelector('.weekly-card')?.textContent).not.toContain('按模型堆叠 Token 与缓存读取率')
+    expect(container.querySelector('.weekly-chart')?.getAttribute('viewBox')).toBe('0 0 820 300')
     expect(container.querySelectorAll('.token-segment')).toHaveLength(2)
     expect(container.querySelector('.token-segment')?.textContent).toContain('Token')
 

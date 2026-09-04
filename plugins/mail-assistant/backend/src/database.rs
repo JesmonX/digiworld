@@ -281,13 +281,15 @@ impl Database {
                 received_at, snippet, body, body_truncated, attachments_json, size, server_seen, has_body)
              VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
              ON CONFLICT(account_id, uid_validity, uid) DO UPDATE SET
-                subject=excluded.subject, sender=excluded.sender, recipients=excluded.recipients,
-                received_at=excluded.received_at,
+                subject=CASE WHEN excluded.subject <> '' OR messages.subject = '' THEN excluded.subject ELSE messages.subject END,
+                sender=CASE WHEN excluded.sender <> '' OR messages.sender = '' THEN excluded.sender ELSE messages.sender END,
+                recipients=CASE WHEN excluded.recipients <> '' OR messages.recipients = '' THEN excluded.recipients ELSE messages.recipients END,
+                received_at=COALESCE(excluded.received_at, messages.received_at),
                 snippet=CASE WHEN excluded.has_body THEN excluded.snippet ELSE messages.snippet END,
                 body=CASE WHEN excluded.has_body THEN excluded.body ELSE messages.body END,
                 body_truncated=CASE WHEN excluded.has_body THEN excluded.body_truncated ELSE messages.body_truncated END,
                 attachments_json=CASE WHEN excluded.has_body THEN excluded.attachments_json ELSE messages.attachments_json END,
-                size=excluded.size,
+                size=CASE WHEN excluded.size > 0 THEN excluded.size ELSE messages.size END,
                 server_seen=CASE WHEN excluded.has_body THEN messages.server_seen ELSE excluded.server_seen END,
                 has_body=MAX(messages.has_body, excluded.has_body)",
             params![
@@ -310,6 +312,37 @@ impl Database {
         Ok(())
     }
 
+    pub fn update_message_body(
+        &self,
+        account_id: &str,
+        uid_validity: u32,
+        uid: u32,
+        body: &str,
+        body_truncated: bool,
+        attachments: &[AttachmentInfo],
+    ) -> Result<bool> {
+        let snippet: String = body.chars().take(180).collect();
+        let changed = self
+            .connection
+            .lock()
+            .expect("database lock poisoned")
+            .execute(
+                "UPDATE messages SET snippet=?4, body=?5, body_truncated=?6,
+                attachments_json=?7, has_body=1
+             WHERE account_id=?1 AND uid_validity=?2 AND uid=?3",
+                params![
+                    account_id,
+                    uid_validity,
+                    uid,
+                    snippet,
+                    body,
+                    body_truncated,
+                    serde_json::to_string(attachments)?,
+                ],
+            )?;
+        Ok(changed > 0)
+    }
+
     pub fn has_body(&self, account_id: &str, uid_validity: u32, uid: u32) -> Result<bool> {
         Ok(self
             .connection
@@ -322,6 +355,19 @@ impl Database {
             )
             .optional()?
             .unwrap_or(false))
+    }
+
+    pub fn incomplete_body_uids(&self, account_id: &str, uid_validity: u32) -> Result<Vec<u32>> {
+        let connection = self.connection.lock().expect("database lock poisoned");
+        let mut statement = connection.prepare(
+            "SELECT uid FROM messages
+             WHERE account_id=?1 AND uid_validity=?2 AND has_body=0
+             ORDER BY uid DESC",
+        )?;
+        statement
+            .query_map(params![account_id, uid_validity], |row| row.get(0))?
+            .collect::<std::result::Result<Vec<u32>, _>>()
+            .map_err(Into::into)
     }
 
     pub fn reconcile_uids(
@@ -394,6 +440,7 @@ impl Database {
 
     pub fn message(&self, id: i64) -> Result<MessageDetail> {
         let connection = self.connection.lock().expect("database lock poisoned");
+        connection.execute("UPDATE messages SET locally_viewed=1 WHERE id=?1", [id])?;
         let detail = connection
             .query_row(
                 "SELECT m.id, m.account_id, a.label, m.subject, m.sender, m.received_at,
@@ -414,19 +461,13 @@ impl Database {
                 },
             )
             .context("邮件不存在")?;
-        connection.execute("UPDATE messages SET locally_viewed=1 WHERE id=?1", [id])?;
         Ok(detail)
     }
 
-    pub fn existing_uids(
-        &self,
-        account_id: &str,
-        uid_validity: u32,
-    ) -> Result<HashSet<u32>> {
+    pub fn existing_uids(&self, account_id: &str, uid_validity: u32) -> Result<HashSet<u32>> {
         let connection = self.connection.lock().expect("database lock poisoned");
-        let mut statement = connection.prepare(
-            "SELECT uid FROM messages WHERE account_id=?1 AND uid_validity=?2",
-        )?;
+        let mut statement = connection
+            .prepare("SELECT uid FROM messages WHERE account_id=?1 AND uid_validity=?2")?;
         let uids = statement
             .query_map(params![account_id, uid_validity], |row| row.get(0))?
             .collect::<std::result::Result<HashSet<u32>, _>>()?;
@@ -441,16 +482,31 @@ impl Database {
     ) -> Result<()> {
         let mut connection = self.connection.lock().expect("database lock poisoned");
         let transaction = connection.transaction()?;
+        let old_server_seen = unseen_uids
+            .iter()
+            .map(|uid| {
+                transaction
+                    .query_row(
+                        "SELECT server_seen FROM messages
+                         WHERE account_id=?1 AND uid_validity=?2 AND uid=?3",
+                        params![account_id, uid_validity, uid],
+                        |row| row.get::<_, bool>(0),
+                    )
+                    .optional()
+                    .map(|value| (*uid, value.unwrap_or(true)))
+            })
+            .collect::<rusqlite::Result<Vec<_>>>()?;
         transaction.execute(
             "UPDATE messages SET server_seen=1 WHERE account_id=?1 AND uid_validity=?2",
             params![account_id, uid_validity],
         )?;
         let mut statement = transaction.prepare(
-            "UPDATE messages SET server_seen=0, locally_viewed=0
+            "UPDATE messages SET server_seen=0,
+                locally_viewed=CASE WHEN ?4 THEN locally_viewed ELSE 0 END
              WHERE account_id=?1 AND uid_validity=?2 AND uid=?3",
         )?;
-        for uid in unseen_uids {
-            statement.execute(params![account_id, uid_validity, uid])?;
+        for (uid, was_server_seen) in old_server_seen {
+            statement.execute(params![account_id, uid_validity, uid, !was_server_seen])?;
         }
         drop(statement);
         transaction.commit()?;
@@ -494,20 +550,30 @@ impl Database {
         Ok(())
     }
 
-    pub fn toggle_read(&self, id: i64, read: bool) -> Result<()> {
-        let connection = self.connection.lock().expect("database lock poisoned");
-        if read {
-            connection.execute(
-                "UPDATE messages SET locally_viewed=1, server_seen=1 WHERE id=?1",
-                params![id],
+    pub fn mark_all_read(&self, account_id: &str) -> Result<u64> {
+        let changed = self
+            .connection
+            .lock()
+            .expect("database lock poisoned")
+            .execute(
+                "UPDATE messages SET locally_viewed=1
+             WHERE account_id=?1 AND locally_viewed=0",
+                [account_id],
             )?;
-        } else {
-            connection.execute(
-                "UPDATE messages SET locally_viewed=0, server_seen=0 WHERE id=?1",
-                params![id],
+        Ok(changed as u64)
+    }
+
+    pub fn mark_all_server_seen(&self, account_id: &str, uid_validity: u32) -> Result<u64> {
+        let changed = self
+            .connection
+            .lock()
+            .expect("database lock poisoned")
+            .execute(
+                "UPDATE messages SET server_seen=1
+             WHERE account_id=?1 AND uid_validity=?2 AND server_seen=0",
+                params![account_id, uid_validity],
             )?;
-        }
-        Ok(())
+        Ok(changed as u64)
     }
 }
 
@@ -670,7 +736,9 @@ mod tests {
             port: 993,
             secret: None,
         };
-        database.save_account_with_reset("acc", &account, false).unwrap();
+        database
+            .save_account_with_reset("acc", &account, false)
+            .unwrap();
         let parsed = ParsedMessage {
             subject: "测试".into(),
             sender: "a@qq.com".into(),
@@ -680,22 +748,40 @@ mod tests {
             body_truncated: false,
             attachments: vec![],
         };
-        database.upsert_message("acc", 1, 100, 10, false, &parsed, false).unwrap();
-        database.upsert_message("acc", 1, 101, 10, false, &parsed, false).unwrap();
+        database
+            .upsert_message("acc", 1, 100, 10, false, &parsed, false)
+            .unwrap();
+        database
+            .upsert_message("acc", 1, 101, 10, false, &parsed, false)
+            .unwrap();
 
         let mut unseen = HashSet::new();
         unseen.insert(100);
+        assert_eq!(database.mark_all_read("acc").unwrap(), 2);
         database.update_seen_flags("acc", 1, &unseen).unwrap();
 
         let msgs = database.list_messages(Some("acc"), "", 0).unwrap().items;
         let m100 = msgs.iter().find(|m| m.id == 1).unwrap();
         let m101 = msgs.iter().find(|m| m.id == 2).unwrap();
         assert!(!m100.server_seen);
+        assert!(m100.locally_viewed);
         assert!(m101.server_seen);
+        assert!(m101.locally_viewed);
 
-        // Update body on m101 should preserve server_seen = true
-        database.upsert_message("acc", 1, 101, 10, false, &parsed, true).unwrap();
+        // Updating a cached body should preserve the header and server flags.
+        database
+            .update_message_body("acc", 1, 101, "更新后的正文", false, &[])
+            .unwrap();
         let m101_after = database.message(2).unwrap();
         assert!(m101_after.summary.server_seen);
+        assert!(m101_after.summary.locally_viewed);
+        assert_eq!(m101_after.summary.subject, "测试");
+        assert_eq!(m101_after.body, "更新后的正文");
+        assert!(m101_after.summary.has_body);
+        assert_eq!(database.incomplete_body_uids("acc", 1).unwrap(), vec![100]);
+        assert_eq!(
+            database.pending_locally_read_uids("acc", 1).unwrap(),
+            vec![100]
+        );
     }
 }

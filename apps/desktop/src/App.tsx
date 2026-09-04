@@ -308,7 +308,6 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
   const [coreMessage, setCoreMessage] = useState<string | null>(null)
   const [updateError, setUpdateError] = useState<string | null>(null)
   const [updateDialog, setUpdateDialog] = useState<UpdateDialog | null>(null)
-  const [diagnosticsMessage, setDiagnosticsMessage] = useState<string | null>(null)
 
   useEffect(() => {
     api.proxySettings().then(setProxy).catch(reason => setProxyMessage(errorMessage(reason)))
@@ -413,16 +412,6 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
     }
   }
 
-  const exportDiagnostics = async () => {
-    setDiagnosticsMessage(null)
-    try {
-      const path = await api.exportDiagnostics()
-      setDiagnosticsMessage(`已导出到 ${path}`)
-    } catch (reason) {
-      setDiagnosticsMessage(`导出失败：${errorMessage(reason)}`)
-    }
-  }
-
   return (
     <div className="settings-stack">
       <article className="settings-card theme-card">
@@ -508,7 +497,6 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
         <div><h3>主程序更新</h3><p>当前版本 {state.version}，检查后由你确认是否下载和安装</p>{coreMessage && <small className="update-message">{coreMessage}</small>}</div>
         <button className="secondary" disabled={updateBusy !== null} onClick={() => void checkCoreUpdate()}>{updateBusy === 'core-check' ? <><LoaderCircle className="spin" />检查中…</> : '检查主程序'}</button>
       </article>
-      <article className="settings-card"><div><h3>诊断信息</h3><p>导出版本、平台、代理模式和插件状态</p>{diagnosticsMessage && <small className="update-message">{diagnosticsMessage}</small>}</div><button className="secondary" onClick={() => void exportDiagnostics()}>导出</button></article>
       <div className="version-line"><ShieldCheck /> Digiworld {state.version}</div>
       {updateDialog && (
         <UpdateDialogView

@@ -16,8 +16,8 @@ The app contacts GitHub Pages and GitHub Releases to check the official catalog,
 download plugins, and check for updates. GitHub may process ordinary web request
 metadata under its own privacy terms.
 
-Diagnostic logs stay on the local computer, omit individual key events and
-credentials, and are exported only when the user explicitly requests it.
+Diagnostic logs stay on the local computer and omit individual key events and
+credentials. Digiworld does not provide a user-facing diagnostic export.
 
 The optional Agent Token Heatmap plugin reads Codex, Claude Code, Pi,
 ZCode, and Antigravity (agy) session files only when the user starts a scan. It extracts timestamps and
@@ -41,7 +41,8 @@ databases or logs. The plugin stores account settings, message headers, up to
 1 MiB of decoded plain-text body per message, attachment names, types, sizes,
 and sync cursors in local plugin storage so the Inbox can be searched and read
 offline. It does not retain attachment contents, render remote HTML resources,
-send mail, or modify server flags, folders, and messages.
+send, delete, or move mail. The only server-side mutation is the explicit
+selected-account bulk `\Seen` update from “全部标为已读”.
 
 For an SSH source, Digiworld reuses the system OpenSSH client, SSH config,
 known-hosts policy, ssh-agent, and keys. An ephemeral Python 3 parser runs in

@@ -16,7 +16,6 @@ const mocks = vi.hoisted(() => ({
   installPluginUpdates: vi.fn(),
   checkCoreUpdate: vi.fn(),
   installCoreUpdate: vi.fn(),
-  exportDiagnostics: vi.fn(),
 }))
 
 vi.mock('./components/WindowChrome', () => ({ WindowChrome: () => <div /> }))
@@ -36,7 +35,6 @@ vi.mock('./lib/api', () => ({
     setLaunchAtStartup: vi.fn(async () => {}),
     setProxySettings: vi.fn(async settings => settings),
     testProxySettings: mocks.testProxySettings,
-    exportDiagnostics: mocks.exportDiagnostics,
     checkPluginUpdates: mocks.checkPluginUpdates,
     installPluginUpdates: mocks.installPluginUpdates,
     checkCoreUpdate: mocks.checkCoreUpdate,
@@ -65,10 +63,8 @@ describe('explicit update consent', () => {
     mocks.installPluginUpdates.mockReset()
     mocks.checkCoreUpdate.mockReset()
     mocks.installCoreUpdate.mockReset()
-    mocks.exportDiagnostics.mockReset()
     mocks.testProxySettings.mockResolvedValue({ ok: true, latencyMs: 1, message: '' })
     mocks.installPluginUpdates.mockResolvedValue([])
-    mocks.exportDiagnostics.mockResolvedValue('C:\\Digiworld\\diagnostics.json')
     localStorage.clear()
   })
 
@@ -134,13 +130,13 @@ describe('explicit update consent', () => {
     await act(async () => root.unmount())
   })
 
-  it('shows the diagnostics export path', async () => {
+  it('does not show the removed diagnostics export', async () => {
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
     await act(async () => button(container, '设置')?.click())
-    await act(async () => { button(container, '导出')?.click(); await flush() })
 
-    expect(container.textContent).toContain('已导出到 C:\\Digiworld\\diagnostics.json')
+    expect(container.textContent).not.toContain('诊断信息')
+    expect(container.textContent).not.toContain('导出版本、平台、代理模式和插件状态')
     await act(async () => root.unmount())
   })
 
