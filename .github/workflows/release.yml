@@ -57,7 +57,7 @@ jobs:
           $tag = '${{ steps.release.outputs.tag }}'
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add Cargo.toml Cargo.lock package.json apps/desktop/package.json apps/desktop/src-tauri/tauri.conf.json packages/plugin-sdk/package.json packages/typography/package.json
+          git add Cargo.toml Cargo.lock package.json apps/desktop/package.json apps/desktop/src-tauri/tauri.conf.json packages/design-system/package.json packages/plugin-sdk/package.json packages/typography/package.json
           git commit -m "chore(release): prepare $tag [skip ci]"
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
