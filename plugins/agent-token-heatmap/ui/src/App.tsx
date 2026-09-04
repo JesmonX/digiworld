@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, BarChart3, Check, Clock3, Database, Gauge, HardDrive, Plus, RefreshCw, Server, Settings2, Trash2, X } from 'lucide-react'
+import { AlertTriangle, Check, Clock3, Database, Gauge, HardDrive, PieChart, Plus, RefreshCw, Server, Settings2, Trash2, X } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import { cacheRateScale, calendarCells, formatTokens, heatLevel, weeklyModelCategories, weeklyUsage, type Metric, type UsageDay, type WeeklyUsagePoint } from './heatmap'
 import './styles.css'
@@ -40,6 +40,7 @@ interface Totals {
 }
 interface Breakdown extends Totals { sourceId: string; sourceLabel: string; agent: Agent }
 interface ModelBreakdown extends Totals { sourceId: string; sourceLabel: string; agent: Agent; model: string }
+interface ModelTotal { model: string; totalTokens: number }
 interface Snapshot {
   startDay?: string
   endDay: string
@@ -196,7 +197,16 @@ export default function App() {
   const max = Math.max(0, ...cells.map(cell => cell.value))
   const dailyRanking = useMemo(() => [...(snapshot?.days ?? [])].filter(day => day.totalTokens > 0).sort((a, b) => b.totalTokens - a.totalTokens || b.day.localeCompare(a.day)).slice(0, 10), [snapshot])
   const dailyMax = dailyRanking[0]?.totalTokens ?? 1
-  const modelBreakdown = useMemo(() => [...(snapshot?.modelBreakdown ?? [])].filter(row => row.totalTokens > 0).sort((a, b) => b.totalTokens - a.totalTokens), [snapshot])
+  const modelTotals = useMemo(() => {
+    const totals = new Map<string, number>()
+    for (const row of snapshot?.modelBreakdown ?? []) {
+      if (!row.model || row.totalTokens <= 0 || !Number.isFinite(row.totalTokens)) continue
+      totals.set(row.model, (totals.get(row.model) ?? 0) + row.totalTokens)
+    }
+    return [...totals.entries()]
+      .map(([model, totalTokens]) => ({ model, totalTokens }))
+      .sort((a, b) => b.totalTokens - a.totalTokens || a.model.localeCompare(b.model))
+  }, [snapshot])
   const weekly = useMemo(() => snapshot ? weeklyUsage(snapshot.endDay, snapshot.days) : [], [snapshot])
   const sourceOptions = settings ? [{ id: 'local', label: '本机' }, ...settings.sshSources] : []
 
@@ -244,8 +254,8 @@ export default function App() {
       </section>
 
       <article className="model-card">
-        <div className="model-card-heading"><div><h2>模型来源明细</h2><p>按设备、Agent 与会话记录中的模型聚合</p></div><BarChart3 /></div>
-        {modelBreakdown.length ? <div className="model-table">{modelBreakdown.map(row => <div key={`${row.sourceId}-${row.agent}-${row.model}`}><span className={`agent-dot ${row.agent}`} /><strong title={row.model}>{row.model === 'unknown' ? '未知模型' : row.model}</strong><span>{agentLabel[row.agent]}</span><span>{row.sourceLabel}</span><b>{formatTokens(row.totalTokens)}</b></div>)}</div> : <Empty />}
+        <div className="model-card-heading"><div><h2>模型来源明细</h2><p>按模型聚合 Token 用量</p></div><PieChart /></div>
+        <ModelPieChart rows={modelTotals} />
       </article>
 
       {settingsOpen && settings && <SourceDialog settings={settings} refreshRunning={refresh.running} onClose={() => setSettingsOpen(false)} onSave={async value => {
@@ -288,7 +298,7 @@ function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
   const yForRate = (rate: number) => top + (cacheAxisMaximum - Math.max(cacheAxisMinimum, Math.min(cacheAxisMaximum, rate))) / cacheAxisRange * plotHeight
 
   return <article className="weekly-card">
-    <div className="panel-heading"><div><h2>近 7 天趋势</h2></div><div className="chart-legend" aria-label="图例"><span className="legend-label">模型</span>{modelCategories.length ? modelCategories.map((category, index) => <span className="legend-item" key={category.key} title={`${category.label} · ${formatTokens(category.totalTokens)}`}><i className={`model-key model-key-${index}`} /><b>{category.label}</b><small>{formatTokens(category.totalTokens)}</small></span>) : <span className="legend-item"><i className="bar-key" /><b>Token</b></span>}<span className="legend-divider" /><span className="legend-item"><i className="line-key" /><b>缓存率</b></span></div></div>
+    <div className="panel-heading"><div><h2>Last 7 Days</h2></div><div className="chart-legend" aria-label="图例">{modelCategories.length ? modelCategories.map((category, index) => <span className="legend-item" key={category.key} title={`${category.label} · ${formatTokens(category.totalTokens)}`}><i className={`model-key model-key-${index}`} /><b>{category.label}</b><small>{formatTokens(category.totalTokens)}</small></span>) : <span className="legend-item"><i className="bar-key" /><b>Token</b></span>}</div></div>
     {points.length ? <svg className="weekly-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="近七天按模型堆叠的 Token 用量柱形图和缓存率折线图">
       <text x={left} y={top - 13} className="chart-axis-title">Token</text>
       <text x={width - right} y={top - 13} textAnchor="end" className="chart-axis-title">缓存率</text>
@@ -328,6 +338,51 @@ function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
       })}
     </svg> : <Empty />}
   </article>
+}
+
+const modelPieColors = ['#5b5ce2', '#d97745', '#0f9f9a', '#4f7fd6', '#c23b7c', '#b7791f', '#6d5bd0', '#98a2b3']
+
+function ModelPieChart({ rows }: { rows: ModelTotal[] }) {
+  if (!rows.length) return <Empty />
+
+  const total = rows.reduce((sum, row) => sum + row.totalTokens, 0)
+  const centerX = 108
+  const centerY = 108
+  const radius = 82
+  let angle = -Math.PI / 2
+  const sectors = rows.map((row, index) => {
+    const startAngle = angle
+    angle += (row.totalTokens / total) * Math.PI * 2
+    return { ...row, index, startAngle, endAngle: angle }
+  })
+
+  return <div className="model-pie-wrap">
+    <svg className="model-pie" viewBox="0 0 216 216" role="img" aria-label="按模型聚合的 Token 用量饼状图">
+      <title>按模型聚合的 Token 用量</title>
+      {sectors.map(sector => <path key={sector.model} className="model-pie-slice" d={pieSectorPath(centerX, centerY, radius, sector.startAngle, sector.endAngle)} fill={modelPieColors[sector.index % modelPieColors.length]}>
+        <title>{`${modelDisplayName(sector.model)} · ${formatTokens(sector.totalTokens)} · ${(sector.totalTokens / total * 100).toFixed(1)}%`}</title>
+      </path>)}
+    </svg>
+    <div className="model-pie-legend" aria-label="模型图例">
+      {sectors.map(sector => <div key={sector.model}><i style={{ background: modelPieColors[sector.index % modelPieColors.length] }} /><strong title={modelDisplayName(sector.model)}>{modelDisplayName(sector.model)}</strong><span>{formatTokens(sector.totalTokens)} · {(sector.totalTokens / total * 100).toFixed(1)}%</span></div>)}
+    </div>
+  </div>
+}
+
+function pieSectorPath(centerX: number, centerY: number, radius: number, startAngle: number, endAngle: number): string {
+  if (endAngle - startAngle >= Math.PI * 2 - 0.001) {
+    return `M ${centerX} ${centerY - radius} A ${radius} ${radius} 0 1 1 ${centerX} ${centerY + radius} A ${radius} ${radius} 0 1 1 ${centerX} ${centerY - radius} Z`
+  }
+  const startX = centerX + Math.cos(startAngle) * radius
+  const startY = centerY + Math.sin(startAngle) * radius
+  const endX = centerX + Math.cos(endAngle) * radius
+  const endY = centerY + Math.sin(endAngle) * radius
+  const largeArc = endAngle - startAngle > Math.PI ? 1 : 0
+  return `M ${centerX} ${centerY} L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArc} 1 ${endX} ${endY} Z`
+}
+
+function modelDisplayName(model: string): string {
+  return model === 'unknown' ? '未知模型' : model
 }
 
 function QuotaCard({ quota, loading, configured, onRefresh, onConfigure }: { quota: CodexQuotaSnapshot | null; loading: boolean; configured: boolean; onRefresh(): void; onConfigure(): void }) {

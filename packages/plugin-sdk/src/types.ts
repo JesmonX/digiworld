@@ -122,6 +122,7 @@ export interface PluginSummary {
   version: string
   name: string
   description: string
+  icon?: string
   enabled: boolean
   state: 'installed' | 'starting' | 'running' | 'paused' | 'failed' | 'disabled'
   permissions: PluginManifest['permissions']

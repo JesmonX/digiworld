@@ -11,6 +11,8 @@ pub struct AccountInput {
     pub username: String,
     pub host: String,
     pub port: u16,
+    #[serde(default = "default_use_proxy")]
+    pub use_proxy: bool,
     #[serde(default)]
     pub secret: Option<String>,
 }
@@ -25,6 +27,7 @@ pub struct Account {
     pub username: String,
     pub host: String,
     pub port: u16,
+    pub use_proxy: bool,
     pub has_credential: bool,
     pub sync_phase: String,
     pub indexed: u64,
@@ -105,4 +108,29 @@ pub struct ParsedMessage {
     pub body: String,
     pub body_truncated: bool,
     pub attachments: Vec<AttachmentInfo>,
+}
+
+fn default_use_proxy() -> bool {
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn account_input_defaults_to_proxy_for_older_requests() {
+        let input: AccountInput = serde_json::from_str(
+            r#"{
+                "provider": "custom",
+                "label": "工作邮箱",
+                "email": "me@example.com",
+                "username": "me@example.com",
+                "host": "imap.example.com",
+                "port": 993
+            }"#,
+        )
+        .unwrap();
+        assert!(input.use_proxy);
+    }
 }

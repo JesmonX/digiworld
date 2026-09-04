@@ -97,5 +97,5 @@ export function PluginFrame({ pluginId, html, theme }: PluginFrameProps) {
     frame.current?.contentWindow?.postMessage(themeMessage, '*')
   }, [pluginId, theme])
 
-  return <iframe ref={frame} className="plugin-frame" title={pluginId} sandbox="allow-scripts allow-downloads" srcDoc={source} />
+  return <iframe ref={frame} className="plugin-frame" title={pluginId} sandbox="allow-scripts allow-downloads" style={{ backgroundColor: theme.bg }} srcDoc={source} />
 }

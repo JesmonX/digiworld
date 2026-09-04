@@ -305,6 +305,7 @@ impl MailEngine {
             username: account.username.clone(),
             host: account.host.clone(),
             port: account.port,
+            use_proxy: account.use_proxy,
             secret: None,
         };
         let secret = credentials::get(id)?;
@@ -551,7 +552,7 @@ impl MailEngine {
 type Session = imap::Session<transport::BoxedIo>;
 
 fn connect(input: &AccountInput, secret: &str) -> Result<Session> {
-    let stream = transport::connect_tls(&input.host, input.port)?;
+    let stream = transport::connect_tls(&input.host, input.port, input.use_proxy)?;
     let client = imap::Client::new(stream);
     client
         .login(&input.username, secret)

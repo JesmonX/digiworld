@@ -53,8 +53,8 @@ server. It keeps application passwords and client authorization codes in the
 operating-system credential store, caches a searchable plain-text copy of the
 Inbox locally, and does not download attachment contents. For a selected
 account, the explicit “全部标为已读” action synchronizes the IMAP `\Seen`
-flag in the background; it does not send, delete, or move messages. Background
-checks use the same Digiworld proxy policy.
+flag in the background; it does not send, delete, or move messages. Each mail
+account can independently opt out of the shared Digiworld proxy policy.
 
 Plugin and core update checks are explicit: Digiworld displays the available
 versions and asks for confirmation before downloading. Confirmed downloads and

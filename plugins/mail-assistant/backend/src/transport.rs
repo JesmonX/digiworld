@@ -12,8 +12,8 @@ pub type BoxedIo = Box<dyn IoStream>;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const IO_TIMEOUT: Duration = Duration::from_secs(60);
 
-pub fn connect_tls(host: &str, port: u16) -> Result<BoxedIo> {
-    let stream = connect_route(host, port)?;
+pub fn connect_tls(host: &str, port: u16, use_proxy: bool) -> Result<BoxedIo> {
+    let stream = connect_route(host, port, use_proxy)?;
     let connector = TlsConnector::builder().build().context("无法初始化 TLS")?;
     connector
         .connect(host, stream)
@@ -24,7 +24,10 @@ pub fn connect_tls(host: &str, port: u16) -> Result<BoxedIo> {
         })
 }
 
-fn connect_route(host: &str, port: u16) -> Result<BoxedIo> {
+fn connect_route(host: &str, port: u16, use_proxy: bool) -> Result<BoxedIo> {
+    if !use_proxy {
+        return direct(host, port);
+    }
     let mode = std::env::var("DIGIWORLD_PROXY_MODE").unwrap_or_else(|_| "system".into());
     if mode == "direct" {
         return direct(host, port);

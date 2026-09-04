@@ -50,7 +50,11 @@ const snapshot = {
     },
   ],
   breakdown: [],
-  modelBreakdown: [],
+  modelBreakdown: [
+    { sourceId: 'local', sourceLabel: '本机', agent: 'codex', model: 'gpt-5.6-mini', inputTokens: 600, outputTokens: 100, cacheReadTokens: 300, cacheWriteTokens: 20, totalTokens: 700 },
+    { sourceId: 'remote', sourceLabel: '服务器', agent: 'claude', model: 'gpt-5.6-mini', inputTokens: 300, outputTokens: 50, cacheReadTokens: 100, cacheWriteTokens: 10, totalTokens: 350 },
+    { sourceId: 'local', sourceLabel: '本机', agent: 'codex', model: 'gpt-5.6-sol', inputTokens: 900, outputTokens: 100, cacheReadTokens: 350, cacheWriteTokens: 20, totalTokens: 500 },
+  ],
 }
 
 const quota = {
@@ -107,8 +111,14 @@ describe('token usage layout', () => {
     expect(Array.from(container.querySelectorAll('.cache-point-label')).map(label => label.textContent)).toEqual(['72.0%', '75.0%'])
     expect(container.querySelector('.chart-legend')?.textContent).toContain('gpt-5.6-sol1.2K')
     expect(container.querySelector('.chart-legend')?.textContent).toContain('gpt-5.6-mini1K')
-    expect(container.querySelector('.chart-legend')?.textContent).toContain('模型')
-    expect(container.querySelector('.chart-legend')?.textContent).toContain('缓存率')
+    expect(container.querySelector('.chart-legend')?.textContent).not.toContain('模型')
+    expect(container.querySelector('.chart-legend')?.textContent).not.toContain('缓存率')
+    expect(container.querySelector('.weekly-card h2')?.textContent).toBe('Last 7 Days')
+    expect(container.querySelectorAll('.model-pie-slice')).toHaveLength(2)
+    expect(container.querySelector('.model-card .model-table')).toBeNull()
+    expect(container.querySelector('.model-pie-legend')?.textContent).toContain('gpt-5.6-mini1.05K')
+    expect(container.querySelector('.model-pie-legend')?.textContent).not.toContain('Codex')
+    expect(container.querySelector('.model-pie-legend')?.textContent).not.toContain('本机')
     expect(container.querySelector('.weekly-card')?.textContent).not.toContain('按模型堆叠 Token 与缓存读取率')
     expect(container.querySelector('.weekly-chart')?.getAttribute('viewBox')).toBe('0 0 820 300')
     expect(container.querySelectorAll('.token-segment')).toHaveLength(2)

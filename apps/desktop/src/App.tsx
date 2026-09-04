@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
-  Activity, AlertTriangle, Boxes, Check, ChevronRight, CircleAlert, Download, Gauge,
-  Library, LoaderCircle, Network, Palette, Pause, RefreshCw, Settings, ShieldCheck,
-  Type,
+  Activity, AlertTriangle, BarChart3, Boxes, Check, ChevronRight, CircleAlert, Download, Gauge,
+  Keyboard, Library, LoaderCircle, Mail, Network, Palette, Pause, RefreshCw, Settings,
+  ShieldCheck, Type, type LucideIcon,
 } from 'lucide-react'
 import { suppressContextMenu, type CatalogIndex, type CatalogPlugin, type PluginSummary } from '@digiworld/plugin-sdk'
 import { PluginFrame } from './components/PluginFrame'
@@ -64,6 +64,27 @@ function stateLabel(plugin: PluginSummary): string {
     failed: '异常',
   }
   return labels[plugin.state] ?? plugin.state
+}
+
+const pluginIconMap: Record<string, LucideIcon> = {
+  keyboard: Keyboard,
+  tokens: BarChart3,
+  mail: Mail,
+  default: Boxes,
+}
+
+function pluginIconKey(plugin: { id: string; icon?: string }): string {
+  if (plugin.icon && pluginIconMap[plugin.icon]) return plugin.icon
+  if (plugin.id.includes('keyboard')) return 'keyboard'
+  if (plugin.id.includes('agent-token')) return 'tokens'
+  if (plugin.id.includes('mail')) return 'mail'
+  return 'default'
+}
+
+function PluginIcon({ plugin }: { plugin: { id: string; icon?: string } }) {
+  const key = pluginIconKey(plugin)
+  const Icon = pluginIconMap[key] ?? Boxes
+  return <Icon aria-hidden="true" data-plugin-icon={key} />
 }
 
 function App() {
@@ -184,7 +205,7 @@ function App() {
               <SidebarGroup label="已安装">
                 {state.plugins.map(plugin => (
                   <NavButton key={plugin.id} active={pluginOpen && page.pluginId === plugin.id}
-                    icon={<Boxes />} label={plugin.name} status={plugin.state} onClick={() => setPage({ pluginId: plugin.id })} />
+                    icon={<PluginIcon plugin={plugin} />} label={plugin.name} status={plugin.state} onClick={() => setPage({ pluginId: plugin.id })} />
                 ))}
               </SidebarGroup>
             ) : null}
@@ -286,7 +307,7 @@ function Home({ plugins, version, onCatalog, onOpen, onRefresh, reducedMotion }:
       <div className="installed-list">
         {plugins.map((plugin, index) => (
           <motion.button key={plugin.id} className="plugin-row" onClick={() => onOpen(plugin.id)} initial={reducedMotion ? false : { opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={reducedMotion ? { duration: 0 } : { delay: index * .035, duration: .18 }}>
-            <span className="row-icon"><Boxes /></span>
+            <span className="row-icon"><PluginIcon plugin={plugin} /></span>
             <span className="plugin-row-copy"><span className="plugin-row-heading"><strong>{plugin.name}</strong><ChevronRight className="row-chevron" /></span><small>{plugin.description || '打开以查看功能'}</small></span>
             <span className={`compact-status ${plugin.state}`}>{stateLabel(plugin)}</span>
           </motion.button>
@@ -321,7 +342,7 @@ function Catalog({ catalog, installed, busy, onInstall, onRefresh, onOpen, curre
           const supported = Boolean(currentTarget && plugin.artifacts.some(artifact => artifact.target === currentTarget))
           return (
             <article className="catalog-card" key={plugin.id}>
-              <div className="catalog-title"><span className="catalog-icon"><Boxes /></span><div className="catalog-version"><span className={`availability-dot ${current ? 'installed' : supported ? 'available' : 'unavailable'}`} /> <small>{current ? '已安装' : supported ? '可安装' : '暂未适配'}</small><small>v{plugin.version}</small></div></div>
+              <div className="catalog-title"><span className="catalog-icon"><PluginIcon plugin={plugin} /></span><div className="catalog-version"><span className={`availability-dot ${current ? 'installed' : supported ? 'available' : 'unavailable'}`} /> <small>{current ? '已安装' : supported ? '可安装' : '暂未适配'}</small><small>v{plugin.version}</small></div></div>
               <h3>{plugin.name}</h3>
               <p>{plugin.description}</p>
               {current

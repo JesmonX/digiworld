@@ -30,6 +30,7 @@ impl Database {
                 username TEXT NOT NULL,
                 host TEXT NOT NULL,
                 port INTEGER NOT NULL,
+                use_proxy INTEGER NOT NULL DEFAULT 1,
                 uid_validity INTEGER,
                 last_uid INTEGER NOT NULL DEFAULT 0,
                 baseline_complete INTEGER NOT NULL DEFAULT 0,
@@ -83,6 +84,18 @@ impl Database {
             END;
             ",
         )?;
+        let has_use_proxy = connection
+            .prepare("PRAGMA table_info(accounts)")?
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<rusqlite::Result<Vec<_>>>()?
+            .into_iter()
+            .any(|name| name == "use_proxy");
+        if !has_use_proxy {
+            connection.execute(
+                "ALTER TABLE accounts ADD COLUMN use_proxy INTEGER NOT NULL DEFAULT 1",
+                [],
+            )?;
+        }
         Ok(Self {
             connection: Mutex::new(connection),
         })
@@ -123,11 +136,11 @@ impl Database {
         let mut connection = self.connection.lock().expect("database lock poisoned");
         let transaction = connection.transaction()?;
         transaction.execute(
-            "INSERT INTO accounts(id, provider, label, email, username, host, port)
-             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            "INSERT INTO accounts(id, provider, label, email, username, host, port, use_proxy)
+             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
              ON CONFLICT(id) DO UPDATE SET provider=excluded.provider, label=excluded.label,
                 email=excluded.email, username=excluded.username, host=excluded.host,
-                port=excluded.port, last_error=NULL, next_sync_at=NULL",
+                port=excluded.port, use_proxy=excluded.use_proxy, last_error=NULL, next_sync_at=NULL",
             params![
                 id,
                 input.provider,
@@ -135,7 +148,8 @@ impl Database {
                 input.email,
                 input.username,
                 input.host,
-                input.port
+                input.port,
+                input.use_proxy
             ],
         )?;
         if reset_cache {
@@ -156,7 +170,7 @@ impl Database {
             .lock()
             .expect("database lock poisoned")
             .query_row(
-                "SELECT id, provider, label, email, username, host, port, sync_phase,
+                "SELECT id, provider, label, email, username, host, port, use_proxy, sync_phase,
                         indexed, total, baseline_complete, last_success_at, last_error, next_sync_at
                  FROM accounts WHERE id=?1",
                 [id],
@@ -168,7 +182,7 @@ impl Database {
     pub fn accounts(&self) -> Result<Vec<Account>> {
         let connection = self.connection.lock().expect("database lock poisoned");
         let mut statement = connection.prepare(
-            "SELECT id, provider, label, email, username, host, port, sync_phase,
+            "SELECT id, provider, label, email, username, host, port, use_proxy, sync_phase,
                     indexed, total, baseline_complete, last_success_at, last_error, next_sync_at
              FROM accounts ORDER BY label COLLATE NOCASE, email COLLATE NOCASE",
         )?;
@@ -586,14 +600,15 @@ fn account_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Account> {
         username: row.get(4)?,
         host: row.get(5)?,
         port: row.get(6)?,
+        use_proxy: row.get(7)?,
         has_credential: false,
-        sync_phase: row.get(7)?,
-        indexed: row.get(8)?,
-        total: row.get(9)?,
-        baseline_complete: row.get(10)?,
-        last_success_at: row.get(11)?,
-        last_error: row.get(12)?,
-        next_sync_at: row.get(13)?,
+        sync_phase: row.get(8)?,
+        indexed: row.get(9)?,
+        total: row.get(10)?,
+        baseline_complete: row.get(11)?,
+        last_success_at: row.get(12)?,
+        last_error: row.get(13)?,
+        next_sync_at: row.get(14)?,
     })
 }
 
@@ -637,6 +652,7 @@ mod tests {
             username: "me@example.com".into(),
             host: "imap.example.com".into(),
             port: 993,
+            use_proxy: true,
             secret: None,
         };
         database
@@ -680,6 +696,7 @@ mod tests {
             username: "me@example.com".into(),
             host: "imap.example.com".into(),
             port: 993,
+            use_proxy: true,
             secret: None,
         };
         database
@@ -734,11 +751,13 @@ mod tests {
             username: "user@qq.com".into(),
             host: "imap.qq.com".into(),
             port: 993,
+            use_proxy: false,
             secret: None,
         };
         database
             .save_account_with_reset("acc", &account, false)
             .unwrap();
+        assert!(!database.account("acc").unwrap().use_proxy);
         let parsed = ParsedMessage {
             subject: "测试".into(),
             sender: "a@qq.com".into(),

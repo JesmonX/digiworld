@@ -103,6 +103,7 @@ pub struct PluginSummary {
     pub version: String,
     pub name: String,
     pub description: String,
+    pub icon: Option<String>,
     pub enabled: bool,
     pub state: String,
     pub permissions: Vec<PermissionRequest>,

@@ -78,8 +78,9 @@ button:focus-visible { outline: 2px solid color-mix(in srgb, var(--dw-accent, #5
 .layout-75 .keyboard-sections, .layout-65 .keyboard-sections { gap: 5px; grid-template-columns: minmax(0, 14fr) minmax(76px, 2fr); }
 .key-row { display: flex; gap: 4px; height: 42px; margin-bottom: 4px; }
 .key-row:last-child { margin-bottom: 0; }
-.nav-section .arrow-up-row { justify-content: center; }
-.nav-section .arrow-up-row .key { flex: 0 0 calc((100% - 8px) / 3); margin-left: 0; }
+.nav-section .key-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.nav-section .key-row .key { width: auto; flex: none; margin-left: 0; }
+.nav-section .key-row .key:only-child { grid-column: 2; }
 .key {
   position: relative;
   flex: var(--width) 0 0;

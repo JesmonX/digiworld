@@ -18,6 +18,7 @@ vi.mock('@digiworld/plugin-sdk', () => ({
 const account = {
   id: 'mail-1', provider: 'custom', label: '工作邮箱', email: 'me@example.com',
   username: 'me@example.com', host: 'imap.example.com', port: 993,
+  useProxy: true,
   hasCredential: true, syncPhase: 'error', indexed: 0, total: 0,
   baselineComplete: false, lastError: 'IMAP 认证失败，请更新授权码',
   nextSyncAt: '2026-09-04T12:05:00Z',
@@ -100,6 +101,32 @@ describe('mail assistant status and search', () => {
     await act(async () => { resolveOld(page('旧结果')); await Promise.resolve() })
     expect(container.textContent).toContain('新结果')
     expect(container.textContent).not.toContain('旧结果')
+    await act(async () => root.unmount())
+  })
+
+  it('lets each account opt out of the shared proxy', async () => {
+    const root = createRoot(container)
+    await act(async () => { root.render(<App />); await flush(); await flush() })
+
+    const accountButton = Array.from(container.querySelectorAll<HTMLButtonElement>('.accounts > button'))
+      .find(item => item.textContent?.includes('工作邮箱'))
+    await act(async () => { accountButton?.click(); await flush() })
+    await act(async () => { container.querySelector<HTMLButtonElement>('.manage')?.click() })
+
+    const toggle = container.querySelector<HTMLInputElement>('input[aria-label="此账号使用代理"]')!
+    expect(toggle.checked).toBe(true)
+    await act(async () => { toggle.click() })
+    expect(toggle.checked).toBe(false)
+
+    mocks.request.mockImplementation(async (method: string, payload?: { account?: unknown }) => {
+      if (method === 'mail.accounts.save') return { ...account, useProxy: false }
+      if (method === 'mail.sync.status') return { accounts: [{ ...account, useProxy: false }], syncingAccountIds: [] }
+      throw new Error(`unexpected method: ${method} ${JSON.stringify(payload)}`)
+    })
+    await act(async () => { container.querySelector<HTMLButtonElement>('.modal .primary')?.click(); await flush() })
+    expect(mocks.request).toHaveBeenCalledWith('mail.accounts.save', {
+      account: expect.objectContaining({ id: 'mail-1', useProxy: false }),
+    })
     await act(async () => root.unmount())
   })
 

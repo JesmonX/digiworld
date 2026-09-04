@@ -40,7 +40,8 @@ operating-system credential store and are never written to Digiworld's SQLite
 databases or logs. The plugin stores account settings, message headers, up to
 1 MiB of decoded plain-text body per message, attachment names, types, sizes,
 and sync cursors in local plugin storage so the Inbox can be searched and read
-offline. It does not retain attachment contents, render remote HTML resources,
+offline. Each account also stores whether its IMAP connection uses the shared
+Digiworld proxy policy. It does not retain attachment contents, render remote HTML resources,
 send, delete, or move mail. The only server-side mutation is the explicit
 selected-account bulk `\Seen` update from “全部标为已读”.
 

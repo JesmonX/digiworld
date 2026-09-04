@@ -12,6 +12,7 @@ const bridge = createPluginBridge(PLUGIN_ID)
 type Provider = 'gmail' | 'qq' | '163' | 'custom'
 interface Account {
   id: string; provider: Provider; label: string; email: string; username: string; host: string; port: number
+  useProxy: boolean
   hasCredential: boolean; syncPhase: string; indexed: number; total: number; baselineComplete: boolean
   lastSuccessAt?: string; lastError?: string; nextSyncAt?: string
 }
@@ -24,7 +25,7 @@ interface MailDetail extends MailSummary { recipients: string; body: string; bod
 interface MailPage { items: MailSummary[]; nextCursor?: number }
 interface SyncStatus { accounts: Account[]; syncingAccountIds: string[] }
 interface AccountDraft {
-  id?: string; provider: Provider; label: string; email: string; username: string; host: string; port: number; secret: string
+  id?: string; provider: Provider; label: string; email: string; username: string; host: string; port: number; useProxy: boolean; secret: string
 }
 
 const providers: Record<Provider, { label: string; host: string; port: number }> = {
@@ -34,7 +35,7 @@ const providers: Record<Provider, { label: string; host: string; port: number }>
   custom: { label: '自定义 IMAP', host: '', port: 993 },
 }
 
-const emptyDraft = (): AccountDraft => ({ provider: 'gmail', label: 'Gmail', email: '', username: '', host: 'imap.gmail.com', port: 993, secret: '' })
+const emptyDraft = (): AccountDraft => ({ provider: 'gmail', label: 'Gmail', email: '', username: '', host: 'imap.gmail.com', port: 993, useProxy: true, secret: '' })
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error)
 const fmtDate = (value?: string) => value ? new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : ''
 const fmtSize = (value: number) => value < 1024 ? `${value} B` : value < 1024 ** 2 ? `${(value / 1024).toFixed(1)} KB` : `${(value / 1024 ** 2).toFixed(1)} MB`
@@ -138,7 +139,7 @@ export default function App() {
 
   const editAccount = (account?: Account) => setDraft(account ? {
     id: account.id, provider: account.provider, label: account.label, email: account.email,
-    username: account.username, host: account.host, port: account.port, secret: '',
+    username: account.username, host: account.host, port: account.port, useProxy: account.useProxy ?? true, secret: '',
   } : emptyDraft())
 
   const applyProvider = (provider: Provider) => {
@@ -231,6 +232,7 @@ export default function App() {
         <label>端口<input type="number" disabled={draft.provider !== 'custom'} value={draft.port} onChange={event => setDraft({ ...draft, port: Number(event.target.value) })} /></label>
         <label className="wide">用户名<input value={draft.username} onChange={event => setDraft({ ...draft, username: event.target.value })} placeholder="默认使用完整邮箱地址" /></label>
         <label className="wide">{draft.id ? '新授权码（留空则不修改）' : '应用专用密码 / 客户端授权码'}<input type="password" autoComplete="new-password" value={draft.secret} onChange={event => setDraft({ ...draft, secret: event.target.value })} /></label>
+        <label className="proxy-option wide"><span><strong>使用代理</strong><small>连接此邮箱时使用 Digiworld 的代理设置</small></span><input type="checkbox" aria-label="此账号使用代理" checked={draft.useProxy} onChange={event => setDraft({ ...draft, useProxy: event.target.checked })} /></label>
       </div>
       {notice && <div className="success">{notice}</div>}
       <footer>{draft.id ? <button className="danger" onClick={() => void removeAccount()} disabled={!!busy}><Trash2 size={15} />删除账号</button> : <span />}

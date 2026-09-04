@@ -177,6 +177,7 @@ impl Store {
                 version: manifest.version,
                 name: manifest.name,
                 description: manifest.description,
+                icon: manifest.icon,
                 enabled,
                 state,
                 permissions: manifest.permissions,

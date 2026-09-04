@@ -49,6 +49,9 @@ describe('PluginFrame theme', () => {
     await act(async () => root.render(<PluginFrame pluginId="sample" html="<main />" theme={violet} />))
 
     const iframe = container.querySelector('iframe')!
+    const expectedBackground = document.createElement('div')
+    expectedBackground.style.backgroundColor = violet.bg
+    expect(iframe.style.backgroundColor).toBe(expectedBackground.style.backgroundColor)
     const postMessage = vi.spyOn(iframe.contentWindow!, 'postMessage')
     await act(async () => window.dispatchEvent(new MessageEvent('message', {
       source: iframe.contentWindow,
