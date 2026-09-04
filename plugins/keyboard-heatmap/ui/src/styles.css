@@ -129,3 +129,30 @@ button.primary:active, button.secondary:active, .pause-button:active, .layout-pi
   .numpad-section { grid-template-rows: repeat(5, 40px); }
   .plugin-header { margin-bottom: 8px; }
 }
+
+/* Keep the board dominant while matching the host's compact surface hierarchy. */
+:root {
+  --dw-radius-control: 7px;
+  --dw-radius-panel: 12px;
+  --dw-shadow-card: 0 7px 20px rgba(47, 55, 80, .055);
+  --dw-shadow-hover: 0 14px 30px rgba(47, 55, 80, .105);
+}
+.heatmap-app { max-width: 1180px; margin-inline: auto; padding-inline: 3px; }
+.plugin-header { min-height: 56px; margin-bottom: 14px; }
+.keyboard-card, .ranking-card { border-radius: var(--dw-radius-panel); box-shadow: var(--dw-shadow-card); transition: border-color .18s ease, box-shadow .18s ease; }
+.keyboard-card:hover, .ranking-card:hover { border-color: color-mix(in srgb, var(--dw-accent, #5b5ce2) 18%, var(--dw-border, #dde3ec)); box-shadow: var(--dw-shadow-hover); }
+.scope-toggle, .layout-picker-trigger { border-radius: var(--dw-radius-control); }
+.layout-picker-trigger { box-shadow: 0 3px 10px rgba(47, 55, 80, .035); transition: border-color .18s ease, background .18s ease, box-shadow .18s ease, transform .18s ease; }
+.keyboard-board { border: 1px solid color-mix(in srgb, var(--dw-border, #dde3ec) 72%, transparent); border-radius: 10px; }
+.key { transition: transform .12s ease, box-shadow .12s ease; }
+.key:hover { transform: translateY(-1px); }
+.ranking-card { padding: 16px 17px; }
+html[data-dw-glass="enabled"] .keyboard-card, html[data-dw-glass="enabled"] .ranking-card { background: color-mix(in srgb, var(--dw-surface, #fff) 88%, transparent); backdrop-filter: blur(14px) saturate(120%); }
+html[data-dw-glass="disabled"] .keyboard-card, html[data-dw-glass="disabled"] .ranking-card { background: var(--dw-surface, #fff); backdrop-filter: none; }
+@media (max-width: 620px) {
+  .plugin-header { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .header-actions { width: 100%; }
+  .scope-toggle { flex: 1; }
+  .scope-toggle button { flex: 1; }
+  .pause-button { flex: 0 0 auto; }
+}

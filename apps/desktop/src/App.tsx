@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Boxes, Check, ChevronRight, CircleAlert, Download, Gauge, Library,
-  LoaderCircle, Network, Palette, Pause, RefreshCw, Settings, ShieldCheck,
+  Activity, AlertTriangle, Boxes, Check, ChevronRight, CircleAlert, Download, Gauge,
+  Library, LoaderCircle, Network, Palette, Pause, RefreshCw, Settings, ShieldCheck,
   Type,
 } from 'lucide-react'
 import { suppressContextMenu, type CatalogIndex, type CatalogPlugin, type PluginSummary } from '@digiworld/plugin-sdk'
@@ -174,16 +174,24 @@ function App() {
       <WindowChrome />
       <div className="app-shell">
         <aside className="sidebar">
-          <nav>
-            <NavButton active={page === 'home'} icon={<Gauge />} label="概览" onClick={() => setPage('home')} />
-            <NavButton active={page === 'catalog'} icon={<Library />} label="功能库" onClick={() => setPage('catalog')} />
-            {state?.plugins.map(plugin => (
-              <NavButton key={plugin.id} active={pluginOpen && page.pluginId === plugin.id}
-                icon={<Boxes />} label={plugin.name} status={plugin.state} onClick={() => setPage({ pluginId: plugin.id })} />
-            ))}
-          </nav>
+          <div className="sidebar-scroll">
+            <SidebarGroup label="工作台">
+              <NavButton active={page === 'home'} icon={<Gauge />} label="概览" onClick={() => setPage('home')} />
+              <NavButton active={page === 'catalog'} icon={<Library />} label="功能库" onClick={() => setPage('catalog')} />
+            </SidebarGroup>
+            {state?.plugins.length ? (
+              <SidebarGroup label="已安装">
+                {state.plugins.map(plugin => (
+                  <NavButton key={plugin.id} active={pluginOpen && page.pluginId === plugin.id}
+                    icon={<Boxes />} label={plugin.name} status={plugin.state} onClick={() => setPage({ pluginId: plugin.id })} />
+                ))}
+              </SidebarGroup>
+            ) : null}
+          </div>
           <div className="sidebar-bottom">
-            <NavButton active={page === 'settings'} icon={<Settings />} label="设置" onClick={() => setPage('settings')} />
+            <SidebarGroup label="系统">
+              <NavButton active={page === 'settings'} icon={<Settings />} label="设置" onClick={() => setPage('settings')} />
+            </SidebarGroup>
           </div>
         </aside>
 
@@ -206,7 +214,7 @@ function App() {
           <section className="content">
             <AnimatePresence initial={false}>
               <motion.div key={typeof page === 'string' ? page : `plugin:${page.pluginId}`} className="page-transition" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: .2, ease: 'easeOut' }}>
-                {page === 'home' && <Home plugins={state?.plugins ?? []} version={state?.version} onCatalog={() => setPage('catalog')} onOpen={id => setPage({ pluginId: id })} />}
+                {page === 'home' && <Home plugins={state?.plugins ?? []} version={state?.version} onCatalog={() => setPage('catalog')} onOpen={id => setPage({ pluginId: id })} onRefresh={() => { void refreshState().catch(reason => setError(errorMessage(reason))) }} />}
                 {page === 'catalog' && <Catalog catalog={catalog} installed={installed} busy={busy} onInstall={setConfirmInstall} onRefresh={() => refreshCatalog(true)} onOpen={id => setPage({ pluginId: id })} currentTarget={state?.target} />}
                 {page === 'settings' && state && <SettingsPage state={state} progress={updateProgress} onProgressReset={() => setUpdateProgress(null)} onPluginsUpdated={refreshState} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} fontThemeId={fontThemeId} onFontThemeChange={setFontThemeId} fontWeight={fontWeight} onFontWeightChange={setFontWeight} glassMode={glassMode} onGlassModeChange={setGlassMode} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
                 {pluginOpen && (
@@ -226,11 +234,15 @@ function App() {
   )
 }
 
+function SidebarGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return <section className="sidebar-section"><h2 className="sidebar-section-label">{label}</h2><nav>{children}</nav></section>
+}
+
 function NavButton({ active, icon, label, status, onClick }: { active: boolean; icon: React.ReactNode; label: string; status?: string; onClick(): void }) {
   return <button title={label} className={`nav-item ${active ? 'active' : ''}`} onClick={onClick}><span>{icon}</span><b>{label}</b>{status && <i className={`state-dot ${status}`} />}</button>
 }
 
-function Home({ plugins, version, onCatalog, onOpen }: { plugins: PluginSummary[]; version: string | undefined; onCatalog(): void; onOpen(id: string): void }) {
+function Home({ plugins, version, onCatalog, onOpen, onRefresh }: { plugins: PluginSummary[]; version: string | undefined; onCatalog(): void; onOpen(id: string): void; onRefresh(): void }) {
   if (plugins.length === 0) return (
     <div className="empty-state">
       <div className="empty-icon"><Boxes /></div>
@@ -241,33 +253,50 @@ function Home({ plugins, version, onCatalog, onOpen }: { plugins: PluginSummary[
   )
 
   const running = plugins.filter(plugin => plugin.state === 'running').length
+  const attention = plugins.filter(plugin => !plugin.enabled || plugin.state === 'failed').length
+  const healthy = attention === 0
   return (
     <div className="home-dashboard">
-      <div className="dashboard-summary" aria-label="Digiworld 状态摘要">
-        <SummaryCard label="已安装" value={plugins.length} detail="个功能" icon={<Boxes />} />
-        <SummaryCard label="运行中" value={running} detail={`共 ${plugins.length} 个`} icon={<Gauge />} />
-        <SummaryCard label="当前版本" value={version ?? '—'} detail="Digiworld" icon={<ShieldCheck />} />
+      <div className="home-intro">
+        <div>
+          <span className="eyebrow"><Activity />数字工作台</span>
+          <h2>你的功能，都在这里</h2>
+          <p>{healthy ? '当前没有停用或异常功能。' : `${attention} 个功能需要你的注意。`}</p>
+        </div>
+        <div className={`health-pill ${healthy ? 'healthy' : 'attention'}`}><span />{healthy ? '运行稳定' : '需要关注'}</div>
       </div>
-      <div className="section-heading">
-        <h2>已安装</h2>
-        <button className="secondary" onClick={onCatalog}>添加功能</button>
+      <div className="dashboard-summary" aria-label="Digiworld 状态摘要">
+        <SummaryCard label="已安装" value={plugins.length} detail="个功能" icon={<Boxes />} tone="accent" />
+        <SummaryCard label="运行中" value={running} detail={`共 ${plugins.length} 个`} icon={<Gauge />} tone="success" />
+        <SummaryCard label="需关注" value={attention} detail={attention ? '请查看状态' : '暂无异常'} icon={attention ? <AlertTriangle /> : <ShieldCheck />} tone={attention ? 'warning' : 'success'} />
+        <SummaryCard label="当前版本" value={version ?? '—'} detail="Digiworld" icon={<ShieldCheck />} tone="neutral" />
+      </div>
+      <div className="section-heading installed-heading">
+        <div><span className="section-kicker">你的工作台</span><h2>已安装功能</h2></div>
+        <button className="secondary" onClick={onCatalog}><Library />添加功能</button>
       </div>
       <div className="installed-list">
         {plugins.map((plugin, index) => (
           <motion.button key={plugin.id} className="plugin-row" onClick={() => onOpen(plugin.id)} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * .035, duration: .18 }}>
             <span className="row-icon"><Boxes /></span>
-            <span className="plugin-row-copy"><strong>{plugin.name}</strong><small>{plugin.description}</small></span>
+            <span className="plugin-row-copy"><span className="plugin-row-heading"><strong>{plugin.name}</strong><ChevronRight className="row-chevron" /></span><small>{plugin.description || '打开以查看功能'}</small></span>
             <span className={`compact-status ${plugin.state}`}>{stateLabel(plugin)}</span>
-            <ChevronRight className="row-chevron" />
           </motion.button>
         ))}
+      </div>
+      <div className="quick-actions" aria-label="快捷操作">
+        <span className="section-kicker">快捷操作</span>
+        <div>
+          <button className="quick-action" onClick={onCatalog}><span><Library /></span><b>浏览功能库</b><ChevronRight /></button>
+          <button className="quick-action" onClick={onRefresh}><span><RefreshCw /></span><b>刷新状态</b><ChevronRight /></button>
+        </div>
       </div>
     </div>
   )
 }
 
-function SummaryCard({ label, value, detail, icon }: { label: string; value: string | number; detail: string; icon: React.ReactNode }) {
-  return <article className="summary-card"><span className="summary-card-icon">{icon}</span><div><small>{label}</small><strong>{value}</strong><span>{detail}</span></div></article>
+function SummaryCard({ label, value, detail, icon, tone = 'accent' }: { label: string; value: string | number; detail: string; icon: React.ReactNode; tone?: 'accent' | 'success' | 'warning' | 'neutral' }) {
+  return <article className={`summary-card ${tone}`}><span className="summary-card-icon">{icon}</span><div><small>{label}</small><strong>{value}</strong><span>{detail}</span></div></article>
 }
 
 function Catalog({ catalog, installed, busy, onInstall, onRefresh, onOpen, currentTarget }: { catalog: CatalogIndex | null; installed: Map<string, PluginSummary>; busy: string | null; onInstall(plugin: CatalogPlugin): void; onRefresh(): void; onOpen(id: string): void; currentTarget?: string | undefined }) {
@@ -284,7 +313,7 @@ function Catalog({ catalog, installed, busy, onInstall, onRefresh, onOpen, curre
           const supported = Boolean(currentTarget && plugin.artifacts.some(artifact => artifact.target === currentTarget))
           return (
             <article className="catalog-card" key={plugin.id}>
-              <div className="catalog-title"><span className="catalog-icon"><Boxes /></span><small>v{plugin.version}</small></div>
+              <div className="catalog-title"><span className="catalog-icon"><Boxes /></span><div className="catalog-version"><span className={`availability-dot ${current ? 'installed' : supported ? 'available' : 'unavailable'}`} /> <small>{current ? '已安装' : supported ? '可安装' : '暂未适配'}</small><small>v{plugin.version}</small></div></div>
               <h3>{plugin.name}</h3>
               <p>{plugin.description}</p>
               {current

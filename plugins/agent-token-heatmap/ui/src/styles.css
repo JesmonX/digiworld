@@ -195,3 +195,33 @@ button.icon.danger { color: var(--dw-danger, #d92d20); }
 .source-modal > footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 15px; }
 @media (max-width: 950px) { .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .insights-grid, .lower-grid { grid-template-columns: 1fr; } .quota-setting-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 620px) { .card-title { align-items: stretch; flex-direction: column; } .heatmap-controls { justify-content: flex-start; } .range-group { width: 100%; } .range-group button { flex: 1; padding-inline: 4px; } .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Shared Digiworld surface language: compact hierarchy with enough separation for scanning. */
+:root {
+  --dw-radius-control: 7px;
+  --dw-radius-panel: 12px;
+  --dw-shadow-card: 0 7px 20px rgba(47, 55, 80, .055);
+  --dw-shadow-hover: 0 14px 30px rgba(47, 55, 80, .105);
+}
+.usage-app { max-width: 1180px; margin-inline: auto; padding-inline: 3px; }
+.usage-header { min-height: 66px; margin-bottom: 14px; }
+.usage-header h1 { font-size: 22px; }
+button.primary, button.secondary { border-radius: var(--dw-radius-control); transition: border-color .18s ease, background .18s ease, box-shadow .18s ease, transform .18s ease; }
+button.primary:hover, button.secondary:hover { transform: translateY(-1px); box-shadow: 0 5px 14px rgba(47, 55, 80, .08); }
+.filter-bar { padding: 11px 13px; border-radius: var(--dw-radius-panel); box-shadow: var(--dw-shadow-card); }
+.filter-chip { border-radius: var(--dw-radius-control); }
+.summary-grid { grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; margin-bottom: 16px; border: 0; background: transparent; }
+.summary-item { min-height: 70px; border: 1px solid var(--dw-border, #dde3ec); border-radius: var(--dw-radius-control); background: color-mix(in srgb, var(--dw-surface, #fff) 88%, transparent); box-shadow: 0 4px 13px rgba(47, 55, 80, .035); }
+.heatmap-card, .breakdown-card, .daily-ranking-card, .model-card, .weekly-card, .quota-card { border-radius: var(--dw-radius-panel); box-shadow: var(--dw-shadow-card); transition: border-color .18s ease, box-shadow .18s ease; }
+.heatmap-card:hover, .breakdown-card:hover, .daily-ranking-card:hover, .model-card:hover, .weekly-card:hover, .quota-card:hover { border-color: color-mix(in srgb, var(--dw-accent, #5b5ce2) 18%, var(--dw-border, #dde3ec)); box-shadow: var(--dw-shadow-hover); }
+.calendar-grid i { transition: transform .12s ease, border-color .12s ease; }
+.calendar-grid i:not(.blank):hover { transform: scale(1.18); border-color: var(--dw-accent, #5b5ce2); }
+.lower-grid { gap: 12px; margin-top: 12px; }
+.model-card { margin-top: 12px; }
+html[data-dw-glass="enabled"] .summary-item { background: color-mix(in srgb, var(--dw-surface, #fff) 88%, transparent); backdrop-filter: blur(12px) saturate(120%); }
+html[data-dw-glass="disabled"] .summary-item { backdrop-filter: none; background: var(--dw-surface, #fff); }
+@media (max-width: 620px) {
+  .usage-header { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .header-buttons { width: 100%; }
+  .header-buttons button { flex: 1; }
+}
