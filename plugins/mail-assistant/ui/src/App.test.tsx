@@ -101,4 +101,71 @@ describe('mail assistant status and search', () => {
     expect(container.textContent).not.toContain('旧结果')
     await act(async () => root.unmount())
   })
+
+  it('correctly displays unread only when both serverSeen and locallyViewed are false, and allows toggling', async () => {
+    const root = createRoot(container)
+    mocks.request.mockImplementation(async (method: string) => {
+      if (method === 'mail.sync.status') return { accounts: [account], syncingAccountIds: [] }
+      if (method === 'mail.settings.get') return { pollMinutes: 10 }
+      if (method === 'mail.messages.list') return {
+        items: [
+          {
+            id: 1, accountId: 'mail-1', accountLabel: '工作邮箱',
+            subject: '未读邮件', sender: 'sender@example.com', receivedAt: '2026-09-04T12:00:00Z',
+            snippet: '未读', serverSeen: false, locallyViewed: false, size: 10, hasBody: true,
+          },
+          {
+            id: 2, accountId: 'mail-1', accountLabel: '工作邮箱',
+            subject: '已读邮件', sender: 'sender@example.com', receivedAt: '2026-09-04T12:00:00Z',
+            snippet: '已读', serverSeen: true, locallyViewed: false, size: 10, hasBody: true,
+          },
+        ],
+      }
+      if (method === 'mail.messages.get') return {
+        id: 1, accountId: 'mail-1', accountLabel: '工作邮箱',
+        subject: '未读邮件', sender: 'sender@example.com', receivedAt: '2026-09-04T12:00:00Z',
+        snippet: '未读', serverSeen: false, locallyViewed: true, size: 10, hasBody: true,
+        recipients: 'me@example.com', body: '正文内容', bodyTruncated: false, attachments: [],
+      }
+      if (method === 'mail.messages.mark_read') return { ok: true }
+      throw new Error(`unexpected method: ${method}`)
+    })
+    vi.useFakeTimers()
+    await act(async () => {
+      root.render(<App />)
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300)
+    })
+
+    const rows = container.querySelectorAll('.mail-row')
+    expect(rows.length).toBe(2)
+    const firstRow = rows[0]!
+    const secondRow = rows[1]!
+    expect(firstRow.classList.contains('new')).toBe(true)
+    expect(secondRow.classList.contains('new')).toBe(false)
+
+    // Click on unread message to open
+    await act(async () => {
+      firstRow.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+    })
+    expect(firstRow.classList.contains('new')).toBe(false)
+
+    // Toggle button should now show '标为未读'
+    const toggleBtn = container.querySelector<HTMLButtonElement>('.toggle-read')!
+    expect(toggleBtn).not.toBeNull()
+    expect(toggleBtn.textContent).toBe('标为未读')
+
+    // Click toggle button to mark as unread
+    await act(async () => {
+      toggleBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+    })
+    expect(mocks.request).toHaveBeenCalledWith('mail.messages.mark_read', { id: 1, read: false })
+    expect(toggleBtn.textContent).toBe('标为已读')
+    expect(firstRow.classList.contains('new')).toBe(true)
+
+    await act(async () => root.unmount())
+  })
 })

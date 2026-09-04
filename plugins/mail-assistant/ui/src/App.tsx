@@ -111,6 +111,15 @@ export default function App() {
     } catch (reason) { setError(errorText(reason)) }
   }
 
+  const toggleRead = async (message: MailDetail) => {
+    const nextRead = !message.serverSeen && !message.locallyViewed
+    try {
+      await bridge.request('mail.messages.mark_read', { id: message.id, read: nextRead })
+      setSelected(current => current && current.id === message.id ? { ...current, locallyViewed: nextRead, serverSeen: nextRead } : current)
+      setMessages(items => items.map(item => item.id === message.id ? { ...item, locallyViewed: nextRead, serverSeen: nextRead } : item))
+    } catch (reason) { setError(errorText(reason)) }
+  }
+
   const changePoll = async (minutes: number) => {
     setPollMinutes(minutes)
     try { await bridge.request('mail.settings.save', { settings: { pollMinutes: minutes } }) }
@@ -177,7 +186,7 @@ export default function App() {
 
       <section className="message-list" aria-label="邮件列表">
         {accounts.length === 0 ? <Empty icon={<Mail />} title="添加邮箱账号" text="支持 Gmail、QQ、163 和自定义 IMAP。" action={() => editAccount()} /> : messages.length === 0 ? <Empty icon={<Inbox />} title={syncing.length ? '正在同步收件箱' : '没有找到邮件'} text={syncing.length ? '首次完整同步可在后台继续。' : '尝试刷新或更换搜索条件。'} /> : <>
-          {messages.map(message => <button key={message.id} className={`mail-row ${selected?.id === message.id ? 'selected' : ''} ${!message.locallyViewed ? 'new' : ''}`} onClick={() => void openMessage(message)}>
+          {messages.map(message => <button key={message.id} className={`mail-row ${selected?.id === message.id ? 'selected' : ''} ${(!message.serverSeen && !message.locallyViewed) ? 'new' : ''}`} onClick={() => void openMessage(message)}>
             <span className="row-top"><strong>{message.sender || '未知发件人'}</strong><time>{fmtDate(message.receivedAt)}</time></span>
             <span className="subject">{message.subject || '（无主题）'}</span>
             <span className="snippet">{message.hasBody ? message.snippet : '正文正在后台同步…'}</span>
@@ -189,7 +198,16 @@ export default function App() {
 
       <article className="detail">
         {!selected ? <Empty icon={<Mail />} title="选择一封邮件" text="正文以纯文本显示，不加载远程图片。" /> : <>
-          <div className="detail-head"><h2>{selected.subject || '（无主题）'}</h2><div><strong>{selected.sender || '未知发件人'}</strong><time>{fmtDate(selected.receivedAt)}</time></div><p>收件人：{selected.recipients || '未提供'}</p></div>
+          <div className="detail-head">
+            <div className="detail-title-bar">
+              <h2>{selected.subject || '（无主题）'}</h2>
+              <button className="secondary toggle-read" onClick={() => void toggleRead(selected)}>
+                {(!selected.serverSeen && !selected.locallyViewed) ? '标为已读' : '标为未读'}
+              </button>
+            </div>
+            <div><strong>{selected.sender || '未知发件人'}</strong><time>{fmtDate(selected.receivedAt)}</time></div>
+            <p>收件人：{selected.recipients || '未提供'}</p>
+          </div>
           {selected.attachments.length > 0 && <div className="attachments">{selected.attachments.map((attachment, index) => <span key={`${attachment.filename}-${index}`}><Paperclip size={13} />{attachment.filename}<small>{fmtSize(attachment.size)}</small></span>)}</div>}
           <pre>{selected.body || (selected.hasBody ? '这封邮件没有纯文本正文。' : '正文正在后台同步…')}{selected.bodyTruncated ? '\n\n[正文已截断]' : ''}</pre>
         </>}

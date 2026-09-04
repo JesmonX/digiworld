@@ -9,7 +9,8 @@ pub trait IoStream: Read + Write + Send {}
 impl<T: Read + Write + Send> IoStream for T {}
 pub type BoxedIo = Box<dyn IoStream>;
 
-const TIMEOUT: Duration = Duration::from_secs(10);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
+const IO_TIMEOUT: Duration = Duration::from_secs(60);
 
 pub fn connect_tls(host: &str, port: u16) -> Result<BoxedIo> {
     let stream = connect_route(host, port)?;
@@ -152,7 +153,7 @@ fn tcp(host: &str, port: u16) -> Result<TcpStream> {
     let addresses = (host, port).to_socket_addrs()?;
     let mut last = None;
     for address in addresses {
-        match TcpStream::connect_timeout(&address, TIMEOUT) {
+        match TcpStream::connect_timeout(&address, CONNECT_TIMEOUT) {
             Ok(stream) => {
                 configure(&stream)?;
                 return Ok(stream);
@@ -166,8 +167,8 @@ fn tcp(host: &str, port: u16) -> Result<TcpStream> {
 }
 
 fn configure(stream: &TcpStream) -> Result<()> {
-    stream.set_read_timeout(Some(TIMEOUT))?;
-    stream.set_write_timeout(Some(TIMEOUT))?;
+    stream.set_read_timeout(Some(IO_TIMEOUT))?;
+    stream.set_write_timeout(Some(IO_TIMEOUT))?;
     stream.set_nodelay(true)?;
     Ok(())
 }

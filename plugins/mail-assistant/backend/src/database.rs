@@ -4,6 +4,7 @@ use crate::model::{
 };
 use anyhow::{Context, Result};
 use rusqlite::{Connection, OptionalExtension, params};
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -286,7 +287,8 @@ impl Database {
                 body=CASE WHEN excluded.has_body THEN excluded.body ELSE messages.body END,
                 body_truncated=CASE WHEN excluded.has_body THEN excluded.body_truncated ELSE messages.body_truncated END,
                 attachments_json=CASE WHEN excluded.has_body THEN excluded.attachments_json ELSE messages.attachments_json END,
-                size=excluded.size, server_seen=excluded.server_seen,
+                size=excluded.size,
+                server_seen=CASE WHEN excluded.has_body THEN messages.server_seen ELSE excluded.server_seen END,
                 has_body=MAX(messages.has_body, excluded.has_body)",
             params![
                 account_id,
@@ -414,6 +416,98 @@ impl Database {
             .context("邮件不存在")?;
         connection.execute("UPDATE messages SET locally_viewed=1 WHERE id=?1", [id])?;
         Ok(detail)
+    }
+
+    pub fn existing_uids(
+        &self,
+        account_id: &str,
+        uid_validity: u32,
+    ) -> Result<HashSet<u32>> {
+        let connection = self.connection.lock().expect("database lock poisoned");
+        let mut statement = connection.prepare(
+            "SELECT uid FROM messages WHERE account_id=?1 AND uid_validity=?2",
+        )?;
+        let uids = statement
+            .query_map(params![account_id, uid_validity], |row| row.get(0))?
+            .collect::<std::result::Result<HashSet<u32>, _>>()?;
+        Ok(uids)
+    }
+
+    pub fn update_seen_flags(
+        &self,
+        account_id: &str,
+        uid_validity: u32,
+        unseen_uids: &HashSet<u32>,
+    ) -> Result<()> {
+        let mut connection = self.connection.lock().expect("database lock poisoned");
+        let transaction = connection.transaction()?;
+        transaction.execute(
+            "UPDATE messages SET server_seen=1 WHERE account_id=?1 AND uid_validity=?2",
+            params![account_id, uid_validity],
+        )?;
+        let mut statement = transaction.prepare(
+            "UPDATE messages SET server_seen=0, locally_viewed=0
+             WHERE account_id=?1 AND uid_validity=?2 AND uid=?3",
+        )?;
+        for uid in unseen_uids {
+            statement.execute(params![account_id, uid_validity, uid])?;
+        }
+        drop(statement);
+        transaction.commit()?;
+        Ok(())
+    }
+
+    pub fn pending_locally_read_uids(
+        &self,
+        account_id: &str,
+        uid_validity: u32,
+    ) -> Result<Vec<u32>> {
+        let connection = self.connection.lock().expect("database lock poisoned");
+        let mut statement = connection.prepare(
+            "SELECT uid FROM messages
+             WHERE account_id=?1 AND uid_validity=?2 AND locally_viewed=1 AND server_seen=0
+             ORDER BY uid ASC",
+        )?;
+        let uids = statement
+            .query_map(params![account_id, uid_validity], |row| row.get(0))?
+            .collect::<std::result::Result<Vec<u32>, _>>()?;
+        Ok(uids)
+    }
+
+    pub fn mark_server_seen(
+        &self,
+        account_id: &str,
+        uid_validity: u32,
+        uids: &[u32],
+    ) -> Result<()> {
+        let mut connection = self.connection.lock().expect("database lock poisoned");
+        let transaction = connection.transaction()?;
+        let mut statement = transaction.prepare(
+            "UPDATE messages SET server_seen=1
+             WHERE account_id=?1 AND uid_validity=?2 AND uid=?3",
+        )?;
+        for uid in uids {
+            statement.execute(params![account_id, uid_validity, uid])?;
+        }
+        drop(statement);
+        transaction.commit()?;
+        Ok(())
+    }
+
+    pub fn toggle_read(&self, id: i64, read: bool) -> Result<()> {
+        let connection = self.connection.lock().expect("database lock poisoned");
+        if read {
+            connection.execute(
+                "UPDATE messages SET locally_viewed=1, server_seen=1 WHERE id=?1",
+                params![id],
+            )?;
+        } else {
+            connection.execute(
+                "UPDATE messages SET locally_viewed=0, server_seen=0 WHERE id=?1",
+                params![id],
+            )?;
+        }
+        Ok(())
     }
 }
 
@@ -561,5 +655,47 @@ mod tests {
                 .items
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn syncs_seen_flags_and_preserves_on_body_update() {
+        let database = Database::open(Path::new(":memory:")).unwrap();
+        let account = AccountInput {
+            id: Some("acc".into()),
+            provider: "qq".into(),
+            label: "QQ".into(),
+            email: "user@qq.com".into(),
+            username: "user@qq.com".into(),
+            host: "imap.qq.com".into(),
+            port: 993,
+            secret: None,
+        };
+        database.save_account_with_reset("acc", &account, false).unwrap();
+        let parsed = ParsedMessage {
+            subject: "测试".into(),
+            sender: "a@qq.com".into(),
+            recipients: "user@qq.com".into(),
+            received_at: None,
+            body: "正文".into(),
+            body_truncated: false,
+            attachments: vec![],
+        };
+        database.upsert_message("acc", 1, 100, 10, false, &parsed, false).unwrap();
+        database.upsert_message("acc", 1, 101, 10, false, &parsed, false).unwrap();
+
+        let mut unseen = HashSet::new();
+        unseen.insert(100);
+        database.update_seen_flags("acc", 1, &unseen).unwrap();
+
+        let msgs = database.list_messages(Some("acc"), "", 0).unwrap().items;
+        let m100 = msgs.iter().find(|m| m.id == 1).unwrap();
+        let m101 = msgs.iter().find(|m| m.id == 2).unwrap();
+        assert!(!m100.server_seen);
+        assert!(m101.server_seen);
+
+        // Update body on m101 should preserve server_seen = true
+        database.upsert_message("acc", 1, 101, 10, false, &parsed, true).unwrap();
+        let m101_after = database.message(2).unwrap();
+        assert!(m101_after.summary.server_seen);
     }
 }

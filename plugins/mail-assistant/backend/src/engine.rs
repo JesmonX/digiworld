@@ -9,6 +9,7 @@ use imap::types::Flag;
 use imap_proto::types::{
     BodyContentCommon, BodyParams, BodyStructure, ContentEncoding, SectionPath,
 };
+#[cfg(test)]
 use mailparse::MailHeaderMap;
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
@@ -16,7 +17,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-const FETCH_BATCH: usize = 100;
+const FETCH_BATCH: usize = 50;
 const MAX_BODY_BYTES: usize = 1024 * 1024;
 
 type Notify = dyn Fn(String, String) + Send + Sync;
@@ -260,6 +261,10 @@ impl MailEngine {
         self.database.message(id)
     }
 
+    pub fn mark_read(&self, id: i64, read: bool) -> Result<()> {
+        self.database.toggle_read(id, read)
+    }
+
     fn sync_account(&self, id: &str) -> Result<()> {
         let account = self.database.account(id)?;
         let input = AccountInput {
@@ -287,13 +292,33 @@ impl MailEngine {
                 });
         let mut session = connect(&input, &secret)?;
         let mailbox = session
-            .examine("INBOX")
-            .context("无法以只读方式打开 INBOX")?;
+            .select("INBOX")
+            .or_else(|_| session.examine("INBOX"))
+            .context("无法打开 INBOX")?;
         let uid_validity = mailbox.uid_validity.unwrap_or(0);
         if stored_validity.is_some_and(|value| value != uid_validity) {
             self.database.reset_for_uid_validity(id, uid_validity)?;
         }
         let effective_baseline = baseline_complete && stored_validity == Some(uid_validity);
+
+        // 1. Sync seen flags from server
+        if let Ok(unseen_list) = session.uid_search("UNSEEN") {
+            let unseen_uids: HashSet<u32> = unseen_list.into_iter().collect();
+            let _ = self.database.update_seen_flags(id, uid_validity, &unseen_uids);
+        }
+
+        // 2. Push locally read messages to server
+        if let Ok(pending_read) = self.database.pending_locally_read_uids(id, uid_validity)
+            && !pending_read.is_empty()
+        {
+            for chunk in pending_read.chunks(FETCH_BATCH) {
+                let seq = format_sequence_set(chunk);
+                if !seq.is_empty() && session.uid_store(&seq, "+FLAGS (\\Seen)").is_ok() {
+                    let _ = self.database.mark_server_seen(id, uid_validity, chunk);
+                }
+            }
+        }
+
         let criteria = if effective_baseline && !reconcile && old_last_uid > 0 {
             format!("UID {}:*", old_last_uid.saturating_add(1))
         } else {
@@ -308,43 +333,71 @@ impl MailEngine {
         if reconcile {
             self.database.reconcile_uids(id, uid_validity, &uids)?;
         }
+
+        let existing_uids = self.database.existing_uids(id, uid_validity).unwrap_or_default();
+        let uids_to_index: Vec<u32> = uids
+            .iter()
+            .copied()
+            .filter(|uid| !existing_uids.contains(uid))
+            .collect();
+
         self.database
             .begin_sync(id, "indexing", uids.len() as u64)?;
-        let mut indexed = 0_u64;
+        let mut indexed = existing_uids.len() as u64;
+        self.database.progress(id, indexed, "indexing")?;
         let mut new_messages = Vec::new();
-        let mut metadata = HashMap::new();
-        for batch in uids.chunks(FETCH_BATCH) {
-            let sequence = batch
-                .iter()
-                .map(u32::to_string)
-                .collect::<Vec<_>>()
-                .join(",");
-            let fetches = session
-                .uid_fetch(
-                    sequence,
-                    "(UID FLAGS RFC822.SIZE BODY.PEEK[HEADER] BODYSTRUCTURE)",
-                )
-                .context("读取邮件头失败")?;
-            for fetch in fetches.iter() {
-                let Some(uid) = fetch.uid else { continue };
+
+        for batch in uids_to_index.chunks(FETCH_BATCH) {
+            let sequence = format_sequence_set(batch);
+            if sequence.is_empty() {
+                continue;
+            }
+            let mut handle_fetch = |fetch: &imap::types::Fetch| -> Result<()> {
+                let Some(uid) = fetch.uid else { return Ok(()) };
                 let size = fetch.size.unwrap_or(0) as u64;
                 let seen = fetch.flags().iter().any(|flag| matches!(flag, Flag::Seen));
                 let header = fetch.header().unwrap_or_default();
                 let parsed = parser::parse(header);
-                let plan = fetch
-                    .bodystructure()
-                    .map(plan_body)
-                    .unwrap_or_else(|| fallback_body_plan(header, size as usize));
-                metadata.insert(uid, (size, seen, parsed.clone(), plan));
                 self.database
                     .upsert_message(id, uid_validity, uid, size, seen, &parsed, false)?;
                 if effective_baseline && uid > old_last_uid {
                     new_messages.push((parsed.sender.clone(), parsed.subject.clone()));
                 }
                 indexed += 1;
+                Ok(())
+            };
+
+            match session.uid_fetch(&sequence, "(UID FLAGS RFC822.SIZE BODY.PEEK[HEADER])") {
+                Ok(fetches) => {
+                    for fetch in fetches.iter() {
+                        let _ = handle_fetch(fetch);
+                    }
+                }
+                Err(err) => {
+                    tracing::warn!("批量读取邮件头失败 ({err})，尝试逐封读取: {sequence}");
+                    let mut any_ok = false;
+                    for &single_uid in batch {
+                        match session.uid_fetch(
+                            single_uid.to_string(),
+                            "(UID FLAGS RFC822.SIZE BODY.PEEK[HEADER])",
+                        ) {
+                            Ok(fetches) => {
+                                for fetch in fetches.iter() {
+                                    let _ = handle_fetch(fetch);
+                                    any_ok = true;
+                                }
+                            }
+                            Err(e) => tracing::warn!("跳过无法读取头的邮件 UID {single_uid}: {e}"),
+                        }
+                    }
+                    if !any_ok && !batch.is_empty() {
+                        return Err(anyhow::anyhow!("读取邮件头失败: {err}"));
+                    }
+                }
             }
             self.database.progress(id, indexed, "indexing")?;
         }
+
         self.database.progress(id, 0, "downloading")?;
         let mut downloaded = 0_u64;
         for uid in &uids {
@@ -352,16 +405,50 @@ impl MailEngine {
                 downloaded += 1;
                 continue;
             }
-            let (size, seen, mut parsed, plan) =
-                metadata
-                    .remove(uid)
-                    .unwrap_or((0, false, empty_message(), BodyPlan::default()));
-            let (body, truncated) = fetch_text_body(&mut session, *uid, &plan)?;
+            let plan = match session.uid_fetch(uid.to_string(), "(BODYSTRUCTURE)") {
+                Ok(fetches) => fetches
+                    .iter()
+                    .next()
+                    .and_then(|f| f.bodystructure())
+                    .map(plan_body)
+                    .unwrap_or_default(),
+                Err(_) => BodyPlan::default(),
+            };
+            let body_result = fetch_text_body(&mut session, *uid, &plan);
+            let (body, truncated, attachments) = match body_result {
+                Ok((body, truncated)) => (body, truncated, plan.attachments),
+                Err(_) => {
+                    match session.uid_fetch(
+                        uid.to_string(),
+                        format!("BODY.PEEK[TEXT]<0.{MAX_BODY_BYTES}>"),
+                    ) {
+                        Ok(fetches) => {
+                            let raw = fetches
+                                .iter()
+                                .next()
+                                .and_then(|f| f.text())
+                                .unwrap_or_default();
+                            let text = parser::decode_text_part(raw, "text/plain", None, "8bit");
+                            let trunc = text.chars().count() > MAX_BODY_BYTES;
+                            (
+                                text.chars().take(MAX_BODY_BYTES).collect(),
+                                trunc,
+                                Vec::new(),
+                            )
+                        }
+                        Err(err) => {
+                            tracing::warn!("读取邮件 UID {uid} 正文失败: {err}");
+                            (String::new(), false, Vec::new())
+                        }
+                    }
+                }
+            };
+            let mut parsed = empty_message();
             parsed.body = body;
             parsed.body_truncated = truncated;
-            parsed.attachments = plan.attachments;
+            parsed.attachments = attachments;
             self.database
-                .upsert_message(id, uid_validity, *uid, size, seen, &parsed, true)?;
+                .upsert_message(id, uid_validity, *uid, 0, false, &parsed, true)?;
             downloaded += 1;
             self.database.progress(id, downloaded, "downloading")?;
         }
@@ -556,6 +643,7 @@ fn fetch_text_body(session: &mut Session, uid: u32, plan: &BodyPlan) -> Result<(
     ))
 }
 
+#[cfg(test)]
 fn fallback_body_plan(header: &[u8], octets: usize) -> BodyPlan {
     let Ok(mail) = mailparse::parse_mail(header) else {
         return BodyPlan::default();
@@ -638,9 +726,52 @@ fn compact(value: &str, limit: usize) -> String {
     value.chars().take(limit).collect()
 }
 
+pub fn format_sequence_set(uids: &[u32]) -> String {
+    if uids.is_empty() {
+        return String::new();
+    }
+    let mut sorted = uids.to_vec();
+    sorted.sort_unstable();
+    sorted.dedup();
+
+    let mut ranges = Vec::new();
+    let mut start = sorted[0];
+    let mut end = sorted[0];
+
+    for &uid in &sorted[1..] {
+        if uid == end + 1 {
+            end = uid;
+        } else {
+            if start == end {
+                ranges.push(start.to_string());
+            } else {
+                ranges.push(format!("{start}:{end}"));
+            }
+            start = uid;
+            end = uid;
+        }
+    }
+    if start == end {
+        ranges.push(start.to_string());
+    } else {
+        ranges.push(format!("{start}:{end}"));
+    }
+    ranges.join(",")
+}
+
 #[cfg(test)]
 mod engine_tests {
     use super::*;
+
+    #[test]
+    fn formats_sequence_set_ascending_and_ranges() {
+        assert_eq!(format_sequence_set(&[]), "");
+        assert_eq!(format_sequence_set(&[42]), "42");
+        assert_eq!(format_sequence_set(&[5, 4, 3, 2, 1]), "1:5");
+        assert_eq!(format_sequence_set(&[10, 1, 2, 8, 9, 3]), "1:3,8:10");
+        assert_eq!(format_sequence_set(&[1, 3, 5, 7]), "1,3,5,7");
+        assert_eq!(format_sequence_set(&[2, 2, 3, 4, 4]), "2:4");
+    }
 
     #[test]
     fn only_falls_back_for_top_level_text_messages() {

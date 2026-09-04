@@ -125,6 +125,18 @@ fn handle(engine: &Arc<MailEngine>, method: &str, params: Value) -> Result<Value
                 .context("缺少邮件 ID")?;
             Ok(serde_json::to_value(engine.message(id)?)?)
         }
+        "mail.messages.mark_read" => {
+            let id = params
+                .get("id")
+                .and_then(Value::as_i64)
+                .context("缺少邮件 ID")?;
+            let read = params
+                .get("read")
+                .and_then(Value::as_bool)
+                .unwrap_or(true);
+            engine.mark_read(id, read)?;
+            Ok(json!({ "ok": true }))
+        }
         _ => bail!("unknown method: {method}"),
     }
 }
