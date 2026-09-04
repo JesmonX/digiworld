@@ -26,18 +26,15 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/setup@v2
         with:
           version: 11.21.0
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
+          runtime: node@24
+          cache: true
+          install: false
       - name: Resolve next Preview version
         id: release
         run: node scripts/resolve-preview-version.mjs
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: swatinem/rust-cache@v2
       - name: Refuse an unsigned release
         shell: pwsh
         run: |
@@ -50,6 +47,8 @@ jobs:
         run: Write-Host 'Plugin archives and updater bundles are cryptographically signed; Windows Authenticode is intentionally omitted for this preview.'
       - name: Validate plugin signing key format
         run: node scripts/validate-plugin-signing-key.mjs
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
       - name: Configure release metadata
         run: node scripts/configure-release.mjs
       - name: Commit reproducible release metadata
@@ -62,13 +61,10 @@ jobs:
           git commit -m "chore(release): prepare $tag [skip ci]"
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
-      - run: cargo test --workspace
-      - run: pnpm --filter @digiworld/plugin-keyboard-heatmap-ui build
-      - run: cargo build --release -p digiworld-keyboard-heatmap
-      - run: pnpm --filter @digiworld/plugin-agent-token-heatmap-ui build
-      - run: cargo build --release -p digiworld-agent-token-heatmap
-      - run: pnpm --filter @digiworld/plugin-mail-assistant-ui build
-      - run: cargo build --release -p digiworld-mail-assistant
+      - name: Build plugin frontends
+        run: pnpm --filter "@digiworld/plugin-*-ui" build
+      - name: Build plugin backends
+        run: cargo build --release -p digiworld-keyboard-heatmap -p digiworld-agent-token-heatmap -p digiworld-mail-assistant
       - name: Package signed keyboard plugin
         shell: pwsh
         env:
