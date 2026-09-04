@@ -18,6 +18,7 @@ describe('plugin presentation helpers', () => {
       accent: '#5b5ce2',
       'font-sans': '"Digiworld LXGW WenKai", serif',
       'font-display': '"Digiworld LXGW WenKai", serif',
+      'font-brand': '"Digiworld Smiley Sans", sans-serif',
       'weight-regular': '500',
       'weight-semibold': '600',
       glass: 'disabled',
@@ -28,6 +29,7 @@ describe('plugin presentation helpers', () => {
     expect(properties.get('--dw-accent')).toBe('#5b5ce2')
     expect(properties.get('--dw-font-sans')).toBe('"Digiworld LXGW WenKai", serif')
     expect(properties.get('--dw-font-display')).toBe('"Digiworld LXGW WenKai", serif')
+    expect(properties.get('--dw-font-brand')).toBe('"Digiworld Smiley Sans", sans-serif')
     expect(properties.get('--dw-weight-regular')).toBe('500')
     expect(properties.get('--dw-weight-semibold')).toBe('600')
     expect(properties.get('--dw-glass')).toBe('disabled')

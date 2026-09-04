@@ -5,6 +5,7 @@ const root = path.resolve(import.meta.dirname, '..')
 const packagePaths = [
   'package.json',
   'apps/desktop/package.json',
+  'packages/design-system/package.json',
   'packages/plugin-sdk/package.json',
   'packages/typography/package.json',
 ]

@@ -11,6 +11,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@digiworld/design-system": "workspace:*",
     "@digiworld/plugin-sdk": "workspace:*",
     "@digiworld/typography": "workspace:*",
     "@tauri-apps/api": "^2.8.0",

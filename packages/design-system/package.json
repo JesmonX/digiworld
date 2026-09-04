@@ -1,0 +1,9 @@
+{
+  "name": "@digiworld/design-system",
+  "version": "0.2.21",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tokens.css": "./tokens.css"
+  }
+}

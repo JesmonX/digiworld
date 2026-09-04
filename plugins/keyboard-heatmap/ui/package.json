@@ -10,6 +10,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@digiworld/design-system": "workspace:*",
     "@digiworld/plugin-sdk": "workspace:*",
     "lucide-react": "^0.468.0",
     "react": "^19.1.0",

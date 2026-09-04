@@ -1,0 +1,34 @@
+:root {
+  color-scheme: light;
+
+  --dw-bg: #f5f7fb;
+  --dw-surface: #ffffff;
+  --dw-surface-raised: #ffffff;
+  --dw-surface-subtle: #f0f3f8;
+  --dw-border: #dde3ec;
+  --dw-border-strong: #c9d2df;
+  --dw-text: #172033;
+  --dw-text-muted: #667085;
+  --dw-accent: #5b5ce2;
+  --dw-accent-strong: #4338ca;
+  --dw-accent-contrast: #ffffff;
+  --dw-accent-secondary: #8b5cf6;
+  --dw-accent-soft: #ededff;
+  --dw-success: #16835b;
+  --dw-warning: #a15c00;
+  --dw-danger: #d92d20;
+
+  --dw-radius-sm: 8px;
+  --dw-radius-md: 12px;
+  --dw-radius-lg: 16px;
+
+  --dw-shadow-xs: 0 1px 2px rgba(47, 55, 80, .045);
+  --dw-shadow-sm: 0 4px 12px rgba(47, 55, 80, .045);
+  --dw-shadow-md: 0 8px 22px rgba(47, 55, 80, .065);
+  --dw-shadow-lg: 0 14px 32px rgba(47, 55, 80, .11);
+
+  --dw-motion-fast: 120ms;
+  --dw-motion-normal: 180ms;
+  --dw-motion-slow: 300ms;
+  --dw-ease-out: cubic-bezier(.2, .8, .2, 1);
+}

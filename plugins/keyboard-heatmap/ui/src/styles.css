@@ -1,5 +1,5 @@
 :root {
-  font-family: var(--dw-font-sans, var(--font-sans));
+  font-family: var(--dw-font-sans, "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", sans-serif);
   font-size: var(--type-body);
   font-weight: var(--weight-regular);
   line-height: 1.5;
@@ -20,7 +20,7 @@
 
 * { box-sizing: border-box; }
 html, body, #root { width: 100%; height: 100%; margin: 0; }
-body { overflow: hidden; background: var(--dw-bg, #f5f7fb); }
+body { overflow: hidden; background: var(--dw-bg, #f5f7fb); font-feature-settings: "liga" 1, "calt" 1, "tnum" 1; font-variant-numeric: tabular-nums; }
 button { font: inherit; }
 button:focus-visible { outline: 2px solid color-mix(in srgb, var(--dw-accent, #5b5ce2) 55%, transparent); outline-offset: 2px; }
 
@@ -30,7 +30,7 @@ button:focus-visible { outline: 2px solid color-mix(in srgb, var(--dw-accent, #5
 .summary-line > div { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
 .summary-line > div + div { padding-left: 22px; border-left: 1px solid var(--dw-border, #dde3ec); }
 .summary-line span { color: var(--dw-text-muted, #667085); font-size: var(--type-body); }
-.summary-line strong { color: var(--dw-text, #172033); font-family: var(--dw-font-display, var(--font-display)); font-size: 20px; font-weight: var(--weight-semibold); letter-spacing: 0; font-feature-settings: "tnum" 1; }
+.summary-line strong { color: var(--dw-text, #172033); font-family: var(--dw-font-display, "Segoe UI Variable Display", "Segoe UI", sans-serif); font-size: 20px; font-weight: var(--weight-semibold); letter-spacing: 0; font-feature-settings: "tnum" 1; }
 .summary-line svg { width: 14px; height: 14px; color: var(--dw-accent-secondary, #8b5cf6); }
 .header-actions { display: flex; align-items: center; gap: 8px; }
 .scope-toggle { display: flex; padding: 3px; border-radius: 8px; background: var(--dw-surface-subtle, #f0f3f8); }
@@ -118,7 +118,7 @@ button:focus-visible { outline: 2px solid color-mix(in srgb, var(--dw-accent, #5
 .no-data { margin: 4px 0; color: var(--dw-text-muted, #667085); font-size: var(--type-body-sm); }
 html[data-dw-glass="enabled"] .keyboard-card, html[data-dw-glass="enabled"] .ranking-card, html[data-dw-glass="enabled"] .layout-menu { background: color-mix(in srgb, var(--dw-surface, #fff) 91%, transparent); backdrop-filter: blur(14px) saturate(120%); }
 html[data-dw-glass="disabled"] .keyboard-card, html[data-dw-glass="disabled"] .ranking-card, html[data-dw-glass="disabled"] .layout-menu { backdrop-filter: none; }
-button.primary, button.secondary, .pause-button, .layout-picker-trigger { transition: border-color .18s ease, background .18s ease, box-shadow .18s ease, transform .18s ease; }
+button.primary, button.secondary, .pause-button, .layout-picker-trigger { transition: border-color var(--dw-motion-normal) var(--dw-ease-out), background var(--dw-motion-normal) var(--dw-ease-out), box-shadow var(--dw-motion-normal) var(--dw-ease-out), transform var(--dw-motion-normal) var(--dw-ease-out); }
 button.primary:hover, button.secondary:hover, .pause-button:hover, .layout-picker-trigger:hover { transform: translateY(-1px); }
 button.primary:active, button.secondary:active, .pause-button:active, .layout-picker-trigger:active { transform: scale(.97); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
@@ -131,20 +131,14 @@ button.primary:active, button.secondary:active, .pause-button:active, .layout-pi
 }
 
 /* Keep the board dominant while matching the host's compact surface hierarchy. */
-:root {
-  --dw-radius-control: 7px;
-  --dw-radius-panel: 12px;
-  --dw-shadow-card: 0 7px 20px rgba(47, 55, 80, .055);
-  --dw-shadow-hover: 0 14px 30px rgba(47, 55, 80, .105);
-}
 .heatmap-app { max-width: 1180px; margin-inline: auto; padding-inline: 3px; }
 .plugin-header { min-height: 56px; margin-bottom: 14px; }
-.keyboard-card, .ranking-card { border-radius: var(--dw-radius-panel); box-shadow: var(--dw-shadow-card); transition: border-color .18s ease, box-shadow .18s ease; }
-.keyboard-card:hover, .ranking-card:hover { border-color: color-mix(in srgb, var(--dw-accent, #5b5ce2) 18%, var(--dw-border, #dde3ec)); box-shadow: var(--dw-shadow-hover); }
-.scope-toggle, .layout-picker-trigger { border-radius: var(--dw-radius-control); }
-.layout-picker-trigger { box-shadow: 0 3px 10px rgba(47, 55, 80, .035); transition: border-color .18s ease, background .18s ease, box-shadow .18s ease, transform .18s ease; }
-.keyboard-board { border: 1px solid color-mix(in srgb, var(--dw-border, #dde3ec) 72%, transparent); border-radius: 10px; }
-.key { transition: transform .12s ease, box-shadow .12s ease; }
+.keyboard-card, .ranking-card { border-radius: var(--dw-radius-lg); box-shadow: var(--dw-shadow-md); transition: transform var(--dw-motion-normal) var(--dw-ease-out), border-color var(--dw-motion-normal) var(--dw-ease-out), box-shadow var(--dw-motion-normal) var(--dw-ease-out); }
+.keyboard-card:hover, .ranking-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--dw-accent, #5b5ce2) 18%, var(--dw-border, #dde3ec)); box-shadow: var(--dw-shadow-lg); }
+.scope-toggle, .layout-picker-trigger { border-radius: var(--dw-radius-sm); }
+.layout-picker-trigger { box-shadow: var(--dw-shadow-sm); transition: border-color var(--dw-motion-normal) var(--dw-ease-out), background var(--dw-motion-normal) var(--dw-ease-out), box-shadow var(--dw-motion-normal) var(--dw-ease-out), transform var(--dw-motion-normal) var(--dw-ease-out); }
+.keyboard-board { border: 1px solid color-mix(in srgb, var(--dw-border, #dde3ec) 72%, transparent); border-radius: var(--dw-radius-md); }
+.key { transition: transform var(--dw-motion-fast) var(--dw-ease-out), box-shadow var(--dw-motion-fast) var(--dw-ease-out); }
 .key:hover { transform: translateY(-1px); }
 .ranking-card { padding: 16px 17px; }
 html[data-dw-glass="enabled"] .keyboard-card, html[data-dw-glass="enabled"] .ranking-card { background: color-mix(in srgb, var(--dw-surface, #fff) 88%, transparent); backdrop-filter: blur(14px) saturate(120%); }

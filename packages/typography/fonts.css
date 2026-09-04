@@ -1,4 +1,12 @@
 @font-face {
+  font-family: "Digiworld Inter Variable";
+  src: url("./fonts/InterVariable.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
   font-family: "Digiworld Plex Sans SC";
   src: url("./fonts/IBMPlexSansSC-Regular.woff2") format("woff2");
   font-style: normal;
@@ -39,8 +47,9 @@
 }
 
 :root {
-  --font-sans: "Digiworld Plex Sans SC", "Segoe UI Variable Text", "Microsoft YaHei UI", sans-serif;
-  --font-display: "Digiworld Smiley Sans", "Digiworld Plex Sans SC", "Microsoft YaHei UI", sans-serif;
+  --font-sans: "Digiworld Inter Variable", "Digiworld Plex Sans SC", "Segoe UI Variable Text", "Microsoft YaHei UI", sans-serif;
+  --font-display: "Digiworld Inter Variable", "Digiworld Plex Sans SC", "Segoe UI Variable Display", "Microsoft YaHei UI", sans-serif;
+  --font-brand: "Digiworld Smiley Sans", "Digiworld Inter Variable", "Digiworld Plex Sans SC", "Microsoft YaHei UI", sans-serif;
   --type-caption: 11px;
   --type-body-sm: 12px;
   --type-body: 13px;

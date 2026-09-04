@@ -30,6 +30,9 @@ describe('accent themes', () => {
       'accent-soft': '#fff0f3',
       'font-sans': expect.stringContaining('LXGW WenKai'),
       'font-display': expect.stringContaining('LXGW WenKai'),
+      'font-brand': expect.stringContaining('Digiworld Smiley Sans'),
+      success: '#16835b',
+      warning: '#a15c00',
     })
   })
 })
@@ -46,11 +49,14 @@ describe('font themes', () => {
     expect(setItem).toHaveBeenCalledWith(FONT_THEME_STORAGE_KEY, 'system')
   })
 
-  it('uses Plex consistently for body and display text', () => {
+  it('uses Inter for Latin UI text, Plex for Chinese fallback, and Smiley only for brand text', () => {
     const plex = getFontTheme('plex')
+    expect(plex.fontSans).toContain('Digiworld Inter Variable')
     expect(plex.fontSans).toContain('Digiworld Plex Sans SC')
+    expect(plex.fontDisplay).toContain('Digiworld Inter Variable')
     expect(plex.fontDisplay).toContain('Digiworld Plex Sans SC')
     expect(plex.fontDisplay).not.toContain('Smiley Sans')
+    expect(plex.fontBrand).toContain('Digiworld Smiley Sans')
   })
 
   it('persists a validated font weight and sends its hierarchy to plugins', () => {

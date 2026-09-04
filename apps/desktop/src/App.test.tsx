@@ -19,6 +19,10 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('./components/WindowChrome', () => ({ WindowChrome: () => <div /> }))
+vi.mock('framer-motion', async importOriginal => {
+  const actual = await importOriginal<typeof import('framer-motion')>()
+  return { ...actual, useReducedMotion: () => true }
+})
 vi.mock('./lib/api', () => ({
   api: {
     appState: vi.fn(async () => ({
@@ -48,6 +52,13 @@ function button(container: HTMLElement, label: string) {
 
 async function flush() {
   await new Promise(resolve => setTimeout(resolve, 0))
+}
+
+async function navigate(container: HTMLElement, label: string) {
+  await act(async () => {
+    button(container, label)?.click()
+    await flush()
+  })
 }
 
 describe('workspace redesign', () => {
@@ -108,7 +119,7 @@ describe('explicit update consent', () => {
     mocks.testProxySettings.mockReturnValue(new Promise(() => {}))
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
-    await act(async () => button(container, '设置')?.click())
+    await navigate(container, '设置')
 
     vi.useFakeTimers()
     await act(async () => button(container, '测试连接')?.click())
@@ -124,7 +135,7 @@ describe('explicit update consent', () => {
     mocks.checkPluginUpdates.mockReturnValue(new Promise(() => {}))
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
-    await act(async () => button(container, '设置')?.click())
+    await navigate(container, '设置')
 
     vi.useFakeTimers()
     await act(async () => button(container, '检查全部插件')?.click())
@@ -146,7 +157,7 @@ describe('explicit update consent', () => {
     }])
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
-    await act(async () => button(container, '设置')?.click())
+    await navigate(container, '设置')
     await act(async () => { button(container, '检查全部插件')?.click(); await flush() })
 
     expect(mocks.checkPluginUpdates).toHaveBeenCalledOnce()
@@ -164,7 +175,7 @@ describe('explicit update consent', () => {
   it('does not show the removed diagnostics export', async () => {
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
-    await act(async () => button(container, '设置')?.click())
+    await navigate(container, '设置')
 
     expect(container.textContent).not.toContain('诊断信息')
     expect(container.textContent).not.toContain('导出版本、平台、代理模式和插件状态')
@@ -177,7 +188,7 @@ describe('explicit update consent', () => {
     mocks.installCoreUpdate.mockReturnValue(new Promise(() => {}))
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
-    await act(async () => button(container, '设置')?.click())
+    await navigate(container, '设置')
     await act(async () => { button(container, '检查主程序')?.click(); await flush() })
 
     expect(mocks.checkCoreUpdate).toHaveBeenCalledOnce()
@@ -192,7 +203,7 @@ describe('explicit update consent', () => {
   it('applies and persists a font preset across the shell', async () => {
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
-    await act(async () => button(container, '设置')?.click())
+    await navigate(container, '设置')
 
     const wenkai = container.querySelector<HTMLButtonElement>('button[aria-label="霞鹜文楷"]')
     await act(async () => { wenkai?.click(); await flush() })
@@ -219,7 +230,7 @@ describe('explicit update consent', () => {
   it('applies and persists the glass preference across the shell', async () => {
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
-    await act(async () => button(container, '设置')?.click())
+    await navigate(container, '设置')
     const toggle = container.querySelector<HTMLButtonElement>('[aria-label="切换玻璃效果"]')!
     expect(toggle.getAttribute('aria-pressed')).toBe('true')
     await act(async () => toggle.click())
@@ -253,7 +264,7 @@ describe('explicit update consent', () => {
     })
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
-    await act(async () => button(container, '功能库')?.click())
+    await navigate(container, '功能库')
     await flush()
 
     expect(container.textContent).toContain('未适配插件')
@@ -274,7 +285,7 @@ describe('explicit update consent', () => {
     })
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
-    await act(async () => button(container, '功能库')?.click())
+    await navigate(container, '功能库')
     await flush()
 
     expect(button(container, '暂未适配当前系统')?.disabled).toBe(true)

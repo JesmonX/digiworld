@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   Activity, AlertTriangle, Boxes, Check, ChevronRight, CircleAlert, Download, Gauge,
   Library, LoaderCircle, Network, Palette, Pause, RefreshCw, Settings, ShieldCheck,
@@ -67,6 +67,7 @@ function stateLabel(plugin: PluginSummary): string {
 }
 
 function App() {
+  const reduceMotion = useReducedMotion()
   const [state, setState] = useState<AppState | null>(null)
   const [catalog, setCatalog] = useState<CatalogIndex | null>(null)
   const [page, setPage] = useState<Page>('home')
@@ -212,9 +213,16 @@ function App() {
           {error && <div className="error-banner"><CircleAlert /><span>{error}</span><button onClick={() => setError(null)}>关闭</button></div>}
 
           <section className="content">
-            <AnimatePresence initial={false}>
-              <motion.div key={typeof page === 'string' ? page : `plugin:${page.pluginId}`} className="page-transition" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: .2, ease: 'easeOut' }}>
-                {page === 'home' && <Home plugins={state?.plugins ?? []} version={state?.version} onCatalog={() => setPage('catalog')} onOpen={id => setPage({ pluginId: id })} onRefresh={() => { void refreshState().catch(reason => setError(errorMessage(reason))) }} />}
+            <AnimatePresence initial={false} mode={reduceMotion ? 'sync' : 'wait'}>
+              <motion.div
+                key={typeof page === 'string' ? page : `plugin:${page.pluginId}`}
+                className="page-transition"
+                initial={reduceMotion ? false : { opacity: 0, y: 8, scale: .985 }}
+                animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+                exit={reduceMotion ? { opacity: 1, x: 0, scale: 1 } : { opacity: 0, x: -6, scale: .995 }}
+                transition={reduceMotion ? { duration: 0 } : { duration: .18, ease: [.2, .8, .2, 1] }}
+              >
+                {page === 'home' && <Home plugins={state?.plugins ?? []} version={state?.version} onCatalog={() => setPage('catalog')} onOpen={id => setPage({ pluginId: id })} onRefresh={() => { void refreshState().catch(reason => setError(errorMessage(reason))) }} reducedMotion={Boolean(reduceMotion)} />}
                 {page === 'catalog' && <Catalog catalog={catalog} installed={installed} busy={busy} onInstall={setConfirmInstall} onRefresh={() => refreshCatalog(true)} onOpen={id => setPage({ pluginId: id })} currentTarget={state?.target} />}
                 {page === 'settings' && state && <SettingsPage state={state} progress={updateProgress} onProgressReset={() => setUpdateProgress(null)} onPluginsUpdated={refreshState} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} fontThemeId={fontThemeId} onFontThemeChange={setFontThemeId} fontWeight={fontWeight} onFontWeightChange={setFontWeight} glassMode={glassMode} onGlassModeChange={setGlassMode} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
                 {pluginOpen && (
@@ -242,7 +250,7 @@ function NavButton({ active, icon, label, status, onClick }: { active: boolean; 
   return <button title={label} className={`nav-item ${active ? 'active' : ''}`} onClick={onClick}><span>{icon}</span><b>{label}</b>{status && <i className={`state-dot ${status}`} />}</button>
 }
 
-function Home({ plugins, version, onCatalog, onOpen, onRefresh }: { plugins: PluginSummary[]; version: string | undefined; onCatalog(): void; onOpen(id: string): void; onRefresh(): void }) {
+function Home({ plugins, version, onCatalog, onOpen, onRefresh, reducedMotion }: { plugins: PluginSummary[]; version: string | undefined; onCatalog(): void; onOpen(id: string): void; onRefresh(): void; reducedMotion: boolean }) {
   if (plugins.length === 0) return (
     <div className="empty-state">
       <div className="empty-icon"><Boxes /></div>
@@ -277,7 +285,7 @@ function Home({ plugins, version, onCatalog, onOpen, onRefresh }: { plugins: Plu
       </div>
       <div className="installed-list">
         {plugins.map((plugin, index) => (
-          <motion.button key={plugin.id} className="plugin-row" onClick={() => onOpen(plugin.id)} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * .035, duration: .18 }}>
+          <motion.button key={plugin.id} className="plugin-row" onClick={() => onOpen(plugin.id)} initial={reducedMotion ? false : { opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={reducedMotion ? { duration: 0 } : { delay: index * .035, duration: .18 }}>
             <span className="row-icon"><Boxes /></span>
             <span className="plugin-row-copy"><span className="plugin-row-heading"><strong>{plugin.name}</strong><ChevronRight className="row-chevron" /></span><small>{plugin.description || '打开以查看功能'}</small></span>
             <span className={`compact-status ${plugin.state}`}>{stateLabel(plugin)}</span>

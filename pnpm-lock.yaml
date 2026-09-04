@@ -20,6 +20,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@digiworld/design-system':
+        specifier: workspace:*
+        version: link:../../packages/design-system
       '@digiworld/plugin-sdk':
         specifier: workspace:*
         version: link:../../packages/plugin-sdk
@@ -64,6 +67,8 @@ importers:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@24.13.3)(jsdom@26.1.0)
 
+  packages/design-system: {}
+
   packages/plugin-sdk:
     devDependencies:
       vitest:
@@ -74,6 +79,9 @@ importers:
 
   plugins/agent-token-heatmap/ui:
     dependencies:
+      '@digiworld/design-system':
+        specifier: workspace:*
+        version: link:../../../packages/design-system
       '@digiworld/plugin-sdk':
         specifier: workspace:*
         version: link:../../../packages/plugin-sdk
@@ -111,6 +119,9 @@ importers:
 
   plugins/keyboard-heatmap/ui:
     dependencies:
+      '@digiworld/design-system':
+        specifier: workspace:*
+        version: link:../../../packages/design-system
       '@digiworld/plugin-sdk':
         specifier: workspace:*
         version: link:../../../packages/plugin-sdk
@@ -145,6 +156,9 @@ importers:
 
   plugins/mail-assistant/ui:
     dependencies:
+      '@digiworld/design-system':
+        specifier: workspace:*
+        version: link:../../../packages/design-system
       '@digiworld/plugin-sdk':
         specifier: workspace:*
         version: link:../../../packages/plugin-sdk

@@ -21,6 +21,7 @@ export interface FontTheme {
   description: string
   fontSans: string
   fontDisplay: string
+  fontBrand: string
 }
 
 export const ACCENT_THEMES: AccentTheme[] = [
@@ -36,8 +37,9 @@ export const FONT_THEMES: FontTheme[] = [
     id: 'plex',
     label: 'Plex 灵动',
     description: '清晰现代，正文与标题保持统一',
-    fontSans: '"Digiworld Plex Sans SC", "Segoe UI Variable Text", "Microsoft YaHei UI", sans-serif',
-    fontDisplay: '"Digiworld Plex Sans SC", "Segoe UI Variable Display", "Microsoft YaHei UI", sans-serif',
+    fontSans: '"Digiworld Inter Variable", "Digiworld Plex Sans SC", "Segoe UI Variable Text", "Microsoft YaHei UI", sans-serif',
+    fontDisplay: '"Digiworld Inter Variable", "Digiworld Plex Sans SC", "Segoe UI Variable Display", "Microsoft YaHei UI", sans-serif',
+    fontBrand: '"Digiworld Smiley Sans", "Digiworld Inter Variable", "Digiworld Plex Sans SC", "Microsoft YaHei UI", sans-serif',
   },
   {
     id: 'wenkai',
@@ -45,6 +47,7 @@ export const FONT_THEMES: FontTheme[] = [
     description: '温润舒展，中文与数字都更具人文感',
     fontSans: '"Digiworld LXGW WenKai", "KaiTi", serif',
     fontDisplay: '"Digiworld LXGW WenKai", "KaiTi", serif',
+    fontBrand: '"Digiworld Smiley Sans", "Digiworld LXGW WenKai", "KaiTi", serif',
   },
   {
     id: 'system',
@@ -52,6 +55,7 @@ export const FONT_THEMES: FontTheme[] = [
     description: '紧凑克制，保持熟悉的桌面观感',
     fontSans: '"Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", sans-serif',
     fontDisplay: '"Segoe UI Variable Display", "Segoe UI Variable Text", "Microsoft YaHei UI", sans-serif',
+    fontBrand: '"Digiworld Smiley Sans", "Segoe UI Variable Display", "Microsoft YaHei UI", sans-serif',
   },
 ]
 
@@ -151,6 +155,7 @@ export function fontThemeStyle(theme: FontTheme): CSSProperties {
   return {
     '--font-sans': theme.fontSans,
     '--font-display': theme.fontDisplay,
+    '--font-brand': theme.fontBrand,
   } as CSSProperties
 }
 
@@ -172,6 +177,7 @@ export function pluginTheme(theme: AccentTheme, font: FontTheme = getFontTheme(D
     'surface-raised': '#ffffff',
     'surface-subtle': '#f0f3f8',
     'border': '#dde3ec',
+    'border-strong': '#c9d2df',
     'text': '#172033',
     'text-muted': '#667085',
     'accent': theme.accent,
@@ -179,9 +185,12 @@ export function pluginTheme(theme: AccentTheme, font: FontTheme = getFontTheme(D
     'accent-contrast': '#ffffff',
     'accent-secondary': theme.accentSecondary,
     'accent-soft': theme.accentSoft,
+    'success': '#16835b',
+    'warning': '#a15c00',
     'danger': '#d92d20',
     'font-sans': font.fontSans,
     'font-display': font.fontDisplay,
+    'font-brand': font.fontBrand,
     'weight-regular': String(weights['--weight-regular']),
     'weight-medium': String(weights['--weight-medium']),
     'weight-semibold': String(weights['--weight-semibold']),

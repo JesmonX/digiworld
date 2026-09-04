@@ -13,6 +13,11 @@ current zero-cost Preview workflow signs plugin archives and updater bundles,
 but intentionally omits Windows Authenticode; stable releases will add a
 public-trust signer such as SignPath Foundation when approved.
 
+The desktop shell and official plugin UIs share semantic colors, radii,
+shadows, and motion through `@digiworld/design-system`. Host-owned typography,
+including Inter Variable for Latin UI text and Plex Sans SC for Chinese, is
+injected into isolated plugin frames without duplicating font assets.
+
 Preview users may see a Windows SmartScreen unknown-publisher warning. Verify
 the published `SHA256SUMS.txt` before running the installer.
 

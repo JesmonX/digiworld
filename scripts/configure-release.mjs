@@ -17,6 +17,7 @@ const configPath = path.join(root, 'apps', 'desktop', 'src-tauri', 'tauri.conf.j
 const packagePaths = [
   path.join(root, 'package.json'),
   path.join(root, 'apps', 'desktop', 'package.json'),
+  path.join(root, 'packages', 'design-system', 'package.json'),
   path.join(root, 'packages', 'plugin-sdk', 'package.json'),
   path.join(root, 'packages', 'typography', 'package.json'),
 ]

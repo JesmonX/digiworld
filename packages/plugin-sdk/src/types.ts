@@ -71,6 +71,7 @@ export interface PluginTheme {
   'surface-raised': string
   'surface-subtle': string
   'border': string
+  'border-strong'?: string
   'text': string
   'text-muted': string
   'accent': string
@@ -78,9 +79,12 @@ export interface PluginTheme {
   'accent-contrast': string
   'accent-secondary': string
   'accent-soft': string
+  'success'?: string
+  'warning'?: string
   'danger': string
   'font-sans': string
   'font-display': string
+  'font-brand'?: string
   'weight-regular'?: string
   'weight-medium'?: string
   'weight-semibold'?: string
