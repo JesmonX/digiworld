@@ -113,26 +113,40 @@ impl Database {
         Ok(())
     }
 
-    pub fn save_account(&self, id: &str, input: &AccountInput) -> Result<()> {
-        self.connection
-            .lock()
-            .expect("database lock poisoned")
-            .execute(
-                "INSERT INTO accounts(id, provider, label, email, username, host, port)
+    pub fn save_account_with_reset(
+        &self,
+        id: &str,
+        input: &AccountInput,
+        reset_cache: bool,
+    ) -> Result<()> {
+        let mut connection = self.connection.lock().expect("database lock poisoned");
+        let transaction = connection.transaction()?;
+        transaction.execute(
+            "INSERT INTO accounts(id, provider, label, email, username, host, port)
              VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)
              ON CONFLICT(id) DO UPDATE SET provider=excluded.provider, label=excluded.label,
                 email=excluded.email, username=excluded.username, host=excluded.host,
-                port=excluded.port, last_error=NULL",
-                params![
-                    id,
-                    input.provider,
-                    input.label,
-                    input.email,
-                    input.username,
-                    input.host,
-                    input.port
-                ],
+                port=excluded.port, last_error=NULL, next_sync_at=NULL",
+            params![
+                id,
+                input.provider,
+                input.label,
+                input.email,
+                input.username,
+                input.host,
+                input.port
+            ],
+        )?;
+        if reset_cache {
+            transaction.execute("DELETE FROM messages WHERE account_id=?1", [id])?;
+            transaction.execute(
+                "UPDATE accounts SET uid_validity=NULL, last_uid=0, baseline_complete=0,
+                    indexed=0, total=0, sync_phase='idle', last_success_at=NULL,
+                    last_full_reconcile_at=NULL, last_error=NULL, next_sync_at=NULL WHERE id=?1",
+                [id],
             )?;
+        }
+        transaction.commit()?;
         Ok(())
     }
 
@@ -142,7 +156,7 @@ impl Database {
             .expect("database lock poisoned")
             .query_row(
                 "SELECT id, provider, label, email, username, host, port, sync_phase,
-                        indexed, total, baseline_complete, last_success_at, last_error
+                        indexed, total, baseline_complete, last_success_at, last_error, next_sync_at
                  FROM accounts WHERE id=?1",
                 [id],
                 account_from_row,
@@ -154,7 +168,7 @@ impl Database {
         let connection = self.connection.lock().expect("database lock poisoned");
         let mut statement = connection.prepare(
             "SELECT id, provider, label, email, username, host, port, sync_phase,
-                    indexed, total, baseline_complete, last_success_at, last_error
+                    indexed, total, baseline_complete, last_success_at, last_error, next_sync_at
              FROM accounts ORDER BY label COLLATE NOCASE, email COLLATE NOCASE",
         )?;
         Ok(statement
@@ -167,20 +181,6 @@ impl Database {
         let transaction = connection.transaction()?;
         transaction.execute("DELETE FROM messages WHERE account_id=?1", [id])?;
         transaction.execute("DELETE FROM accounts WHERE id=?1", [id])?;
-        transaction.commit()?;
-        Ok(())
-    }
-
-    pub fn reset_account_cache(&self, id: &str) -> Result<()> {
-        let mut connection = self.connection.lock().expect("database lock poisoned");
-        let transaction = connection.transaction()?;
-        transaction.execute("DELETE FROM messages WHERE account_id=?1", [id])?;
-        transaction.execute(
-            "UPDATE accounts SET uid_validity=NULL, last_uid=0, baseline_complete=0,
-                indexed=0, total=0, sync_phase='idle', last_success_at=NULL,
-                last_full_reconcile_at=NULL, last_error=NULL WHERE id=?1",
-            [id],
-        )?;
         transaction.commit()?;
         Ok(())
     }
@@ -235,7 +235,7 @@ impl Database {
                 "UPDATE accounts SET uid_validity=?2, last_uid=?3, baseline_complete=1,
                 sync_phase='idle', indexed=total, last_success_at=?4,
                 last_full_reconcile_at=CASE WHEN ?5 THEN ?4 ELSE last_full_reconcile_at END,
-                last_error=NULL WHERE id=?1",
+                last_error=NULL, next_sync_at=NULL WHERE id=?1",
                 params![id, uid_validity, last_uid, now, reconciled],
             )?;
         Ok(())
@@ -433,6 +433,7 @@ fn account_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Account> {
         baseline_complete: row.get(10)?,
         last_success_at: row.get(11)?,
         last_error: row.get(12)?,
+        next_sync_at: row.get(13)?,
     })
 }
 
@@ -478,7 +479,9 @@ mod tests {
             port: 993,
             secret: None,
         };
-        database.save_account("account-1", &account).unwrap();
+        database
+            .save_account_with_reset("account-1", &account, false)
+            .unwrap();
         database
             .upsert_message(
                 "account-1",
@@ -503,6 +506,60 @@ mod tests {
         assert_eq!(
             database.message(page.items[0].id).unwrap().body,
             "今天完成邮件助手"
+        );
+    }
+
+    #[test]
+    fn resets_account_cache_in_the_same_transaction() {
+        let database = Database::open(Path::new(":memory:")).unwrap();
+        let mut account = AccountInput {
+            id: Some("account-1".into()),
+            provider: "custom".into(),
+            label: "工作".into(),
+            email: "me@example.com".into(),
+            username: "me@example.com".into(),
+            host: "imap.example.com".into(),
+            port: 993,
+            secret: None,
+        };
+        database
+            .save_account_with_reset("account-1", &account, false)
+            .unwrap();
+        database
+            .upsert_message(
+                "account-1",
+                7,
+                9,
+                12,
+                false,
+                &ParsedMessage {
+                    subject: "旧邮件".into(),
+                    sender: String::new(),
+                    recipients: String::new(),
+                    received_at: None,
+                    body: "old".into(),
+                    body_truncated: false,
+                    attachments: vec![],
+                },
+                true,
+            )
+            .unwrap();
+        account.host = "imap2.example.com".into();
+
+        database
+            .save_account_with_reset("account-1", &account, true)
+            .unwrap();
+
+        assert_eq!(
+            database.account("account-1").unwrap().host,
+            "imap2.example.com"
+        );
+        assert!(
+            database
+                .list_messages(Some("account-1"), "", 0)
+                .unwrap()
+                .items
+                .is_empty()
         );
     }
 }

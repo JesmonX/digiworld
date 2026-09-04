@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle, ChevronDown, Inbox, LoaderCircle, Mail, Paperclip, Plus, RefreshCw,
   Search, Settings, Trash2, X,
@@ -13,7 +13,7 @@ type Provider = 'gmail' | 'qq' | '163' | 'custom'
 interface Account {
   id: string; provider: Provider; label: string; email: string; username: string; host: string; port: number
   hasCredential: boolean; syncPhase: string; indexed: number; total: number; baselineComplete: boolean
-  lastSuccessAt?: string; lastError?: string
+  lastSuccessAt?: string; lastError?: string; nextSyncAt?: string
 }
 interface MailSummary {
   id: number; accountId: string; accountLabel: string; subject: string; sender: string; receivedAt?: string
@@ -52,6 +52,7 @@ export default function App() {
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const messageRequest = useRef(0)
 
   const refreshStatus = useCallback(async () => {
     const status = await bridge.request<SyncStatus>('mail.sync.status')
@@ -60,9 +61,11 @@ export default function App() {
   }, [])
 
   const loadMessages = useCallback(async (append = false, cursor = 0) => {
+    const request = ++messageRequest.current
     const page = await bridge.request<MailPage>('mail.messages.list', {
       accountId: accountId || undefined, query: query.trim(), cursor,
     })
+    if (request !== messageRequest.current) return
     setMessages(current => append ? [...current, ...page.items] : page.items)
     setNextCursor(page.nextCursor)
   }, [accountId, query])
@@ -166,8 +169,8 @@ export default function App() {
       <aside className="accounts">
         <button className={!accountId ? 'active' : ''} onClick={() => setAccountId('')}><Inbox size={17} /><span>全部收件箱</span></button>
         {accounts.map(account => <button key={account.id} className={accountId === account.id ? 'active' : ''} onClick={() => setAccountId(account.id)} onDoubleClick={() => editAccount(account)}>
-          <Mail size={17} /><span><strong>{account.label}</strong><small>{syncing.includes(account.id) ? `${account.syncPhase === 'indexing' ? '索引' : '正文'} ${account.indexed}/${account.total}` : account.email}</small></span>
-          {syncing.includes(account.id) ? <LoaderCircle className="spin" size={14} /> : account.lastError ? <AlertCircle className="warn" size={14} /> : null}
+          <Mail size={17} /><span><strong>{account.label}</strong><small title={account.lastError}>{syncing.includes(account.id) ? `${account.syncPhase === 'indexing' ? '索引' : '正文'} ${account.indexed}/${account.total}` : account.lastError || account.email}</small></span>
+          {syncing.includes(account.id) ? <LoaderCircle className="spin" size={14} /> : account.lastError ? <span aria-label="同步失败" title={account.lastError}><AlertCircle className="warn" size={14} /></span> : null}
         </button>)}
         {currentAccount && <button className="manage" onClick={() => editAccount(currentAccount)}><Settings size={15} />账号设置</button>}
       </aside>

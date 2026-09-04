@@ -44,6 +44,8 @@ export interface PluginUpdateInfo {
   compatible: boolean
   permissionsChanged: boolean
   addedPermissions: Array<{ id: string; reason: string }>
+  removedPermissions: Array<{ id: string; reason: string }>
+  changedPermissions: Array<{ id: string; oldReason: string; newReason: string }>
 }
 
 export interface UpdateProgress {

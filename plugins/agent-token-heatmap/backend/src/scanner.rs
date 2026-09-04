@@ -283,6 +283,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "manual smoke test against the current user's Agy data"]
     fn scans_real_agy_conversations_if_present() {
         let root = default_root(AgentKind::Agy);
         if !root.exists() {

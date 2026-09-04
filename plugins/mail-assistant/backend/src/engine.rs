@@ -4,11 +4,12 @@ use crate::model::{
     Account, AccountInput, AttachmentInfo, MessagePage, ParsedMessage, Settings, SyncStatus,
 };
 use crate::{parser, transport};
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use imap::types::Flag;
 use imap_proto::types::{
     BodyContentCommon, BodyParams, BodyStructure, ContentEncoding, SectionPath,
 };
+use mailparse::MailHeaderMap;
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -54,14 +55,18 @@ impl MailEngine {
                         .unwrap_or(10);
                     if let Ok(accounts) = engine.accounts() {
                         for account in accounts {
-                            let due = engine
-                                .last_started
-                                .lock()
-                                .expect("scheduler lock poisoned")
-                                .get(&account.id)
-                                .is_none_or(|started| {
-                                    started.elapsed() >= Duration::from_secs(poll * 60)
-                                });
+                            let retry_due =
+                                retry_due_at(account.next_sync_at.as_deref(), chrono::Utc::now());
+                            let due = retry_due.unwrap_or_else(|| {
+                                engine
+                                    .last_started
+                                    .lock()
+                                    .expect("scheduler lock poisoned")
+                                    .get(&account.id)
+                                    .is_none_or(|started| {
+                                        started.elapsed() >= Duration::from_secs(poll * 60)
+                                    })
+                            });
                             if due {
                                 engine.start_sync(Some(&account.id));
                             }
@@ -141,15 +146,22 @@ impl MailEngine {
             .examine("INBOX")
             .context("无法以只读方式打开 INBOX")?;
         let _ = session.logout();
+        let old_secret = input.id.as_ref().and_then(|_| credentials::get(&id).ok());
         credentials::set(&id, &secret)?;
-        if let Err(error) = self.database.save_account(&id, &input) {
-            if input.id.is_none() {
-                let _ = credentials::delete(&id);
+        if let Err(error) = self
+            .database
+            .save_account_with_reset(&id, &input, connection_changed)
+        {
+            let rollback = match old_secret {
+                Some(old) => credentials::set(&id, &old),
+                None => credentials::delete(&id),
+            };
+            if let Err(rollback_error) = rollback {
+                return Err(anyhow!(
+                    "保存账号失败: {error}; 恢复原凭据失败: {rollback_error}"
+                ));
             }
             return Err(error);
-        }
-        if connection_changed {
-            self.database.reset_account_cache(&id)?;
         }
         self.start_sync(Some(&id));
         let mut account = self.database.account(&id)?;
@@ -166,8 +178,19 @@ impl MailEngine {
         {
             bail!("账号正在同步，请稍后再删除")
         }
+        let old_secret = credentials::get(id).ok();
         credentials::delete(id)?;
-        self.database.remove_account(id)
+        if let Err(error) = self.database.remove_account(id) {
+            if let Some(secret) = old_secret
+                && let Err(rollback_error) = credentials::set(id, &secret)
+            {
+                return Err(anyhow!(
+                    "删除账号失败: {error}; 恢复原凭据失败: {rollback_error}"
+                ));
+            }
+            return Err(error);
+        }
+        Ok(())
     }
 
     pub fn start_sync(self: &Arc<Self>, account_id: Option<&str>) -> Vec<String> {
@@ -308,7 +331,10 @@ impl MailEngine {
                 let seen = fetch.flags().iter().any(|flag| matches!(flag, Flag::Seen));
                 let header = fetch.header().unwrap_or_default();
                 let parsed = parser::parse(header);
-                let plan = fetch.bodystructure().map(plan_body).unwrap_or_default();
+                let plan = fetch
+                    .bodystructure()
+                    .map(plan_body)
+                    .unwrap_or_else(|| fallback_body_plan(header, size as usize));
                 metadata.insert(uid, (size, seen, parsed.clone(), plan));
                 self.database
                     .upsert_message(id, uid_validity, uid, size, seen, &parsed, false)?;
@@ -479,6 +505,9 @@ fn fetch_text_body(session: &mut Session, uid: u32, plan: &BodyPlan) -> Result<(
     } else {
         &plan.text
     };
+    if parts.is_empty() {
+        bail!("邮件服务器未提供可安全读取的文本正文结构")
+    }
     let mut remaining = MAX_BODY_BYTES;
     let mut bodies = Vec::new();
     let total = parts.iter().map(|part| part.octets).sum::<usize>();
@@ -486,7 +515,7 @@ fn fetch_text_body(session: &mut Session, uid: u32, plan: &BodyPlan) -> Result<(
         if remaining == 0 {
             break;
         }
-        let limit = part.octets.min(remaining);
+        let limit = part.octets.max(1).min(remaining);
         let section = if part.path.is_empty() {
             "TEXT".to_string()
         } else {
@@ -507,17 +536,16 @@ fn fetch_text_body(session: &mut Session, uid: u32, plan: &BodyPlan) -> Result<(
                 fetch.section(&SectionPath::Part(part.path.clone(), None))
             }
         });
-        if let Some(raw) = raw {
-            let body = parser::decode_text_part(
-                raw,
-                &part.mime_type,
-                part.charset.as_deref(),
-                &part.encoding,
-            );
-            remaining = remaining.saturating_sub(raw.len());
-            if !body.trim().is_empty() {
-                bodies.push(body);
-            }
+        let raw = raw.context("邮件服务器未返回请求的正文部分")?;
+        let body = parser::decode_text_part(
+            raw,
+            &part.mime_type,
+            part.charset.as_deref(),
+            &part.encoding,
+        );
+        remaining = remaining.saturating_sub(raw.len());
+        if !body.trim().is_empty() {
+            bodies.push(body);
         }
     }
     let body = bodies.join("\n\n");
@@ -526,6 +554,39 @@ fn fetch_text_body(session: &mut Session, uid: u32, plan: &BodyPlan) -> Result<(
         body.chars().take(MAX_BODY_BYTES).collect(),
         total > MAX_BODY_BYTES || char_truncated,
     ))
+}
+
+fn fallback_body_plan(header: &[u8], octets: usize) -> BodyPlan {
+    let Ok(mail) = mailparse::parse_mail(header) else {
+        return BodyPlan::default();
+    };
+    let mime_type = mail.ctype.mimetype.to_ascii_lowercase();
+    if !matches!(mime_type.as_str(), "text/plain" | "text/html") {
+        return BodyPlan::default();
+    }
+    let part = TextPart {
+        path: Vec::new(),
+        mime_type: mime_type.clone(),
+        charset: mail.ctype.params.get("charset").cloned(),
+        encoding: mail
+            .headers
+            .get_first_value("Content-Transfer-Encoding")
+            .unwrap_or_else(|| "8bit".into()),
+        octets,
+    };
+    let mut plan = BodyPlan::default();
+    if mime_type == "text/plain" {
+        plan.text.push(part);
+    } else {
+        plan.html.push(part);
+    }
+    plan
+}
+
+fn retry_due_at(next_sync_at: Option<&str>, now: chrono::DateTime<chrono::Utc>) -> Option<bool> {
+    next_sync_at
+        .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
+        .map(|next| now >= next.with_timezone(&chrono::Utc))
 }
 
 fn empty_message() -> ParsedMessage {
@@ -575,4 +636,36 @@ fn redact_error(value: &str) -> String {
 fn compact(value: &str, limit: usize) -> String {
     let value = value.split_whitespace().collect::<Vec<_>>().join(" ");
     value.chars().take(limit).collect()
+}
+
+#[cfg(test)]
+mod engine_tests {
+    use super::*;
+
+    #[test]
+    fn only_falls_back_for_top_level_text_messages() {
+        let plain = fallback_body_plan(
+            b"Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n",
+            42,
+        );
+        assert_eq!(plain.text.len(), 1);
+        assert_eq!(plain.text[0].octets, 42);
+        assert_eq!(plain.text[0].encoding, "quoted-printable");
+
+        let multipart =
+            fallback_body_plan(b"Content-Type: multipart/mixed; boundary=x\r\n\r\n", 100);
+        assert!(multipart.text.is_empty());
+        assert!(multipart.html.is_empty());
+    }
+
+    #[test]
+    fn honors_persisted_retry_deadlines() {
+        let now = chrono::DateTime::parse_from_rfc3339("2026-09-04T12:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        assert_eq!(retry_due_at(Some("2026-09-04T11:59:59Z"), now), Some(true));
+        assert_eq!(retry_due_at(Some("2026-09-04T12:05:00Z"), now), Some(false));
+        assert_eq!(retry_due_at(Some("invalid"), now), None);
+        assert_eq!(retry_due_at(None, now), None);
+    }
 }

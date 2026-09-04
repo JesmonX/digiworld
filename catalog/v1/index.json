@@ -21,15 +21,31 @@
     },
     {
       "id": "io.github.jesmonx.digiworld.keyboard-heatmap",
-      "version": "0.1.0",
+      "version": "0.1.4",
       "name": "键盘热力图",
-      "description": "以精致的 104 键热力图查看实体键位使用频率，只保存每日聚合次数。",
+      "description": "在 104、87、84、68 和 61 键主流配列中查看实体键位热力图，只保存每日聚合次数。",
       "author": "JesmonX",
-      "minCoreVersion": "0.1.0",
+      "minCoreVersion": "0.2.5",
       "permissions": [
         { "id": "global-input", "reason": "在其他应用获得焦点时统计实体键位按下次数。" },
         { "id": "background", "reason": "关闭 Digiworld 窗口后继续累计键位次数。" },
         { "id": "plugin-storage", "reason": "在本机保存每日聚合计数和插件设置。" }
+      ],
+      "artifacts": []
+    },
+    {
+      "id": "io.github.jesmonx.digiworld.mail-assistant",
+      "version": "0.1.1",
+      "name": "邮件助手",
+      "description": "通过只读 IMAP 汇总多个邮箱的收件箱，在本机离线阅读、搜索并接收新邮件通知。",
+      "author": "JesmonX",
+      "minCoreVersion": "0.2.12",
+      "permissions": [
+        { "id": "background", "reason": "在 Digiworld 驻留后台时定期检查新邮件。" },
+        { "id": "notifications", "reason": "通过 Digiworld 显示按账号聚合的新邮件通知。" },
+        { "id": "network:imap", "reason": "使用 Digiworld 的代理策略连接用户配置的 IMAP 收件服务器。" },
+        { "id": "plugin-storage", "reason": "在本机保存邮件索引、纯文本正文、同步游标和非敏感账号设置。" },
+        { "id": "secret:mail-credentials", "reason": "在操作系统凭据库中保存邮箱应用专用密码或客户端授权码。" }
       ],
       "artifacts": []
     }

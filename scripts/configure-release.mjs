@@ -12,6 +12,7 @@ if (!publicKey) throw new Error('DIGIWORLD_UPDATER_PUBLIC_KEY is required')
 
 const root = path.resolve(import.meta.dirname, '..')
 const cargoPath = path.join(root, 'Cargo.toml')
+const cargoLockPath = path.join(root, 'Cargo.lock')
 const configPath = path.join(root, 'apps', 'desktop', 'src-tauri', 'tauri.conf.json')
 const packagePaths = [
   path.join(root, 'package.json'),
@@ -27,6 +28,14 @@ const nextCargo = cargo.replace(
 )
 if (nextCargo === cargo) throw new Error('Could not update [workspace.package].version')
 await writeFile(cargoPath, nextCargo)
+
+const cargoLock = await readFile(cargoLockPath, 'utf8')
+const nextCargoLock = cargoLock.replace(
+  /(\[\[package\]\]\nname = "digiworld"\nversion = ")[^"]+"/,
+  `$1${version}"`,
+)
+if (nextCargoLock === cargoLock) throw new Error('Could not update digiworld in Cargo.lock')
+await writeFile(cargoLockPath, nextCargoLock)
 
 for (const packagePath of packagePaths) {
   const packageJson = JSON.parse(await readFile(packagePath, 'utf8'))

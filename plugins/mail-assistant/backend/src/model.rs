@@ -32,6 +32,7 @@ pub struct Account {
     pub baseline_complete: bool,
     pub last_success_at: Option<String>,
     pub last_error: Option<String>,
+    pub next_sync_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

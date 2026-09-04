@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   installPluginUpdates: vi.fn(),
   checkCoreUpdate: vi.fn(),
   installCoreUpdate: vi.fn(),
+  exportDiagnostics: vi.fn(),
 }))
 
 vi.mock('./components/WindowChrome', () => ({ WindowChrome: () => <div /> }))
@@ -35,7 +36,7 @@ vi.mock('./lib/api', () => ({
     setLaunchAtStartup: vi.fn(async () => {}),
     setProxySettings: vi.fn(async settings => settings),
     testProxySettings: mocks.testProxySettings,
-    exportDiagnostics: vi.fn(async () => ''),
+    exportDiagnostics: mocks.exportDiagnostics,
     checkPluginUpdates: mocks.checkPluginUpdates,
     installPluginUpdates: mocks.installPluginUpdates,
     checkCoreUpdate: mocks.checkCoreUpdate,
@@ -64,8 +65,10 @@ describe('explicit update consent', () => {
     mocks.installPluginUpdates.mockReset()
     mocks.checkCoreUpdate.mockReset()
     mocks.installCoreUpdate.mockReset()
+    mocks.exportDiagnostics.mockReset()
     mocks.testProxySettings.mockResolvedValue({ ok: true, latencyMs: 1, message: '' })
     mocks.installPluginUpdates.mockResolvedValue([])
+    mocks.exportDiagnostics.mockResolvedValue('C:\\Digiworld\\diagnostics.json')
     localStorage.clear()
   })
 
@@ -111,6 +114,8 @@ describe('explicit update consent', () => {
       id: 'example.plugin', name: '示例插件', currentVersion: '1.0.0', version: '1.1.0',
       minCoreVersion: '0.2.0', compatible: true, permissionsChanged: true,
       addedPermissions: [{ id: 'process:shell', reason: '运行用户选择的命令' }],
+      removedPermissions: [{ id: 'network:openai', reason: '读取限额' }],
+      changedPermissions: [{ id: 'plugin-storage', oldReason: '保存旧数据', newReason: '保存聚合数据' }],
     }])
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
@@ -121,9 +126,21 @@ describe('explicit update consent', () => {
     expect(mocks.installPluginUpdates).not.toHaveBeenCalled()
     expect(container.textContent).toContain('1.0.0 → 1.1.0')
     expect(container.textContent).toContain('运行已配置的系统 Shell：运行用户选择的命令')
+    expect(container.textContent).toContain('移除 访问 OpenAI Codex 服务：读取限额')
+    expect(container.textContent).toContain('变更 本地插件存储：保存旧数据 → 保存聚合数据')
 
     await act(async () => { button(container, '同意并更新 1 项')?.click(); await flush() })
     expect(mocks.installPluginUpdates).toHaveBeenCalledWith([{ id: 'example.plugin', version: '1.1.0' }])
+    await act(async () => root.unmount())
+  })
+
+  it('shows the diagnostics export path', async () => {
+    const root = createRoot(container)
+    await act(async () => { root.render(<App />); await flush() })
+    await act(async () => button(container, '设置')?.click())
+    await act(async () => { button(container, '导出')?.click(); await flush() })
+
+    expect(container.textContent).toContain('已导出到 C:\\Digiworld\\diagnostics.json')
     await act(async () => root.unmount())
   })
 
@@ -201,6 +218,25 @@ describe('explicit update consent', () => {
     expect(container.textContent).toContain('未适配插件')
     const disabledBtn = container.querySelector<HTMLButtonElement>('button[disabled]')
     expect(disabledBtn?.textContent).toContain('暂未适配当前系统')
+    await act(async () => root.unmount())
+  })
+
+  it('does not treat a catalog entry without artifacts as installable', async () => {
+    mocks.catalog.mockResolvedValue({
+      schemaVersion: 1,
+      sequence: 1,
+      generatedAt: '',
+      plugins: [{
+        id: 'empty.plugin', version: '1.0.0', name: '缺少产物', description: '', author: '',
+        minCoreVersion: '0.1.0', permissions: [], artifacts: [],
+      }],
+    })
+    const root = createRoot(container)
+    await act(async () => { root.render(<App />); await flush() })
+    await act(async () => button(container, '功能库')?.click())
+    await flush()
+
+    expect(button(container, '暂未适配当前系统')?.disabled).toBe(true)
     await act(async () => root.unmount())
   })
 })

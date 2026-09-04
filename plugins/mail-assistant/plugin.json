@@ -1,6 +1,6 @@
 {
   "id": "io.github.jesmonx.digiworld.mail-assistant",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "name": "邮件助手",
   "description": "通过只读 IMAP 汇总多个邮箱的收件箱，在本机离线阅读、搜索并接收新邮件通知。",
   "author": "JesmonX",

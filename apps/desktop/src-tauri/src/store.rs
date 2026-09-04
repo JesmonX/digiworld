@@ -75,18 +75,18 @@ impl Store {
     pub fn install(&self, manifest: &PluginManifest, enabled: bool) -> Result<bool> {
         let mut connection = self.connection.lock().expect("store lock poisoned");
         let transaction = connection.transaction()?;
-        let old_permissions: Vec<String> = {
+        let old_permissions: Vec<(String, String)> = {
             let mut statement = transaction.prepare(
-                "SELECT permission FROM granted_permissions WHERE plugin_id = ?1 ORDER BY permission",
+                "SELECT permission, reason FROM granted_permissions WHERE plugin_id = ?1 ORDER BY permission",
             )?;
             statement
-                .query_map([&manifest.id], |row| row.get(0))?
+                .query_map([&manifest.id], |row| Ok((row.get(0)?, row.get(1)?)))?
                 .collect::<std::result::Result<_, _>>()?
         };
         let mut new_permissions: Vec<_> = manifest
             .permissions
             .iter()
-            .map(|value| value.id.clone())
+            .map(|value| (value.id.clone(), value.reason.clone()))
             .collect();
         new_permissions.sort();
         let permissions_changed = old_permissions != new_permissions;

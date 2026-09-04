@@ -1,6 +1,6 @@
 {
   "name": "digiworld",
-  "version": "0.2.6",
+  "version": "0.2.14",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.21.0",
@@ -8,7 +8,8 @@
     "dev": "pnpm --filter @digiworld/desktop tauri dev",
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
-    "test": "pnpm -r --if-present test",
+    "test": "node scripts/check-version-consistency.mjs && pnpm -r --if-present test",
+    "check:versions": "node scripts/check-version-consistency.mjs",
     "lint": "pnpm -r --if-present lint",
     "package:keyboard": "node scripts/package-plugin.mjs keyboard-heatmap",
     "package:agent-tokens": "node scripts/package-plugin.mjs agent-token-heatmap",

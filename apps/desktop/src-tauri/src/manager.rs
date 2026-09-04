@@ -2,8 +2,8 @@ use crate::catalog::{CatalogClient, sha256_hex, verify_package};
 use crate::error::{DigiworldError, Result};
 use crate::model::{
     CORE_VERSION, CatalogIndex, InstallResult, MANIFEST_SCHEMA_VERSION, PROTOCOL_VERSION,
-    PluginManifest, PluginSummary, PluginUpdateInfo, PluginUpdateRequest, ProxySettings,
-    ProxyTestResult, target_key,
+    PermissionChange, PluginManifest, PluginSummary, PluginUpdateInfo, PluginUpdateRequest,
+    ProxySettings, ProxyTestResult, target_key,
 };
 use crate::network;
 use crate::process::PluginProcess;
@@ -156,6 +156,11 @@ impl PluginManager {
                     .artifacts
                     .iter()
                     .any(|artifact| artifact.target == target);
+            let (added_permissions, removed_permissions, changed_permissions) =
+                permission_diff(&current.permissions, &entry.permissions);
+            let permissions_changed = !added_permissions.is_empty()
+                || !removed_permissions.is_empty()
+                || !changed_permissions.is_empty();
             updates.push(PluginUpdateInfo {
                 id: entry.id.clone(),
                 name: entry.name.clone(),
@@ -163,17 +168,10 @@ impl PluginManager {
                 version: entry.version.clone(),
                 min_core_version: entry.min_core_version.clone(),
                 compatible,
-                permissions_changed: current.permissions != entry.permissions,
-                added_permissions: entry
-                    .permissions
-                    .iter()
-                    .filter(|permission| {
-                        !current.permissions.iter().any(|installed| {
-                            installed.id == permission.id && installed.reason == permission.reason
-                        })
-                    })
-                    .cloned()
-                    .collect(),
+                permissions_changed,
+                added_permissions,
+                removed_permissions,
+                changed_permissions,
             });
         }
         Ok(updates)
@@ -362,29 +360,50 @@ impl PluginManager {
         }
         tokio::fs::rename(&staging, &destination).await?;
 
-        let permissions_changed = self.store.install(&manifest, was_enabled)?;
+        let permissions_changed = match self.store.install(&manifest, was_enabled) {
+            Ok(value) => value,
+            Err(error) => {
+                let rollback_result = restore_plugin_files(&destination, &rollback).await;
+                if let Some(old) = old_manifest.as_ref()
+                    && was_enabled
+                    && rollback_result.is_ok()
+                {
+                    let _ = self.start(old).await;
+                }
+                if let Err(rollback_error) = rollback_result {
+                    return Err(DigiworldError::Plugin(format!(
+                        "database update failed: {error}; filesystem rollback failed: {rollback_error}"
+                    )));
+                }
+                return Err(error);
+            }
+        };
         let start_result = if was_enabled {
             self.start(&manifest).await
         } else {
             Ok(())
         };
         if let Err(error) = start_result {
-            let _ = tokio::fs::remove_dir_all(&destination).await;
-            if rollback.exists() {
-                let _ = tokio::fs::rename(&rollback, &destination).await;
-            }
+            let rollback_result = restore_plugin_files(&destination, &rollback).await;
             if let Some(old) = old_manifest {
                 let _ = self.store.install(&old, was_enabled);
-                if was_enabled {
+                if was_enabled && rollback_result.is_ok() {
                     let _ = self.start(&old).await;
                 }
             } else {
                 let _ = self.store.remove(plugin_id);
             }
+            if let Err(rollback_error) = rollback_result {
+                return Err(DigiworldError::Plugin(format!(
+                    "plugin start failed: {error}; filesystem rollback failed: {rollback_error}"
+                )));
+            }
             return Err(error);
         }
         if rollback.exists() {
-            tokio::fs::remove_dir_all(&rollback).await?;
+            if let Err(error) = tokio::fs::remove_dir_all(&rollback).await {
+                tracing::warn!(plugin = %plugin_id, %error, "installed plugin but could not remove rollback directory");
+            }
         }
         let summary = self.summary(plugin_id)?;
         on_progress(
@@ -590,11 +609,55 @@ impl PluginManager {
     }
 }
 
+async fn restore_plugin_files(destination: &Path, rollback: &Path) -> Result<()> {
+    if destination.exists() {
+        tokio::fs::remove_dir_all(destination).await?;
+    }
+    if rollback.exists() {
+        tokio::fs::rename(rollback, destination).await?;
+    }
+    Ok(())
+}
+
 fn has_network_permission(manifest: &PluginManifest) -> bool {
     manifest
         .permissions
         .iter()
         .any(|permission| permission.id.starts_with("network:"))
+}
+
+fn permission_diff(
+    current: &[crate::model::PermissionRequest],
+    candidate: &[crate::model::PermissionRequest],
+) -> (
+    Vec<crate::model::PermissionRequest>,
+    Vec<crate::model::PermissionRequest>,
+    Vec<PermissionChange>,
+) {
+    let added = candidate
+        .iter()
+        .filter(|permission| !current.iter().any(|value| value.id == permission.id))
+        .cloned()
+        .collect();
+    let removed = current
+        .iter()
+        .filter(|permission| !candidate.iter().any(|value| value.id == permission.id))
+        .cloned()
+        .collect();
+    let changed = candidate
+        .iter()
+        .filter_map(|permission| {
+            current
+                .iter()
+                .find(|value| value.id == permission.id && value.reason != permission.reason)
+                .map(|installed| PermissionChange {
+                    id: permission.id.clone(),
+                    old_reason: installed.reason.clone(),
+                    new_reason: permission.reason.clone(),
+                })
+        })
+        .collect();
+    (added, removed, changed)
 }
 
 async fn extract_package(bytes: Vec<u8>, destination: PathBuf) -> Result<()> {
@@ -748,5 +811,59 @@ mod tests {
         assert!(!is_newer_version("2.0.0", "2.0.0").unwrap());
         assert!(!is_newer_version("2.1.0", "2.0.9").unwrap());
         assert!(is_newer_version("1.0.0-beta.1", "1.0.0").unwrap());
+    }
+
+    #[test]
+    fn classifies_permission_changes_by_identity() {
+        use crate::model::PermissionRequest;
+        let current = vec![
+            PermissionRequest {
+                id: "removed".into(),
+                reason: "old".into(),
+            },
+            PermissionRequest {
+                id: "changed".into(),
+                reason: "old reason".into(),
+            },
+        ];
+        let candidate = vec![
+            PermissionRequest {
+                id: "changed".into(),
+                reason: "new reason".into(),
+            },
+            PermissionRequest {
+                id: "added".into(),
+                reason: "new".into(),
+            },
+        ];
+
+        let (added, removed, changed) = permission_diff(&current, &candidate);
+
+        assert_eq!(added[0].id, "added");
+        assert_eq!(removed[0].id, "removed");
+        assert_eq!(changed[0].id, "changed");
+        assert_eq!(changed[0].old_reason, "old reason");
+        assert_eq!(changed[0].new_reason, "new reason");
+    }
+
+    #[tokio::test]
+    async fn restores_previous_plugin_directory() {
+        let root =
+            std::env::temp_dir().join(format!("digiworld-rollback-{}", uuid::Uuid::new_v4()));
+        let destination = root.join("plugin");
+        let rollback = root.join(".rollback-plugin");
+        std::fs::create_dir_all(&destination).unwrap();
+        std::fs::create_dir_all(&rollback).unwrap();
+        std::fs::write(destination.join("version"), "new").unwrap();
+        std::fs::write(rollback.join("version"), "old").unwrap();
+
+        restore_plugin_files(&destination, &rollback).await.unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(destination.join("version")).unwrap(),
+            "old"
+        );
+        assert!(!rollback.exists());
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

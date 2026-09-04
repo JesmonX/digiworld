@@ -52,6 +52,14 @@ jobs:
         run: node scripts/validate-plugin-signing-key.mjs
       - name: Configure release metadata
         run: node scripts/configure-release.mjs
+      - name: Commit reproducible release metadata
+        shell: pwsh
+        run: |
+          $tag = '${{ steps.release.outputs.tag }}'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Cargo.toml Cargo.lock package.json apps/desktop/package.json apps/desktop/src-tauri/tauri.conf.json packages/plugin-sdk/package.json packages/typography/package.json
+          git commit -m "chore(release): prepare $tag [skip ci]"
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: cargo test --workspace
@@ -114,6 +122,12 @@ jobs:
             'The plugin archive and updater bundle are still cryptographically signed.'
             'Windows SmartScreen may show an unknown-publisher warning.'
           ) -Encoding utf8
+      - name: Publish versioned source commit and tag
+        shell: pwsh
+        run: |
+          $tag = '${{ steps.release.outputs.tag }}'
+          git tag $tag
+          git push origin HEAD:main $tag
       - uses: actions/upload-artifact@v7
         with:
           name: windows-preview-release

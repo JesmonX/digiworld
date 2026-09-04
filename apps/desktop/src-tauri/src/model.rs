@@ -139,6 +139,16 @@ pub struct PluginUpdateInfo {
     pub compatible: bool,
     pub permissions_changed: bool,
     pub added_permissions: Vec<PermissionRequest>,
+    pub removed_permissions: Vec<PermissionRequest>,
+    pub changed_permissions: Vec<PermissionChange>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PermissionChange {
+    pub id: String,
+    pub old_reason: String,
+    pub new_reason: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -56,8 +56,8 @@ fn main() -> Result<()> {
             break;
         }
     }
-    engine.shutdown()?;
     capture.stop();
+    engine.shutdown()?;
     Ok(())
 }
 
@@ -77,10 +77,7 @@ fn parse_data_dir() -> Result<PathBuf> {
 fn handle(engine: &StatsEngine, method: &str, params: Value) -> Result<Value> {
     match method {
         "health" => Ok(json!({ "status": "ok", "protocolVersion": 1 })),
-        "shutdown" => {
-            engine.shutdown()?;
-            Ok(json!({ "stopped": true }))
-        }
+        "shutdown" => Ok(json!({ "stopped": true })),
         "heatmap.snapshot" => {
             let scope = params
                 .get("scope")
