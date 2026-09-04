@@ -3,8 +3,8 @@ import {
   DEFAULT_ACCENT_THEME_ID, DEFAULT_FONT_THEME_ID, DEFAULT_FONT_WEIGHT, FONT_THEME_STORAGE_KEY,
   FONT_WEIGHT_STORAGE_KEY,
   THEME_STORAGE_KEY, getAccentTheme, getFontTheme, loadAccentThemeId,
-  loadFontThemeId, loadFontWeight, pluginTheme, saveAccentThemeId, saveFontThemeId,
-  saveFontWeight,
+  loadFontThemeId, loadFontWeight, loadGlassMode, pluginTheme, saveAccentThemeId, saveFontThemeId,
+  saveFontWeight, saveGlassMode, GLASS_STORAGE_KEY,
 } from './theme'
 
 describe('accent themes', () => {
@@ -65,5 +65,18 @@ describe('font themes', () => {
       'weight-semibold': '700',
       'weight-bold': '800',
     })
+  })
+
+  it('loads and saves the glass preference with an enabled fallback', () => {
+    const values = new Map<string, string>()
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value) },
+    }
+    expect(loadGlassMode(storage)).toBe('enabled')
+    saveGlassMode('disabled', storage)
+    expect(loadGlassMode(storage)).toBe('disabled')
+    values.set(GLASS_STORAGE_KEY, 'unexpected')
+    expect(loadGlassMode(storage)).toBe('enabled')
   })
 })

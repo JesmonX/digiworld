@@ -9,6 +9,7 @@ describe('plugin presentation helpers', () => {
         colorScheme: '',
         setProperty(name: string, value: string) { properties.set(name, value) },
       },
+      dataset: {} as DOMStringMap,
     } as unknown as HTMLElement
 
     applyPluginTheme({
@@ -19,6 +20,7 @@ describe('plugin presentation helpers', () => {
       'font-display': '"Digiworld LXGW WenKai", serif',
       'weight-regular': '500',
       'weight-semibold': '600',
+      glass: 'disabled',
     }, root)
 
     expect(root.style.colorScheme).toBe('light')
@@ -28,6 +30,8 @@ describe('plugin presentation helpers', () => {
     expect(properties.get('--dw-font-display')).toBe('"Digiworld LXGW WenKai", serif')
     expect(properties.get('--dw-weight-regular')).toBe('500')
     expect(properties.get('--dw-weight-semibold')).toBe('600')
+    expect(properties.get('--dw-glass')).toBe('disabled')
+    expect(root.dataset.dwGlass).toBe('disabled')
   })
 
   it('suppresses and restores the native context menu', () => {

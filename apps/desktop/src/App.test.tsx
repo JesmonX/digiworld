@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import { FONT_THEME_STORAGE_KEY, FONT_WEIGHT_STORAGE_KEY } from './theme'
+import { FONT_THEME_STORAGE_KEY, FONT_WEIGHT_STORAGE_KEY, GLASS_STORAGE_KEY } from './theme'
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -181,6 +181,19 @@ describe('explicit update consent', () => {
     const stylesheet = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8')
     expect(stylesheet).toMatch(/\.main \{[^}]*min-height: 0;/)
     expect(stylesheet).toMatch(/\.content \{[^}]*overflow: auto;/)
+    await act(async () => root.unmount())
+  })
+
+  it('applies and persists the glass preference across the shell', async () => {
+    const root = createRoot(container)
+    await act(async () => { root.render(<App />); await flush() })
+    await act(async () => button(container, '设置')?.click())
+    const toggle = container.querySelector<HTMLButtonElement>('[aria-label="切换玻璃效果"]')!
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+    await act(async () => toggle.click())
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+    expect(localStorage.getItem(GLASS_STORAGE_KEY)).toBe('disabled')
+    expect(container.querySelector('.app-window')?.className).toContain('glass-disabled')
     await act(async () => root.unmount())
   })
 

@@ -4,6 +4,7 @@ import type { PluginTheme } from '@digiworld/plugin-sdk'
 export type AccentThemeId = 'violet' | 'blue' | 'teal' | 'orange' | 'rose'
 export type FontThemeId = 'plex' | 'wenkai' | 'system'
 export type FontWeight = 400 | 500 | 600
+export type GlassMode = 'enabled' | 'disabled'
 
 export interface AccentTheme {
   id: AccentThemeId
@@ -60,6 +61,7 @@ export const DEFAULT_FONT_WEIGHT: FontWeight = 500
 export const THEME_STORAGE_KEY = 'digiworld.accent-theme.v1'
 export const FONT_THEME_STORAGE_KEY = 'digiworld.font-theme.v1'
 export const FONT_WEIGHT_STORAGE_KEY = 'digiworld.font-weight.v1'
+export const GLASS_STORAGE_KEY = 'digiworld.glass.v1'
 
 export function getAccentTheme(id: AccentThemeId): AccentTheme {
   return ACCENT_THEMES.find(theme => theme.id === id) ?? ACCENT_THEMES[0]!
@@ -120,6 +122,22 @@ export function saveFontWeight(weight: FontWeight, storage?: Pick<Storage, 'setI
   }
 }
 
+export function loadGlassMode(storage?: Pick<Storage, 'getItem'>): GlassMode {
+  try {
+    return (storage ?? window.localStorage).getItem(GLASS_STORAGE_KEY) === 'disabled' ? 'disabled' : 'enabled'
+  } catch {
+    return 'enabled'
+  }
+}
+
+export function saveGlassMode(mode: GlassMode, storage?: Pick<Storage, 'setItem'>): void {
+  try {
+    (storage ?? window.localStorage).setItem(GLASS_STORAGE_KEY, mode)
+  } catch {
+    // A presentation preference should never prevent the desktop UI from working.
+  }
+}
+
 export function accentThemeStyle(theme: AccentTheme): CSSProperties {
   return {
     '--accent': theme.accent,
@@ -145,7 +163,7 @@ export function fontWeightStyle(weight: FontWeight): CSSProperties {
   } as CSSProperties
 }
 
-export function pluginTheme(theme: AccentTheme, font: FontTheme = getFontTheme(DEFAULT_FONT_THEME_ID), weight: FontWeight = DEFAULT_FONT_WEIGHT): PluginTheme {
+export function pluginTheme(theme: AccentTheme, font: FontTheme = getFontTheme(DEFAULT_FONT_THEME_ID), weight: FontWeight = DEFAULT_FONT_WEIGHT, glass: GlassMode = 'enabled'): PluginTheme {
   const weights = fontWeightStyle(weight) as Record<string, number>
   return {
     'color-scheme': 'light',
@@ -168,5 +186,6 @@ export function pluginTheme(theme: AccentTheme, font: FontTheme = getFontTheme(D
     'weight-medium': String(weights['--weight-medium']),
     'weight-semibold': String(weights['--weight-semibold']),
     'weight-bold': String(weights['--weight-bold']),
+    glass,
   }
 }

@@ -45,7 +45,7 @@ describe('PluginFrame theme', () => {
   it('sends the current theme when ready and after a live theme change', async () => {
     const root = createRoot(container)
     const violet = pluginTheme(getAccentTheme('violet'))
-    const blue = pluginTheme(getAccentTheme('blue'), getFontTheme('wenkai'))
+    const blue = pluginTheme(getAccentTheme('blue'), getFontTheme('wenkai'), 500, 'disabled')
     await act(async () => root.render(<PluginFrame pluginId="sample" html="<main />" theme={violet} />))
 
     const iframe = container.querySelector('iframe')!

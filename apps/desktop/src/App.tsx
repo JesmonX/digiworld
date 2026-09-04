@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
   Boxes, Check, ChevronRight, CircleAlert, Download, Gauge, Library,
   LoaderCircle, Network, Palette, Pause, RefreshCw, Settings, ShieldCheck,
@@ -14,7 +15,7 @@ import {
 import {
   ACCENT_THEMES, FONT_THEMES, accentThemeStyle, fontThemeStyle, getAccentTheme,
   getFontTheme, loadAccentThemeId, loadFontThemeId, loadFontWeight, pluginTheme, saveAccentThemeId,
-  saveFontThemeId, saveFontWeight, fontWeightStyle, type AccentThemeId, type FontThemeId, type FontWeight,
+  saveFontThemeId, saveFontWeight, fontWeightStyle, loadGlassMode, saveGlassMode, type AccentThemeId, type FontThemeId, type FontWeight, type GlassMode,
 } from './theme'
 import './styles.css'
 
@@ -77,13 +78,15 @@ function App() {
   const [accentThemeId, setAccentThemeId] = useState<AccentThemeId>(loadAccentThemeId)
   const [fontThemeId, setFontThemeId] = useState<FontThemeId>(loadFontThemeId)
   const [fontWeight, setFontWeight] = useState<FontWeight>(loadFontWeight)
+  const [glassMode, setGlassMode] = useState<GlassMode>(loadGlassMode)
   const accentTheme = getAccentTheme(accentThemeId)
   const fontTheme = getFontTheme(fontThemeId)
-  const activePluginTheme = useMemo(() => pluginTheme(accentTheme, fontTheme, fontWeight), [accentTheme, fontTheme, fontWeight])
+  const activeTheme = useMemo(() => pluginTheme(accentTheme, fontTheme, fontWeight, glassMode), [accentTheme, fontTheme, fontWeight, glassMode])
 
   useEffect(() => saveAccentThemeId(accentThemeId), [accentThemeId])
   useEffect(() => saveFontThemeId(fontThemeId), [fontThemeId])
   useEffect(() => saveFontWeight(fontWeight), [fontWeight])
+  useEffect(() => saveGlassMode(glassMode), [glassMode])
 
   const refreshState = useCallback(async () => setState(await api.appState()), [])
   const refreshCatalog = useCallback(async (force = false) => setCatalog(await api.catalog(force)), [])
@@ -167,7 +170,7 @@ function App() {
   const pluginOpen = typeof page !== 'string'
 
   return (
-    <div className={`app-window ${pluginOpen ? 'plugin-open' : ''}`} style={{ ...accentThemeStyle(accentTheme), ...fontThemeStyle(fontTheme), ...fontWeightStyle(fontWeight) }}>
+    <div className={`app-window glass-${glassMode} ${pluginOpen ? 'plugin-open' : ''}`} style={{ ...accentThemeStyle(accentTheme), ...fontThemeStyle(fontTheme), ...fontWeightStyle(fontWeight) }}>
       <WindowChrome />
       <div className="app-shell">
         <aside className="sidebar">
@@ -201,15 +204,19 @@ function App() {
           {error && <div className="error-banner"><CircleAlert /><span>{error}</span><button onClick={() => setError(null)}>关闭</button></div>}
 
           <section className="content">
-            {page === 'home' && <Home plugins={state?.plugins ?? []} onCatalog={() => setPage('catalog')} onOpen={id => setPage({ pluginId: id })} />}
-            {page === 'catalog' && <Catalog catalog={catalog} installed={installed} busy={busy} onInstall={setConfirmInstall} onRefresh={() => refreshCatalog(true)} onOpen={id => setPage({ pluginId: id })} currentTarget={state?.target} />}
-            {page === 'settings' && state && <SettingsPage state={state} progress={updateProgress} onProgressReset={() => setUpdateProgress(null)} onPluginsUpdated={refreshState} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} fontThemeId={fontThemeId} onFontThemeChange={setFontThemeId} fontWeight={fontWeight} onFontWeightChange={setFontWeight} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
-            {pluginOpen && (
-              !selectedPlugin ? <Loading label="载入插件" />
-                : selectedPlugin.enabled
-                  ? (pluginHtml ? <PluginFrame pluginId={page.pluginId} html={pluginHtml} theme={activePluginTheme} /> : <Loading label="载入界面" />)
-                  : <div className="plugin-disabled"><Pause /><h2>已停用</h2></div>
-            )}
+            <AnimatePresence initial={false}>
+              <motion.div key={typeof page === 'string' ? page : `plugin:${page.pluginId}`} className="page-transition" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: .2, ease: 'easeOut' }}>
+                {page === 'home' && <Home plugins={state?.plugins ?? []} version={state?.version} onCatalog={() => setPage('catalog')} onOpen={id => setPage({ pluginId: id })} />}
+                {page === 'catalog' && <Catalog catalog={catalog} installed={installed} busy={busy} onInstall={setConfirmInstall} onRefresh={() => refreshCatalog(true)} onOpen={id => setPage({ pluginId: id })} currentTarget={state?.target} />}
+                {page === 'settings' && state && <SettingsPage state={state} progress={updateProgress} onProgressReset={() => setUpdateProgress(null)} onPluginsUpdated={refreshState} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} fontThemeId={fontThemeId} onFontThemeChange={setFontThemeId} fontWeight={fontWeight} onFontWeightChange={setFontWeight} glassMode={glassMode} onGlassModeChange={setGlassMode} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
+                {pluginOpen && (
+                  !selectedPlugin ? <Loading label="载入插件" />
+                    : selectedPlugin.enabled
+                      ? (pluginHtml ? <PluginFrame pluginId={page.pluginId} html={pluginHtml} theme={{ ...activeTheme, glass: glassMode }} /> : <Loading label="载入界面" />)
+                      : <div className="plugin-disabled"><Pause /><h2>已停用</h2></div>
+                )}
+              </motion.div>
+            </AnimatePresence>
           </section>
         </main>
       </div>
@@ -223,7 +230,7 @@ function NavButton({ active, icon, label, status, onClick }: { active: boolean; 
   return <button title={label} className={`nav-item ${active ? 'active' : ''}`} onClick={onClick}><span>{icon}</span><b>{label}</b>{status && <i className={`state-dot ${status}`} />}</button>
 }
 
-function Home({ plugins, onCatalog, onOpen }: { plugins: PluginSummary[]; onCatalog(): void; onOpen(id: string): void }) {
+function Home({ plugins, version, onCatalog, onOpen }: { plugins: PluginSummary[]; version: string | undefined; onCatalog(): void; onOpen(id: string): void }) {
   if (plugins.length === 0) return (
     <div className="empty-state">
       <div className="empty-icon"><Boxes /></div>
@@ -233,24 +240,34 @@ function Home({ plugins, onCatalog, onOpen }: { plugins: PluginSummary[]; onCata
     </div>
   )
 
+  const running = plugins.filter(plugin => plugin.state === 'running').length
   return (
-    <div className="installed-section">
+    <div className="home-dashboard">
+      <div className="dashboard-summary" aria-label="Digiworld 状态摘要">
+        <SummaryCard label="已安装" value={plugins.length} detail="个功能" icon={<Boxes />} />
+        <SummaryCard label="运行中" value={running} detail={`共 ${plugins.length} 个`} icon={<Gauge />} />
+        <SummaryCard label="当前版本" value={version ?? '—'} detail="Digiworld" icon={<ShieldCheck />} />
+      </div>
       <div className="section-heading">
         <h2>已安装</h2>
         <button className="secondary" onClick={onCatalog}>添加功能</button>
       </div>
       <div className="installed-list">
-        {plugins.map(plugin => (
-          <button key={plugin.id} className="plugin-row" onClick={() => onOpen(plugin.id)}>
+        {plugins.map((plugin, index) => (
+          <motion.button key={plugin.id} className="plugin-row" onClick={() => onOpen(plugin.id)} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * .035, duration: .18 }}>
             <span className="row-icon"><Boxes /></span>
-            <strong>{plugin.name}</strong>
+            <span className="plugin-row-copy"><strong>{plugin.name}</strong><small>{plugin.description}</small></span>
             <span className={`compact-status ${plugin.state}`}>{stateLabel(plugin)}</span>
             <ChevronRight className="row-chevron" />
-          </button>
+          </motion.button>
         ))}
       </div>
     </div>
   )
+}
+
+function SummaryCard({ label, value, detail, icon }: { label: string; value: string | number; detail: string; icon: React.ReactNode }) {
+  return <article className="summary-card"><span className="summary-card-icon">{icon}</span><div><small>{label}</small><strong>{value}</strong><span>{detail}</span></div></article>
 }
 
 function Catalog({ catalog, installed, busy, onInstall, onRefresh, onOpen, currentTarget }: { catalog: CatalogIndex | null; installed: Map<string, PluginSummary>; busy: string | null; onInstall(plugin: CatalogPlugin): void; onRefresh(): void; onOpen(id: string): void; currentTarget?: string | undefined }) {
@@ -287,7 +304,7 @@ type UpdateDialog =
   | { kind: 'plugins'; updates: PluginUpdateInfo[] }
   | { kind: 'core'; update: CoreUpdateInfo }
 
-function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, accentThemeId, onAccentThemeChange, fontThemeId, onFontThemeChange, fontWeight, onFontWeightChange, onChange }: {
+function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, accentThemeId, onAccentThemeChange, fontThemeId, onFontThemeChange, fontWeight, onFontWeightChange, glassMode, onGlassModeChange, onChange }: {
   state: AppState
   progress: UpdateProgress | null
   onProgressReset(): void
@@ -298,6 +315,8 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
   onFontThemeChange(id: FontThemeId): void
   fontWeight: FontWeight
   onFontWeightChange(weight: FontWeight): void
+  glassMode: GlassMode
+  onGlassModeChange(mode: GlassMode): void
   onChange(enabled: boolean): Promise<void>
 }) {
   const [proxy, setProxy] = useState<ProxySettings>({ mode: 'system' })
@@ -474,6 +493,7 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
           <output>{fontWeight}</output>
         </div>
       </article>
+      <article className="settings-card appearance-card"><div><h3>玻璃效果</h3><p>应用到 Digiworld 界面和已安装插件</p></div><button aria-label="切换玻璃效果" className={`switch ${glassMode === 'enabled' ? 'on' : ''}`} aria-pressed={glassMode === 'enabled'} onClick={() => onGlassModeChange(glassMode === 'enabled' ? 'disabled' : 'enabled')}><span /></button></article>
       <article className="settings-card"><div><h3>开机启动</h3><p>在后台启动已启用的插件</p></div><button aria-label="切换开机启动" className={`switch ${state.launchAtStartup ? 'on' : ''}`} onClick={() => void onChange(!state.launchAtStartup)}><span /></button></article>
       <article className="settings-card proxy-card">
         <div className="proxy-copy">

@@ -16,6 +16,7 @@ export function applyPluginTheme(theme: Partial<PluginTheme>, root: HTMLElement 
     root.style.setProperty(`--dw-${key}`, String(value))
   }
   if (theme['color-scheme']) root.style.colorScheme = theme['color-scheme']
+  if (theme.glass) root.dataset.dwGlass = theme.glass
 }
 
 export function suppressContextMenu(target: EventTarget = window): () => void {

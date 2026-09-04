@@ -85,6 +85,7 @@ export interface PluginTheme {
   'weight-medium'?: string
   'weight-semibold'?: string
   'weight-bold'?: string
+  glass?: 'enabled' | 'disabled'
 }
 
 export type RpcId = string | number
