@@ -150,6 +150,31 @@ fn default_quota_refresh_interval() -> Option<u64> {
     Some(60)
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexResetCredit {
+    pub id: String,
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
+    pub granted_at: i64,
+    #[serde(default)]
+    pub expires_at: Option<i64>,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub reset_type: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexResetCreditsSummary {
+    pub available_count: i64,
+    #[serde(default)]
+    pub credits: Option<Vec<CodexResetCredit>>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CodexQuotaWindow {
@@ -167,6 +192,8 @@ pub struct CodexQuotaSnapshot {
     pub fetched_at: Option<String>,
     pub plan_type: Option<String>,
     pub windows: Vec<CodexQuotaWindow>,
+    #[serde(default)]
+    pub reset_credits: Option<CodexResetCreditsSummary>,
     pub error: Option<String>,
 }
 
@@ -179,6 +206,7 @@ impl CodexQuotaSnapshot {
             fetched_at: None,
             plan_type: None,
             windows: Vec::new(),
+            reset_credits: None,
             error: None,
         }
     }
@@ -191,6 +219,7 @@ impl CodexQuotaSnapshot {
             fetched_at: None,
             plan_type: None,
             windows: Vec::new(),
+            reset_credits: None,
             error: Some(error),
         }
     }

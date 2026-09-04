@@ -96,6 +96,18 @@ button svg { width: 14px; height: 14px; }
 .quota-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--dw-accent, #5b5ce2), var(--dw-accent-secondary, #8b5cf6)); }
 .quota-window small { display: flex; align-items: center; gap: 4px; color: var(--dw-text-muted, #667085); font-size: var(--type-caption); }
 .quota-window small svg { width: 11px; height: 11px; }
+.quota-resets { margin-top: 13px; padding-top: 9px; border-top: 1px solid #eef1f5; display: flex; flex-direction: column; gap: 7px; }
+.quota-resets-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.quota-resets-title { display: inline-flex; align-items: center; gap: 5px; font-size: var(--type-caption); font-weight: var(--weight-medium); color: var(--dw-text, #172033); }
+.quota-resets-title svg { width: 12px; height: 12px; color: var(--dw-accent, #5b5ce2); }
+.quota-resets-badge { font-size: var(--type-caption); padding: 1px 7px; border-radius: 999px; }
+.quota-resets-badge.active { background: var(--dw-accent-soft, #ededff); color: var(--dw-accent-strong, #4338ca); font-weight: var(--weight-semibold); }
+.quota-resets-badge.zero { background: var(--dw-surface-subtle, #f0f3f8); color: var(--dw-text-muted, #667085); }
+.quota-reset-items { display: flex; flex-direction: column; gap: 6px; max-height: 120px; overflow-y: auto; }
+.quota-reset-item { padding: 6px 8px; border-radius: 6px; background: var(--dw-surface-subtle, #f0f3f8); border: 1px solid color-mix(in srgb, var(--dw-border, #dde3ec) 60%, transparent); font-size: var(--type-caption); display: flex; flex-direction: column; gap: 3px; }
+.quota-reset-item-name { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-weight: var(--weight-medium); color: var(--dw-text, #172033); }
+.quota-reset-item-desc { font-size: 11px; color: var(--dw-text-muted, #667085); font-weight: normal; }
+.quota-reset-item-dates { display: flex; flex-wrap: wrap; gap: 8px 12px; color: var(--dw-text-muted, #667085); font-size: 11px; }
 .quota-meta { margin-top: 13px; padding-top: 8px; border-top: 1px solid #eef1f5; color: var(--dw-text-muted, #667085); font-size: var(--type-caption); }
 .quota-meta.warning { color: #9a6700; }
 .quota-empty { min-height: 190px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--dw-text-muted, #667085); text-align: center; font-size: var(--type-body-sm); }

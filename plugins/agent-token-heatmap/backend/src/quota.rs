@@ -1,5 +1,6 @@
 use crate::model::{
-    CodexQuotaSettings, CodexQuotaSnapshot, CodexQuotaWindow, ShellPreset, SshSource,
+    CodexQuotaSettings, CodexQuotaSnapshot, CodexQuotaWindow, CodexResetCreditsSummary,
+    ShellPreset, SshSource,
 };
 use anyhow::{Context, Result, anyhow, bail};
 use chrono::Utc;
@@ -20,6 +21,8 @@ const MAX_ERROR_OUTPUT: usize = 16 * 1024;
 struct AppServerResponse {
     rate_limits: RateLimitSnapshot,
     rate_limits_by_limit_id: Option<std::collections::BTreeMap<String, RateLimitSnapshot>>,
+    #[serde(default)]
+    rate_limit_reset_credits: Option<CodexResetCreditsSummary>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -324,6 +327,7 @@ fn parse_response(
         fetched_at: Some(Utc::now().to_rfc3339()),
         plan_type: rate_limits.plan_type.clone(),
         windows,
+        reset_credits: response.rate_limit_reset_credits,
         error: None,
     })
 }
@@ -340,13 +344,32 @@ mod tests {
                 "primary": {"usedPercent": 64, "windowDurationMins": 10080, "resetsAt": 200},
                 "secondary": {"usedPercent": 60, "windowDurationMins": 300, "resetsAt": 100},
                 "planType": "plus"
-            }}
+            }},
+            "rateLimitResetCredits": {
+                "availableCount": 1,
+                "credits": [{
+                    "id": "credit-1",
+                    "title": "里程碑赠送",
+                    "description": "系统赠送",
+                    "grantedAt": 1788500000,
+                    "expiresAt": 1789500000,
+                    "status": "available",
+                    "resetType": "codexRateLimits"
+                }]
+            }
         });
         let parsed = parse_response(value, "local".into(), "本机".into()).unwrap();
         assert_eq!(parsed.status, "ready");
         assert_eq!(parsed.plan_type.as_deref(), Some("plus"));
         assert_eq!(parsed.windows[0].window_duration_mins, Some(300));
         assert_eq!(parsed.windows[1].window_duration_mins, Some(10080));
+        let resets = parsed.reset_credits.unwrap();
+        assert_eq!(resets.available_count, 1);
+        let credits = resets.credits.unwrap();
+        assert_eq!(credits[0].id, "credit-1");
+        assert_eq!(credits[0].title.as_deref(), Some("里程碑赠送"));
+        assert_eq!(credits[0].granted_at, 1788500000);
+        assert_eq!(credits[0].expires_at, Some(1789500000));
     }
 
     #[test]

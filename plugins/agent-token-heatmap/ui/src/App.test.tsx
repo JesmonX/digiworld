@@ -64,6 +64,18 @@ const quota = {
   fetchedAt: '2026-09-03T06:00:00Z',
   planType: 'Plus',
   windows: [{ usedPercent: 32, windowDurationMins: 300, resetsAt: null }],
+  resetCredits: {
+    availableCount: 1,
+    credits: [
+      {
+        id: 'credit-1',
+        title: '赠送重置卡',
+        grantedAt: 1788500000,
+        expiresAt: 1789500000,
+        status: 'available',
+      },
+    ],
+  },
   error: null,
 }
 
@@ -128,6 +140,13 @@ describe('token usage layout', () => {
     expect(quotaFill.style.width).toBe('68%')
     const quotaRule = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8').match(/\.quota-track i \{[^}]+\}/)?.[0]
     expect(quotaRule).not.toContain('margin-left: auto')
+
+    const quotaResets = container.querySelector<HTMLElement>('.quota-resets')!
+    expect(quotaResets.textContent).toContain('重置卡')
+    expect(quotaResets.textContent).toContain('1 张可用')
+    expect(quotaResets.textContent).toContain('赠送重置卡')
+    expect(quotaResets.textContent).toContain('获得：')
+    expect(quotaResets.textContent).toContain('到期：')
 
     mocks.request.mockClear()
     const thirtyDays = Array.from(heatmap.querySelectorAll('button')).find(button => button.textContent === '30 天')!

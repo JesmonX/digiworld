@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Check, Clock3, Database, Gauge, HardDrive, PieChart, Plus, RefreshCw, Server, Settings2, Trash2, X } from 'lucide-react'
+import { AlertTriangle, Check, Clock3, Database, Gauge, HardDrive, PieChart, Plus, RefreshCw, Server, Settings2, Ticket, Trash2, X } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import { cacheRateScale, calendarCells, formatTokens, heatLevel, weeklyModelCategories, weeklyUsage, type Metric, type UsageDay, type WeeklyUsagePoint } from './heatmap'
 import './styles.css'
@@ -50,6 +50,19 @@ interface Snapshot {
   modelBreakdown: ModelBreakdown[]
 }
 interface QuotaWindow { usedPercent: number; windowDurationMins: number | null; resetsAt: number | null }
+interface CodexResetCredit {
+  id: string
+  title?: string | null
+  description?: string | null
+  grantedAt: number
+  expiresAt?: number | null
+  status?: string | null
+  resetType?: string | null
+}
+interface CodexResetCreditsSummary {
+  availableCount: number
+  credits?: CodexResetCredit[] | null
+}
 interface CodexQuotaSnapshot {
   status: 'ready' | 'stale' | 'unavailable' | 'unconfigured'
   sourceId: string | null
@@ -57,6 +70,7 @@ interface CodexQuotaSnapshot {
   fetchedAt: string | null
   planType: string | null
   windows: QuotaWindow[]
+  resetCredits?: CodexResetCreditsSummary | null
   error: string | null
 }
 interface RefreshStatus {
@@ -387,6 +401,9 @@ function modelDisplayName(model: string): string {
 
 function QuotaCard({ quota, loading, configured, onRefresh, onConfigure }: { quota: CodexQuotaSnapshot | null; loading: boolean; configured: boolean; onRefresh(): void; onConfigure(): void }) {
   const available = quota && (quota.status === 'ready' || quota.status === 'stale') && quota.windows.length > 0
+  const resetSummary = quota?.resetCredits
+  const availableResets = resetSummary?.availableCount ?? 0
+  const credits = (resetSummary?.credits ?? []).filter(credit => credit.status !== 'redeemed')
   return <article className={`quota-card ${quota?.status ?? ''}`}>
     <div className="panel-heading"><div><h2>Codex 限额</h2><p>{quota?.sourceLabel ?? '指定账号设备'}{quota?.planType ? ` · ${quota.planType}` : ''}</p></div><button className="panel-action" title="刷新 Codex 限额" disabled={loading || !configured} onClick={onRefresh}><RefreshCw className={loading ? 'spin' : ''} /></button></div>
     {!configured || quota?.status === 'unconfigured' ? <div className="quota-empty"><Gauge /><span>尚未选择限额查询设备</span><button onClick={onConfigure}>前往设置</button></div>
@@ -396,6 +413,30 @@ function QuotaCard({ quota, loading, configured, onRefresh, onConfigure }: { quo
             const remaining = 100 - Math.max(0, Math.min(100, window.usedPercent))
             return <div key={`${window.windowDurationMins ?? index}-${window.resetsAt ?? index}`} className="quota-window"><div><strong>{formatDuration(window.windowDurationMins)}</strong><span>已用 {window.usedPercent}% · 剩余 {Math.max(0, 100 - window.usedPercent)}%</span></div><div className="quota-track"><i style={{ width: `${remaining}%` }} /></div><small><Clock3 />{formatReset(window.resetsAt)}</small></div>
           })}</div>
+          <div className="quota-resets">
+            <div className="quota-resets-header">
+              <span className="quota-resets-title"><Ticket />重置卡</span>
+              <span className={`quota-resets-badge ${availableResets > 0 ? 'active' : 'zero'}`}>
+                {availableResets > 0 ? `${availableResets} 张可用` : '0 张可用'}
+              </span>
+            </div>
+            {credits.length > 0 && (
+              <div className="quota-reset-items">
+                {credits.map((credit, index) => (
+                  <div key={credit.id || index} className="quota-reset-item">
+                    <div className="quota-reset-item-name">
+                      <span>{credit.title || '额度重置卡'}</span>
+                      {credit.description && <span className="quota-reset-item-desc">{credit.description}</span>}
+                    </div>
+                    <div className="quota-reset-item-dates">
+                      <span>获得：{formatCardDate(credit.grantedAt)}</span>
+                      <span>到期：{formatCardDate(credit.expiresAt)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <div className={`quota-meta ${quota.status === 'stale' ? 'warning' : ''}`}>{quota.status === 'stale' ? `刷新失败，显示上次结果：${quota.error ?? '未知错误'}` : `更新于 ${formatFetchedAt(quota.fetchedAt)}`}</div>
         </> : <div className="quota-empty error"><AlertTriangle /><span>{quota?.error ?? '当前设备无法获取 Codex 限额'}</span><button onClick={onConfigure}>检查设置</button></div>}
   </article>
@@ -413,6 +454,12 @@ function formatReset(seconds: number | null): string {
   if (!seconds) return '未提供重置时间'
   const ms = seconds > 100_000_000_000 ? seconds : seconds * 1000
   return `${new Date(ms).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })} 重置`
+}
+
+function formatCardDate(seconds: number | null | undefined): string {
+  if (!seconds) return '永久有效'
+  const ms = seconds > 100_000_000_000 ? seconds : seconds * 1000
+  return new Date(ms).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
 function formatFetchedAt(value: string | null): string {
