@@ -246,11 +246,19 @@ fn default_range() -> String {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DailyModelSnapshot {
+    pub model: String,
+    pub total_tokens: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DaySnapshot {
     pub day: String,
     #[serde(flatten)]
     pub usage: TokenUsage,
     pub total_tokens: u64,
+    pub models: Vec<DailyModelSnapshot>,
 }
 
 #[derive(Debug, Clone, Serialize)]

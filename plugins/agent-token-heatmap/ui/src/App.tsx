@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, BarChart3, Check, Clock3, Database, Gauge, HardDrive, Plus, RefreshCw, Server, Settings2, Trash2, X } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
-import { cacheRateScale, calendarCells, formatTokens, heatLevel, weeklyUsage, type Metric, type UsageDay, type WeeklyUsagePoint } from './heatmap'
+import { cacheRateScale, calendarCells, formatTokens, heatLevel, weeklyModelCategories, weeklyUsage, type Metric, type UsageDay, type WeeklyUsagePoint } from './heatmap'
 import './styles.css'
 
 const PLUGIN_ID = 'io.github.jesmonx.digiworld.agent-token-heatmap'
@@ -271,6 +271,7 @@ function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
   const step = plotWidth / Math.max(points.length, 1)
   const barWidth = Math.min(46, step * .54)
   const maximum = Math.max(1, ...points.map(point => point.totalTokens))
+  const modelCategories = weeklyModelCategories(points)
   const { minimum: cacheAxisMinimum, maximum: cacheAxisMaximum } = cacheRateScale(points.map(point => point.cacheRate))
   const cacheAxisRange = Math.max(.05, cacheAxisMaximum - cacheAxisMinimum)
   const segments: WeeklyUsagePoint[][] = []
@@ -286,7 +287,7 @@ function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
   const yForRate = (rate: number) => top + (cacheAxisMaximum - Math.max(cacheAxisMinimum, Math.min(cacheAxisMaximum, rate))) / cacheAxisRange * plotHeight
 
   return <article className="weekly-card">
-    <div className="panel-heading"><div><h2>近 7 天趋势</h2><p>总 Token 与缓存读取率</p></div><div className="chart-legend"><span><i className="bar-key" />Token</span><span><i className="line-key" />缓存率</span></div></div>
+    <div className="panel-heading"><div><h2>近 7 天趋势</h2><p>按模型堆叠 Token 与缓存读取率</p></div><div className="chart-legend">{modelCategories.length ? modelCategories.map((category, index) => <span key={category.key} title={`${category.label} · ${formatTokens(category.totalTokens)}`}><i className={`model-key model-key-${index}`} />{category.label}<small>{formatTokens(category.totalTokens)}</small></span>) : <span><i className="bar-key" />Token</span>}<span><i className="line-key" />缓存率</span></div></div>
     {points.length ? <svg className="weekly-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="近七天 Token 用量柱形图和缓存率折线图">
       {[0, .5, 1].map(ratio => {
         const y = top + ratio * plotHeight
@@ -294,9 +295,24 @@ function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
       })}
       {points.map((point, index) => {
         const x = left + (index + .5) * step
-        const barHeight = point.totalTokens > 0 ? Math.max(2, point.totalTokens / maximum * plotHeight) : 0
+        const scale = plotHeight / maximum
+        let offset = 0
         const cache = point.cacheRate == null ? '—' : `${(point.cacheRate * 100).toFixed(1)}%`
-        return <g key={point.day}><title>{`${point.day} · ${formatTokens(point.totalTokens)} Token · 缓存率 ${cache}`}</title><rect x={x - barWidth / 2} y={top + plotHeight - barHeight} width={barWidth} height={barHeight} rx="4" className="token-bar" /><text x={x} y={height - 17} textAnchor="middle" className="chart-day-label">{point.day.slice(5).replace('-', '/')}</text></g>
+        const modelSummary = modelCategories
+          .map(category => {
+            const value = category.values[index] ?? 0
+            return value > 0 ? `${category.label} ${formatTokens(value)}` : null
+          })
+          .filter(Boolean)
+          .join('、')
+        return <g key={point.day}><title>{`${point.day} · ${formatTokens(point.totalTokens)} Token${modelSummary ? ` · ${modelSummary}` : ''} · 缓存率 ${cache}`}</title>{modelCategories.map((category, categoryIndex) => {
+          const value = category.values[index] ?? 0
+          if (value <= 0) return null
+          const segmentHeight = value * scale
+          const y = top + plotHeight - offset - segmentHeight
+          offset += segmentHeight
+          return <rect key={`${point.day}-${category.key}`} x={x - barWidth / 2} y={y} width={barWidth} height={segmentHeight} rx="2" className={`token-segment model-${categoryIndex}`}><title>{`${point.day} · ${category.label} · ${formatTokens(value)} Token (${point.totalTokens > 0 ? (value / point.totalTokens * 100).toFixed(1) : '0.0'}%)`}</title></rect>
+        })}<text x={x} y={height - 17} textAnchor="middle" className="chart-day-label">{point.day.slice(5).replace('-', '/')}</text></g>
       })}
       {segments.map((segment, index) => segment.length > 1 && <polyline key={index} points={segment.map(point => `${xFor(point)},${yForRate(point.cacheRate!)}`).join(' ')} className="cache-line" />)}
       {points.filter(point => point.cacheRate != null).map(point => {

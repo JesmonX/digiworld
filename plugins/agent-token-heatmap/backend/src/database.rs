@@ -1,6 +1,6 @@
 use crate::model::{
-    AgentKind, Breakdown, DaySnapshot, FileUsage, ModelBreakdown, ScanBatch, SnapshotRequest,
-    SourceStatus, TokenUsage, UsageSettings, UsageSnapshot, UsageTotals,
+    AgentKind, Breakdown, DailyModelSnapshot, DaySnapshot, FileUsage, ModelBreakdown, ScanBatch,
+    SnapshotRequest, SourceStatus, TokenUsage, UsageSettings, UsageSnapshot, UsageTotals,
 };
 use anyhow::{Context, Result};
 use chrono::{Duration, Local};
@@ -269,6 +269,7 @@ impl Database {
         })?;
         let mut totals = TokenUsage::default();
         let mut by_day = BTreeMap::<String, TokenUsage>::new();
+        let mut by_day_model = BTreeMap::<(String, String), u64>::new();
         let mut breakdown = BTreeMap::<(String, AgentKind), TokenUsage>::new();
         let mut model_breakdown = BTreeMap::<(String, AgentKind, String), TokenUsage>::new();
         for row in rows {
@@ -281,7 +282,9 @@ impl Database {
                 continue;
             }
             totals.add_assign(&usage);
-            by_day.entry(day).or_default().add_assign(&usage);
+            by_day.entry(day.clone()).or_default().add_assign(&usage);
+            let day_model_total = by_day_model.entry((day, model.clone())).or_default();
+            *day_model_total = day_model_total.saturating_add(usage.total_tokens());
             breakdown
                 .entry((source_id.clone(), agent))
                 .or_default()
@@ -290,6 +293,18 @@ impl Database {
                 .entry((source_id, agent, model))
                 .or_default()
                 .add_assign(&usage);
+        }
+        let mut models_by_day = BTreeMap::<String, Vec<DailyModelSnapshot>>::new();
+        for ((day, model), total_tokens) in by_day_model {
+            if total_tokens > 0 {
+                models_by_day
+                    .entry(day)
+                    .or_default()
+                    .push(DailyModelSnapshot {
+                        model,
+                        total_tokens,
+                    });
+            }
         }
         let statuses = self.statuses(&source_ids)?;
         let total_tokens = totals.total_tokens();
@@ -305,10 +320,14 @@ impl Database {
             },
             days: by_day
                 .into_iter()
-                .map(|(day, usage)| DaySnapshot {
-                    total_tokens: usage.total_tokens(),
-                    day,
-                    usage,
+                .map(|(day, usage)| {
+                    let models = models_by_day.remove(&day).unwrap_or_default();
+                    DaySnapshot {
+                        total_tokens: usage.total_tokens(),
+                        day,
+                        models,
+                        usage,
+                    }
                 })
                 .collect(),
             breakdown: breakdown
@@ -477,8 +496,94 @@ mod tests {
             .unwrap();
         assert_eq!(snapshot.totals.total_tokens, 110);
         assert_eq!(snapshot.totals.cache_rate, Some(0.6));
+        assert_eq!(snapshot.days[0].models.len(), 1);
+        assert_eq!(snapshot.days[0].models[0].model, "gpt-5.6-sol");
+        assert_eq!(snapshot.days[0].models[0].total_tokens, 110);
         assert_eq!(snapshot.model_breakdown.len(), 1);
         assert_eq!(snapshot.model_breakdown[0].model, "gpt-5.6-sol");
+    }
+
+    #[test]
+    fn groups_daily_tokens_by_model_after_source_and_agent_filters() {
+        let mut database = Database::open(Path::new(":memory:")).unwrap();
+        let day = Local::now().format("%Y-%m-%d").to_string();
+        let batch = ScanBatch {
+            files: vec![
+                FileUsage {
+                    agent: AgentKind::Codex,
+                    file_hash: "codex-one".into(),
+                    size: 10,
+                    modified: 1,
+                    daily: vec![DailyUsage {
+                        day: day.clone(),
+                        model: "gpt-5.6-sol".into(),
+                        usage: TokenUsage {
+                            input_tokens: 100,
+                            output_tokens: 10,
+                            ..TokenUsage::default()
+                        },
+                    }],
+                },
+                FileUsage {
+                    agent: AgentKind::Codex,
+                    file_hash: "codex-two".into(),
+                    size: 10,
+                    modified: 1,
+                    daily: vec![DailyUsage {
+                        day: day.clone(),
+                        model: "gpt-5.6-mini".into(),
+                        usage: TokenUsage {
+                            input_tokens: 40,
+                            output_tokens: 5,
+                            ..TokenUsage::default()
+                        },
+                    }],
+                },
+                FileUsage {
+                    agent: AgentKind::Claude,
+                    file_hash: "claude-one".into(),
+                    size: 10,
+                    modified: 1,
+                    daily: vec![DailyUsage {
+                        day,
+                        model: "claude-opus-4-8".into(),
+                        usage: TokenUsage {
+                            input_tokens: 900,
+                            output_tokens: 90,
+                            ..TokenUsage::default()
+                        },
+                    }],
+                },
+            ],
+            seen: BTreeMap::from([(
+                AgentKind::Codex,
+                vec!["codex-one".into(), "codex-two".into()],
+            )]),
+            warnings: vec![],
+        };
+        database.apply_scan("local", &batch).unwrap();
+
+        let snapshot = database
+            .snapshot(
+                &SnapshotRequest {
+                    range: "365".into(),
+                    agents: vec![AgentKind::Codex],
+                    sources: vec!["local".into()],
+                },
+                &UsageSettings::default(),
+            )
+            .unwrap();
+
+        assert_eq!(snapshot.days.len(), 1);
+        assert_eq!(snapshot.days[0].total_tokens, 155);
+        assert_eq!(
+            snapshot.days[0]
+                .models
+                .iter()
+                .map(|model| (model.model.as_str(), model.total_tokens))
+                .collect::<Vec<_>>(),
+            vec![("gpt-5.6-mini", 45), ("gpt-5.6-sol", 110)]
+        );
     }
 
     #[test]

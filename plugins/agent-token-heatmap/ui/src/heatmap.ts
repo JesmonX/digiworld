@@ -1,5 +1,10 @@
 export type Metric = 'totalTokens' | 'inputTokens' | 'outputTokens' | 'cacheReadTokens'
 
+export interface ModelTokens {
+  model: string
+  totalTokens: number
+}
+
 export interface UsageDay {
   day: string
   inputTokens: number
@@ -8,10 +13,18 @@ export interface UsageDay {
   cacheWriteTokens: number
   totalTokens: number
   cacheAvailable?: boolean
+  models?: ModelTokens[]
 }
 
 export interface WeeklyUsagePoint extends UsageDay {
   cacheRate: number | undefined
+}
+
+export interface WeeklyModelCategory {
+  key: string
+  label: string
+  totalTokens: number
+  values: number[]
 }
 
 export interface CacheRateScale {
@@ -73,16 +86,47 @@ export function weeklyUsage(endDay: string, days: UsageDay[]): WeeklyUsagePoint[
     const day = current.toISOString().slice(0, 10)
     const usage = values.get(day) ?? {
       day, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0,
-      cacheWriteTokens: 0, totalTokens: 0, cacheAvailable: false,
+      cacheWriteTokens: 0, totalTokens: 0, cacheAvailable: false, models: [],
     }
     result.push({
       ...usage,
+      models: modelTokensForDay(usage),
       cacheRate: usage.cacheAvailable && usage.inputTokens > 0
         ? usage.cacheReadTokens / usage.inputTokens
         : undefined,
     })
   }
   return result
+}
+
+export function weeklyModelCategories(points: WeeklyUsagePoint[], limit = 6): WeeklyModelCategory[] {
+  const dailyModels = points.map(modelTokensForDay)
+  const totals = new Map<string, number>()
+  for (const models of dailyModels) {
+    for (const row of models) {
+      totals.set(row.model, (totals.get(row.model) ?? 0) + row.totalTokens)
+    }
+  }
+
+  const ranked = [...totals.entries()]
+    .filter(([, totalTokens]) => totalTokens > 0 && Number.isFinite(totalTokens))
+    .sort(([leftModel, leftTotal], [rightModel, rightTotal]) => rightTotal - leftTotal || leftModel.localeCompare(rightModel))
+  const topModels = ranked.slice(0, Math.max(0, Math.floor(limit)))
+  const topModelNames = new Set(topModels.map(([model]) => model))
+  const categories = topModels.map(([model, totalTokens]) => ({
+    key: `model:${model}`,
+    label: model === 'unknown' ? '未知模型' : model,
+    totalTokens,
+    values: dailyModels.map(models => models.find(row => row.model === model)?.totalTokens ?? 0),
+  }))
+  const otherValues = dailyModels.map(models => models
+    .filter(row => !topModelNames.has(row.model))
+    .reduce((total, row) => total + row.totalTokens, 0))
+  const otherTotal = otherValues.reduce((total, value) => total + value, 0)
+  if (otherTotal > 0) {
+    categories.push({ key: 'other', label: '其他', totalTokens: otherTotal, values: otherValues })
+  }
+  return categories
 }
 
 export function cacheRateScale(rates: Array<number | undefined>): CacheRateScale {
@@ -115,4 +159,20 @@ export function cacheRateScale(rates: Array<number | undefined>): CacheRateScale
 
 function parseDay(day: string): Date {
   return new Date(`${day}T00:00:00Z`)
+}
+
+function modelTokensForDay(day: UsageDay): ModelTokens[] {
+  const totals = new Map<string, number>()
+  for (const row of day.models ?? []) {
+    if (!row.model || row.totalTokens <= 0 || !Number.isFinite(row.totalTokens)) continue
+    totals.set(row.model, (totals.get(row.model) ?? 0) + row.totalTokens)
+  }
+  if (!totals.size && day.totalTokens > 0) {
+    totals.set('unknown', day.totalTokens)
+  }
+  const modelTotal = [...totals.values()].reduce((total, value) => total + value, 0)
+  if (modelTotal < day.totalTokens) {
+    totals.set('unknown', (totals.get('unknown') ?? 0) + day.totalTokens - modelTotal)
+  }
+  return [...totals.entries()].map(([model, totalTokens]) => ({ model, totalTokens }))
 }

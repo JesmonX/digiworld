@@ -40,11 +40,13 @@ const snapshot = {
       day: '2026-09-02', inputTokens: 800, outputTokens: 200,
       cacheReadTokens: 576, cacheWriteTokens: 40, totalTokens: 1_000,
       cacheAvailable: true,
+      models: [{ model: 'gpt-5.6-mini', totalTokens: 1_000 }],
     },
     {
       day: '2026-09-03', inputTokens: 1_000, outputTokens: 200,
       cacheReadTokens: 750, cacheWriteTokens: 50, totalTokens: 1_200,
       cacheAvailable: true,
+      models: [{ model: 'gpt-5.6-sol', totalTokens: 1_200 }],
     },
   ],
   breakdown: [],
@@ -103,6 +105,10 @@ describe('token usage layout', () => {
     const cacheAxisLabels = Array.from(container.querySelectorAll('.weekly-chart .chart-axis-label')).filter((_, index) => index % 2 === 1).map(label => label.textContent)
     expect(cacheAxisLabels).toEqual(['85%', '73%', '60%'])
     expect(Array.from(container.querySelectorAll('.cache-point-label')).map(label => label.textContent)).toEqual(['72.0%', '75.0%'])
+    expect(container.querySelector('.chart-legend')?.textContent).toContain('gpt-5.6-sol1.2K')
+    expect(container.querySelector('.chart-legend')?.textContent).toContain('gpt-5.6-mini1K')
+    expect(container.querySelectorAll('.token-segment')).toHaveLength(2)
+    expect(container.querySelector('.token-segment')?.textContent).toContain('Token')
 
     const quotaFill = container.querySelector<HTMLElement>('.quota-track i')!
     expect(quotaFill.style.width).toBe('68%')
