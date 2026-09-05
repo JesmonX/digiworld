@@ -9,6 +9,7 @@ interface PluginFrameProps {
   pluginId: string
   html: string
   theme: PluginTheme
+  active?: boolean
 }
 
 export function resolveTypographyUrls(css: string, baseUrl?: string): string {
@@ -66,7 +67,7 @@ export function withInitialTheme(html: string, theme: PluginTheme): string {
     : themed
 }
 
-export function PluginFrame({ pluginId, html, theme }: PluginFrameProps) {
+export function PluginFrame({ pluginId, html, theme, active = true }: PluginFrameProps) {
   const frame = useRef<HTMLIFrameElement>(null)
   const ready = useRef(false)
   // Theme changes travel over the bridge; changing srcDoc would destroy plugin state.
@@ -86,6 +87,10 @@ export function PluginFrame({ pluginId, html, theme }: PluginFrameProps) {
 
       if (message.kind === 'ready') {
         ready.current = true
+        const visibilityMessage: HostToPluginMessage = {
+          source: 'digiworld-host', pluginId, kind: 'event', method: 'host.visibility', payload: { active },
+        }
+        frame.current?.contentWindow?.postMessage(visibilityMessage, '*')
         const themeMessage: HostToPluginMessage = {
           source: 'digiworld-host', pluginId, kind: 'theme', payload: theme,
         }
@@ -108,7 +113,7 @@ export function PluginFrame({ pluginId, html, theme }: PluginFrameProps) {
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [pluginId, theme])
+  }, [pluginId, theme, active])
 
   useEffect(() => {
     if (!ready.current) return
@@ -117,6 +122,14 @@ export function PluginFrame({ pluginId, html, theme }: PluginFrameProps) {
     }
     frame.current?.contentWindow?.postMessage(themeMessage, '*')
   }, [pluginId, theme])
+
+  useEffect(() => {
+    if (!ready.current) return
+    const visibilityMessage: HostToPluginMessage = {
+      source: 'digiworld-host', pluginId, kind: 'event', method: 'host.visibility', payload: { active },
+    }
+    frame.current?.contentWindow?.postMessage(visibilityMessage, '*')
+  }, [pluginId, active])
 
   return <iframe ref={frame} className="plugin-frame" title={pluginId} sandbox="allow-scripts allow-downloads" style={{ backgroundColor: theme.bg }} srcDoc={source} />
 }

@@ -4,8 +4,12 @@ export interface PluginBridgeOptions {
   contextMenu?: 'disabled' | 'native'
 }
 
+export interface RequestOptions {
+  timeoutMs?: number
+}
+
 export interface DigiworldPluginBridge {
-  request<T>(method: string, payload?: unknown): Promise<T>
+  request<T>(method: string, payload?: unknown, options?: RequestOptions): Promise<T>
   on<T>(method: string, listener: (payload: T) => void): () => void
   ready(): void
 }
@@ -63,8 +67,9 @@ export function createPluginBridge(pluginId: string, options: PluginBridgeOption
   }
 
   return {
-    request<T>(method: string, payload?: unknown): Promise<T> {
+    request<T>(method: string, payload?: unknown, options?: RequestOptions): Promise<T> {
       const requestId = `${Date.now()}-${++sequence}`
+      const timeoutMs = options?.timeoutMs ?? 15_000
       return new Promise<T>((resolve, reject) => {
         pending.set(requestId, { resolve: value => resolve(value as T), reject })
         send({ source: 'digiworld-plugin', pluginId, kind: 'request', requestId, method, payload })
@@ -73,7 +78,7 @@ export function createPluginBridge(pluginId: string, options: PluginBridgeOption
           if (!request) return
           pending.delete(requestId)
           request.reject(new Error(`Plugin request timed out: ${method}`))
-        }, 15_000)
+        }, timeoutMs)
       })
     },
     on<T>(method: string, listener: (payload: T) => void): () => void {

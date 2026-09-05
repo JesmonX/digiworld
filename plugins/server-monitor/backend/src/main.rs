@@ -97,11 +97,22 @@ impl App {
         let s = self.settings()?;
         let mut out = vec![];
         for d in s.devices.iter().filter(|d| id.is_none_or(|x| x == d.id)) {
-            let mut v = ssh(&d.host, HELPER)?;
-            v["id"] = json!(d.id);
-            v["label"] = json!(d.label);
-            v["selection"] = json!({"disks":d.disks,"interfaces":d.interfaces,"showCpu":d.show_cpu,"showGpu":d.show_gpu,"showTraffic":d.show_traffic});
-            out.push(v)
+            match ssh(&d.host, HELPER) {
+                Ok(mut v) => {
+                    v["id"] = json!(d.id);
+                    v["label"] = json!(d.label);
+                    v["selection"] = json!({"disks":d.disks,"interfaces":d.interfaces,"showCpu":d.show_cpu,"showGpu":d.show_gpu,"showTraffic":d.show_traffic});
+                    out.push(v);
+                }
+                Err(e) => {
+                    out.push(json!({
+                        "id": d.id,
+                        "label": d.label,
+                        "error": e.to_string(),
+                        "selection": {"disks":d.disks,"interfaces":d.interfaces,"showCpu":d.show_cpu,"showGpu":d.show_gpu,"showTraffic":d.show_traffic},
+                    }));
+                }
+            }
         }
         Ok(json!({"devices":out}))
     }

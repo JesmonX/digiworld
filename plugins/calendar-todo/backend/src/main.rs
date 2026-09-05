@@ -124,30 +124,47 @@ impl App {
             .next()
             .context("CalDAV 未返回当前用户 principal")?;
         let principal_href = tag(&principal_block, "href").context("CalDAV principal 缺少地址")?;
-        let principal = absolute(&root, &principal_href);
+        let principal = resolve_url(&root, &principal_href)?;
         let home_doc = self.propfind(&principal, "0", "<c:calendar-home-set/>")?;
         let home_block = blocks(&home_doc, "calendar-home-set")
             .into_iter()
             .next()
             .context("CalDAV 未返回日历目录")?;
         let home_href = tag(&home_block, "href").context("CalDAV 日历目录缺少地址")?;
-        let home = absolute(&root, &home_href);
-        let text=self.propfind(&home,"1","<d:displayname/><d:resourcetype/><c:supported-calendar-component-set/><d:current-user-privilege-set/>")?;
+        let home = resolve_url(&principal, &home_href)?;
+
+        let text = self.propfind(
+            &home,
+            "1",
+            "<d:displayname/><d:resourcetype/><c:supported-calendar-component-set/><d:current-user-privilege-set/>",
+        )?;
+        let clean_home_url = home.trim_end_matches('/');
         let mut out = vec![];
         for block in blocks(&text, "response") {
-            if !block.contains("calendar") || !block.contains("VEVENT") {
+            let rt = blocks(&block, "resourcetype").into_iter().next().unwrap_or_default();
+            if !rt.contains("calendar") {
                 continue;
             }
+            if let Some(comps) = blocks(&block, "supported-calendar-component-set").into_iter().next() {
+                if !comps.contains("VEVENT") {
+                    continue;
+                }
+            }
             let href = tag(&block, "href").unwrap_or_default();
-            let name = tag(&block, "displayname").unwrap_or_else(|| href.clone());
             if href.is_empty() {
                 continue;
             }
+            let cal_url = resolve_url(&home, &href)?;
+            let clean_cal_url = cal_url.trim_end_matches('/');
+            if clean_cal_url == clean_home_url || clean_cal_url.ends_with("/calendars") {
+                continue;
+            }
+            let name = tag(&block, "displayname").unwrap_or_else(|| href.clone());
             let read_only = !block.contains("<d:write") && !block.contains(":write");
             out.push(Calendar {
                 id: href.clone(),
                 name,
-                href: absolute(&root, &href),
+                href: cal_url,
                 read_only,
             })
         }
@@ -187,7 +204,7 @@ impl App {
                     && let Some(mut e) = parse_event(&ics)
                 {
                     e.calendar_id = cal.id.clone();
-                    e.href = absolute(&cal.href, &href);
+                    e.href = resolve_url(&cal.href, &href)?;
                     e.etag = etag;
                     events.push(e)
                 }
@@ -371,20 +388,21 @@ fn xml(s: &str) -> String {
         .trim()
         .to_string()
 }
-fn absolute(base: &str, h: &str) -> String {
-    if h.starts_with("http") {
-        h.into()
-    } else {
-        format!(
-            "{}{}",
-            base.split('/').take(3).collect::<Vec<_>>().join("/"),
-            if h.starts_with('/') {
-                h.into()
-            } else {
-                format!("/{h}")
-            }
-        )
+fn resolve_url(base: &str, href: &str) -> Result<String> {
+    if href.starts_with("http://") || href.starts_with("https://") {
+        return Ok(href.to_string());
     }
+    let base_with_slash = if base.ends_with('/') {
+        base.to_string()
+    } else {
+        format!("{base}/")
+    };
+    let base_url = reqwest::Url::parse(&base_with_slash)
+        .with_context(|| format!("无效的基础 URL: {base}"))?;
+    let resolved = base_url
+        .join(href)
+        .with_context(|| format!("无法解析相对路径: {href}"))?;
+    Ok(resolved.to_string())
 }
 fn unfold(s: &str) -> String {
     s.replace("\r\n ", "").replace("\r\n\t", "")
@@ -516,8 +534,22 @@ mod tests {
     #[test]
     fn resolves_dav_paths() {
         assert_eq!(
-            absolute("https://caldav.icloud.com/", "/123/calendars/"),
+            resolve_url("https://caldav.icloud.com/", "/123/calendars/").unwrap(),
             "https://caldav.icloud.com/123/calendars/"
         )
+    }
+    #[test]
+    fn resolves_partitioned_dav_paths() {
+        assert_eq!(
+            resolve_url("https://p120-caldav.icloud.com:443/123/calendars/", "/123/calendars/home/").unwrap(),
+            "https://p120-caldav.icloud.com/123/calendars/home/"
+        );
+    }
+    #[test]
+    fn resolves_relative_subpaths() {
+        assert_eq!(
+            resolve_url("https://p120-caldav.icloud.com:443/123/calendars/", "home/").unwrap(),
+            "https://p120-caldav.icloud.com/123/calendars/home/"
+        );
     }
 }

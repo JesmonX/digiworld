@@ -1,4 +1,338 @@
-import{useEffect,useMemo,useState}from'react';import{Button,Input,Card,Status,Textarea,Select}from'@digiworld/design-system/react';import{createPluginBridge}from'@digiworld/plugin-sdk';import{CalendarDays,CheckSquare,Plus,RefreshCw,Settings,Trash2,X}from'lucide-react';
-const bridge=createPluginBridge('io.github.jesmonx.digiworld.calendar-todo');type Cal={id:string;name:string;href:string;readOnly:boolean};type Event={id:string;calendarId:string;href:string;etag:string;title:string;start:string;end:string;allDay:boolean;location:string;notes:string;recurring:boolean};type Todo={id:string;title:string;done:boolean;due?:string;createdAt:string;updatedAt:string};const blank=(cal=''):Event=>({id:'',calendarId:cal,href:'',etag:'',title:'',start:'',end:'',allDay:false,location:'',notes:'',recurring:false});
-export default function App(){const[account,setAccount]=useState<{username:string;serverUrl:string;selectedCalendars:string[]}|null>(null);const[accountDraft,setAccountDraft]=useState({username:'',serverUrl:'https://caldav.icloud.com',selectedCalendars:[] as string[]});const[secret,setSecret]=useState('');const[cals,setCals]=useState<Cal[]>([]);const[events,setEvents]=useState<Event[]>([]);const[todos,setTodos]=useState<Todo[]>([]);const[tab,setTab]=useState<'calendar'|'todo'>('calendar');const[edit,setEdit]=useState<Event|null>(null);const[todoText,setTodoText]=useState('');const[todoDue,setTodoDue]=useState('');const[error,setError]=useState('');const[busy,setBusy]=useState(false);const load=async(sync=false)=>{setBusy(true);setError('');try{const a=await bridge.request<typeof account>('calendar.account.get');setAccount(a);const data=sync&&a?await bridge.request<{calendars:Cal[];events:Event[]}>('calendar.sync'):await bridge.request<{calendars:Cal[];events:Event[]}>('calendar.cached');setCals(data.calendars);setEvents(data.events);setTodos(await bridge.request<Todo[]>('todo.list'))}catch(e){setError(String(e))}finally{setBusy(false)}};useEffect(()=>{void load();bridge.ready()},[]);useEffect(()=>{if(!account)return;const t=setInterval(()=>void load(true),60000);return()=>clearInterval(t)},[account?.username]);const days=useMemo(()=>{const m=new Map<string,Event[]>();for(const e of events){const d=formatDate(e.start);m.set(d,[...(m.get(d)||[]),e])}return [...m].sort((a,b)=>a[0].localeCompare(b[0]))},[events]);const connect=async()=>{setBusy(true);try{const found=await bridge.request<Cal[]>('calendar.account.save',{account:accountDraft,secret});setCals(found);const saved={...accountDraft,selectedCalendars:found.map(c=>c.id)};await bridge.request('calendar.account.save',{account:saved,secret});setAccount(saved);await load(true)}catch(e){setError(String(e))}finally{setBusy(false)}};const saveEvent=async()=>{if(!edit)return;try{await bridge.request('calendar.event.save',{event:edit,overwrite:false});setEdit(null);await load(true)}catch(e){setError(String(e))}};const delEvent=async()=>{if(!edit)return;try{await bridge.request('calendar.event.delete',{event:edit,overwrite:false});setEdit(null);await load(true)}catch(e){setError(String(e))}};const selectCalendar=async(id:string,checked:boolean)=>{if(!account)return;const ids=checked?[...account.selectedCalendars,id]:account.selectedCalendars.filter(x=>x!==id);await bridge.request('calendar.selection.save',{calendarIds:ids});setAccount({...account,selectedCalendars:ids});await load(true)};const saveTodo=async()=>{if(!todoText.trim())return;await bridge.request('todo.save',{todo:{id:'',title:todoText,done:false,due:todoDue||null,createdAt:'',updatedAt:''}});setTodoText('');setTodoDue('');await load()};const toggle=async(t:Todo)=>{await bridge.request('todo.save',{todo:{...t,done:!t.done}});await load()};const removeTodo=async(id:string)=>{await bridge.request('todo.delete',{id});await load()};if(!account)return <main className="connect"><Card><CalendarDays size={28}/><h1>连接 iCloud 日历</h1><p>在 Apple Account 网站生成 App 专用密码。凭据只保存到系统凭据库。</p><label>Apple Account<Input type="email" value={accountDraft.username} onChange={e=>setAccountDraft({...accountDraft,username:e.target.value})}/></label><label>App 专用密码<Input type="password" value={secret} onChange={e=>setSecret(e.target.value)}/></label><Button variant="primary" onClick={()=>void connect()} disabled={busy||!secret}>连接并发现日历</Button>{error&&<Status tone="error">{error}</Status>}</Card></main>;return <main><header className="dw-toolbar"><div className="tabs"><Button aria-pressed={tab==='calendar'} onClick={()=>setTab('calendar')}><CalendarDays size={15}/>日历</Button><Button aria-pressed={tab==='todo'} onClick={()=>setTab('todo')}><CheckSquare size={15}/>Todo</Button></div><Button onClick={()=>void load(true)} disabled={busy}><RefreshCw size={15}/>同步</Button><Button onClick={()=>{setAccountDraft(account);setAccount(null)}}><Settings size={15}/>账号</Button></header>{error&&<Status tone="error">{error}</Status>}{tab==='calendar'?<><div className="calendar-actions"><span>{events.length} 个事件 · {cals.length} 个日历</span><div className="calendar-picker">{cals.map(c=><label key={c.id}><input type="checkbox" checked={account.selectedCalendars.includes(c.id)} onChange={e=>void selectCalendar(c.id,e.target.checked)}/>{c.name}</label>)}</div><Button variant="primary" onClick={()=>setEdit(blank(cals[0]?.id))} disabled={!cals.length}><Plus size={15}/>新事件</Button></div><section className="agenda">{days.length?days.map(([day,list])=><Card key={day}><time>{day}</time>{list.map(e=><Button key={`${e.href}-${e.id}`} className="event" onClick={()=>setEdit(e)}><span><strong>{e.title||'无标题'}</strong><small>{e.allDay?'全天':formatTime(e.start)}{e.location?` · ${e.location}`:''}</small></span>{e.recurring&&<small>重复</small>}</Button>)}</Card>):<Status>没有缓存事件，点击同步从 iCloud 读取。</Status>}</section></>:<section className="todo"><Card className="todo-add"><Input value={todoText} onChange={e=>setTodoText(e.target.value)} placeholder="添加 Todo" onKeyDown={e=>{if(e.key==='Enter')void saveTodo()}}/><Input type="date" aria-label="截止日期" value={todoDue} onChange={e=>setTodoDue(e.target.value)}/><Button variant="primary" onClick={()=>void saveTodo()}><Plus size={15}/></Button></Card>{todos.map(t=><Card key={t.id} className={t.done?'done':''}><input type="checkbox" checked={t.done} onChange={()=>void toggle(t)}/><span>{t.title}{t.due&&<small>截止 {t.due}</small>}</span><Button onClick={()=>void removeTodo(t.id)}><Trash2 size={15}/></Button></Card>)}</section>}{edit&&<Card className="editor"><header><h2>{edit.href?'编辑事件':'新建事件'}</h2><Button onClick={()=>setEdit(null)}><X size={16}/></Button></header>{edit.recurring&&<Status>重复事件在这里仅供查看，请在 Apple 日历中编辑。</Status>}<label>标题<Input disabled={edit.recurring} value={edit.title} onChange={e=>setEdit({...edit,title:e.target.value})}/></label><label>日历<Select disabled={!!edit.href||edit.recurring} value={edit.calendarId} onChange={e=>setEdit({...edit,calendarId:e.target.value})}>{cals.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</Select></label><label className="check"><input disabled={edit.recurring} type="checkbox" checked={edit.allDay} onChange={e=>setEdit({...edit,allDay:e.target.checked})}/>全天</label><label>开始<Input disabled={edit.recurring} value={edit.start} onChange={e=>setEdit({...edit,start:e.target.value})} placeholder={edit.allDay?'20260905':'20260905T090000Z'}/></label><label>结束<Input disabled={edit.recurring} value={edit.end} onChange={e=>setEdit({...edit,end:e.target.value})} placeholder={edit.allDay?'20260906':'20260905T100000Z'}/></label><label>地点<Input disabled={edit.recurring} value={edit.location} onChange={e=>setEdit({...edit,location:e.target.value})}/></label><label>备注<Textarea disabled={edit.recurring} value={edit.notes} onChange={e=>setEdit({...edit,notes:e.target.value})}/></label><footer>{edit.href&&!edit.recurring?<Button variant="danger" onClick={()=>void delEvent()}>删除</Button>:<span/>}<div><Button onClick={()=>setEdit(null)}>取消</Button><Button variant="primary" disabled={edit.recurring||!edit.title||!edit.start||!edit.end} onClick={()=>void saveEvent()}>保存</Button></div></footer></Card>}</main>}
-function formatDate(v:string){if(/^\d{8}/.test(v))return`${v.slice(0,4)}-${v.slice(4,6)}-${v.slice(6,8)}`;const d=new Date(v);return Number.isNaN(+d)?v:new Intl.DateTimeFormat('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit'}).format(d)}function formatTime(v:string){if(/^\d{8}T\d{6}Z?$/.test(v))return`${v.slice(9,11)}:${v.slice(11,13)}`;const d=new Date(v);return Number.isNaN(+d)?v:new Intl.DateTimeFormat('zh-CN',{hour:'2-digit',minute:'2-digit'}).format(d)}
+import { useEffect, useMemo, useState } from 'react'
+import { Button, Input, Card, Status, Textarea, Select } from '@digiworld/design-system/react'
+import { createPluginBridge } from '@digiworld/plugin-sdk'
+import { CalendarDays, CheckSquare, Plus, RefreshCw, Settings, Trash2, X } from 'lucide-react'
+
+const bridge = createPluginBridge('io.github.jesmonx.digiworld.calendar-todo')
+
+type Cal = {
+  id: string
+  name: string
+  href: string
+  readOnly: boolean
+}
+
+type Event = {
+  id: string
+  calendarId: string
+  href: string
+  etag: string
+  title: string
+  start: string
+  end: string
+  allDay: boolean
+  location: string
+  notes: string
+  recurring: boolean
+}
+
+type Todo = {
+  id: string
+  title: string
+  done: boolean
+  due?: string
+  createdAt: string
+  updatedAt: string
+}
+
+const blank = (cal = ''): Event => ({
+  id: '',
+  calendarId: cal,
+  href: '',
+  etag: '',
+  title: '',
+  start: '',
+  end: '',
+  allDay: false,
+  location: '',
+  notes: '',
+  recurring: false,
+})
+
+export default function App() {
+  const [account, setAccount] = useState<{ username: string; serverUrl: string; selectedCalendars: string[] } | null>(null)
+  const [accountDraft, setAccountDraft] = useState({ username: '', serverUrl: 'https://caldav.icloud.com', selectedCalendars: [] as string[] })
+  const [secret, setSecret] = useState('')
+  const [cals, setCals] = useState<Cal[]>([])
+  const [events, setEvents] = useState<Event[]>([])
+  const [todos, setTodos] = useState<Todo[]>([])
+  const [tab, setTab] = useState<'calendar' | 'todo'>('calendar')
+  const [edit, setEdit] = useState<Event | null>(null)
+  const [todoText, setTodoText] = useState('')
+  const [todoDue, setTodoDue] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const load = async (sync = false) => {
+    setBusy(true)
+    setError('')
+    try {
+      const a = await bridge.request<typeof account>('calendar.account.get')
+      setAccount(a)
+      const data = sync && a
+        ? await bridge.request<{ calendars: Cal[]; events: Event[] }>('calendar.sync')
+        : await bridge.request<{ calendars: Cal[]; events: Event[] }>('calendar.cached')
+      setCals(data.calendars)
+      setEvents(data.events)
+      setTodos(await bridge.request<Todo[]>('todo.list'))
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  useEffect(() => {
+    void load()
+    bridge.ready()
+  }, [])
+
+  useEffect(() => {
+    if (!account) return
+    const t = setInterval(() => void load(true), 60000)
+    return () => clearInterval(t)
+  }, [account?.username])
+
+  const days = useMemo(() => {
+    const m = new Map<string, Event[]>()
+    for (const e of events) {
+      const d = formatDate(e.start)
+      m.set(d, [...(m.get(d) || []), e])
+    }
+    return [...m].sort((a, b) => a[0].localeCompare(b[0]))
+  }, [events])
+
+  const connect = async () => {
+    setBusy(true)
+    try {
+      const found = await bridge.request<Cal[]>('calendar.account.save', { account: accountDraft, secret })
+      setCals(found)
+      const calendarIds = found.map(c => c.id)
+      const updated = await bridge.request<typeof account>('calendar.selection.save', { calendarIds })
+      setAccount(updated || { ...accountDraft, selectedCalendars: calendarIds })
+      await load(true)
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const saveEvent = async () => {
+    if (!edit) return
+    try {
+      await bridge.request('calendar.event.save', { event: edit, overwrite: false })
+      setEdit(null)
+      await load(true)
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
+  const delEvent = async () => {
+    if (!edit) return
+    try {
+      await bridge.request('calendar.event.delete', { event: edit, overwrite: false })
+      setEdit(null)
+      await load(true)
+    } catch (e) {
+      setError(String(e))
+    }
+  }
+
+  const selectCalendar = async (id: string, checked: boolean) => {
+    if (!account) return
+    const ids = checked ? [...account.selectedCalendars, id] : account.selectedCalendars.filter(x => x !== id)
+    const updated = await bridge.request<typeof account>('calendar.selection.save', { calendarIds: ids })
+    setAccount(updated || { ...account, selectedCalendars: ids })
+    await load(true)
+  }
+
+  const saveTodo = async () => {
+    if (!todoText.trim()) return
+    await bridge.request('todo.save', { todo: { id: '', title: todoText, done: false, due: todoDue || null, createdAt: '', updatedAt: '' } })
+    setTodoText('')
+    setTodoDue('')
+    await load()
+  }
+
+  const toggle = async (t: Todo) => {
+    await bridge.request('todo.save', { todo: { ...t, done: !t.done } })
+    await load()
+  }
+
+  const removeTodo = async (id: string) => {
+    await bridge.request('todo.delete', { id })
+    await load()
+  }
+
+  if (!account) {
+    return (
+      <main className="connect">
+        <Card>
+          <CalendarDays size={28} />
+          <h1>连接 iCloud 日历</h1>
+          <p>在 Apple Account 网站生成 App 专用密码。凭据只保存到系统凭据库。</p>
+          <label>
+            Apple Account
+            <Input type="email" value={accountDraft.username} onChange={e => setAccountDraft({ ...accountDraft, username: e.target.value })} />
+          </label>
+          <label>
+            App 专用密码
+            <Input type="password" value={secret} onChange={e => setSecret(e.target.value)} />
+          </label>
+          <Button variant="primary" onClick={() => void connect()} disabled={busy || !secret}>
+            连接并发现日历
+          </Button>
+          {error && <Status tone="error">{error}</Status>}
+        </Card>
+      </main>
+    )
+  }
+
+  return (
+    <main>
+      <header className="dw-toolbar">
+        <div className="tabs">
+          <Button aria-pressed={tab === 'calendar'} onClick={() => setTab('calendar')}>
+            <CalendarDays size={15} />日历
+          </Button>
+          <Button aria-pressed={tab === 'todo'} onClick={() => setTab('todo')}>
+            <CheckSquare size={15} />Todo
+          </Button>
+        </div>
+        <Button onClick={() => void load(true)} disabled={busy}>
+          <RefreshCw size={15} />同步
+        </Button>
+        <Button onClick={() => { setAccountDraft(account); setAccount(null) }}>
+          <Settings size={15} />账号
+        </Button>
+      </header>
+
+      {error && <Status tone="error">{error}</Status>}
+
+      {tab === 'calendar' ? (
+        <>
+          <div className="calendar-actions">
+            <span>{events.length} 个事件 · {cals.length} 个日历</span>
+            <div className="calendar-picker">
+              {cals.map(c => (
+                <label key={c.id}>
+                  <input type="checkbox" checked={account.selectedCalendars.includes(c.id)} onChange={e => void selectCalendar(c.id, e.target.checked)} />
+                  {c.name}
+                </label>
+              ))}
+            </div>
+            <Button variant="primary" onClick={() => setEdit(blank(cals[0]?.id))} disabled={!cals.length}>
+              <Plus size={15} />新事件
+            </Button>
+          </div>
+
+          <section className="agenda">
+            {days.length ? (
+              days.map(([day, list]) => (
+                <Card key={day}>
+                  <time>{day}</time>
+                  {list.map(e => (
+                    <Button key={`${e.href}-${e.id}`} className="event" onClick={() => setEdit(e)}>
+                      <span>
+                        <strong>{e.title || '无标题'}</strong>
+                        <small>{e.allDay ? '全天' : formatTime(e.start)}{e.location ? ` · ${e.location}` : ''}</small>
+                      </span>
+                      {e.recurring && <small>重复</small>}
+                    </Button>
+                  ))}
+                </Card>
+              ))
+            ) : (
+              <Status>没有缓存事件，点击同步从 iCloud 读取。</Status>
+            )}
+          </section>
+        </>
+      ) : (
+        <section className="todo">
+          <Card className="todo-add">
+            <Input
+              value={todoText}
+              onChange={e => setTodoText(e.target.value)}
+              placeholder="添加 Todo"
+              onKeyDown={e => { if (e.key === 'Enter') void saveTodo() }}
+            />
+            <Input type="date" aria-label="截止日期" value={todoDue} onChange={e => setTodoDue(e.target.value)} />
+            <Button variant="primary" onClick={() => void saveTodo()}><Plus size={15} /></Button>
+          </Card>
+          {todos.map(t => (
+            <Card key={t.id} className={t.done ? 'done' : ''}>
+              <input type="checkbox" checked={t.done} onChange={() => void toggle(t)} />
+              <span>{t.title}{t.due && <small>截止 {t.due}</small>}</span>
+              <Button onClick={() => void removeTodo(t.id)}><Trash2 size={15} /></Button>
+            </Card>
+          ))}
+        </section>
+      )}
+
+      {edit && (
+        <Card className="editor">
+          <header>
+            <h2>{edit.href ? '编辑事件' : '新建事件'}</h2>
+            <Button onClick={() => setEdit(null)}><X size={16} /></Button>
+          </header>
+          {edit.recurring && <Status>重复事件在这里仅供查看，请在 Apple 日历中编辑。</Status>}
+          <label>
+            标题
+            <Input disabled={edit.recurring} value={edit.title} onChange={e => setEdit({ ...edit, title: e.target.value })} />
+          </label>
+          <label>
+            日历
+            <Select disabled={!!edit.href || edit.recurring} value={edit.calendarId} onChange={e => setEdit({ ...edit, calendarId: e.target.value })}>
+              {cals.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </Select>
+          </label>
+          <label className="check">
+            <input disabled={edit.recurring} type="checkbox" checked={edit.allDay} onChange={e => setEdit({ ...edit, allDay: e.target.checked })} />
+            全天
+          </label>
+          <label>
+            开始
+            <Input disabled={edit.recurring} value={edit.start} onChange={e => setEdit({ ...edit, start: e.target.value })} placeholder={edit.allDay ? '20260905' : '20260905T090000Z'} />
+          </label>
+          <label>
+            结束
+            <Input disabled={edit.recurring} value={edit.end} onChange={e => setEdit({ ...edit, end: e.target.value })} placeholder={edit.allDay ? '20260906' : '20260905T100000Z'} />
+          </label>
+          <label>
+            地点
+            <Input disabled={edit.recurring} value={edit.location} onChange={e => setEdit({ ...edit, location: e.target.value })} />
+          </label>
+          <label>
+            备注
+            <Textarea disabled={edit.recurring} value={edit.notes} onChange={e => setEdit({ ...edit, notes: e.target.value })} />
+          </label>
+          <footer>
+            {edit.href && !edit.recurring ? (
+              <Button variant="danger" onClick={() => void delEvent()}>删除</Button>
+            ) : <span />}
+            <div>
+              <Button onClick={() => setEdit(null)}>取消</Button>
+              <Button variant="primary" disabled={edit.recurring || !edit.title || !edit.start || !edit.end} onClick={() => void saveEvent()}>
+                保存
+              </Button>
+            </div>
+          </footer>
+        </Card>
+      )}
+    </main>
+  )
+}
+
+function formatDate(v: string) {
+  if (/^\d{8}/.test(v)) return `${v.slice(0, 4)}-${v.slice(4, 6)}-${v.slice(6, 8)}`
+  const d = new Date(v)
+  return Number.isNaN(+d) ? v : new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
+}
+
+function formatTime(v: string) {
+  if (/^\d{8}T\d{6}Z?$/.test(v)) return `${v.slice(9, 11)}:${v.slice(11, 13)}`
+  const d = new Date(v)
+  return Number.isNaN(+d) ? v : new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(d)
+}

@@ -123,7 +123,11 @@ function App() {
   const [page, setPage] = useState<Page>('home')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [pluginHtml, setPluginHtml] = useState<string | null>(null)
+  const isDesignPreview = typeof window !== 'undefined' && (
+    window.location.pathname.includes('design.html') || window.location.search.includes('state=')
+  )
+  const [pluginHtmlMap, setPluginHtmlMap] = useState<Record<string, { version: string; html: string }>>({})
+  const [openedPluginIds, setOpenedPluginIds] = useState<string[]>([])
   const [confirmInstall, setConfirmInstall] = useState<CatalogPlugin | null>(null)
   const [updateProgress, setUpdateProgress] = useState<UpdateProgress | null>(null)
   const [accentThemeId, setAccentThemeId] = useState<AccentThemeId>(loadAccentThemeId)
@@ -171,16 +175,25 @@ function App() {
     Promise.all([refreshState(), refreshCatalog()]).catch(reason => setError(errorMessage(reason)))
   }, [refreshCatalog, refreshState])
 
-  useEffect(() => {
-    if (typeof page === 'string') {
-      setPluginHtml(null)
-      return
-    }
-    api.pluginUi(page.pluginId).then(setPluginHtml).catch(reason => setError(errorMessage(reason)))
-  }, [page])
-
   const installed = useMemo(() => new Map(state?.plugins.map(plugin => [plugin.id, plugin]) ?? []), [state])
   const selectedPlugin = typeof page === 'string' ? undefined : installed.get(page.pluginId)
+
+  useEffect(() => {
+    if (typeof page === 'string') return
+    const id = page.pluginId
+    const currentVersion = installed.get(id)?.version
+    if (isDesignPreview) {
+      setOpenedPluginIds([id])
+    } else {
+      setOpenedPluginIds(prev => prev.includes(id) ? prev : [...prev, id])
+    }
+    const cached = pluginHtmlMap[id]
+    if (!cached || (currentVersion && cached.version !== currentVersion)) {
+      api.pluginUi(id)
+        .then(html => setPluginHtmlMap(prev => ({ ...prev, [id]: { version: currentVersion ?? '', html } })))
+        .catch(reason => setError(errorMessage(reason)))
+    }
+  }, [page, isDesignPreview, pluginHtmlMap, installed])
 
   const install = async (plugin: CatalogPlugin) => {
     setBusy(plugin.id)
@@ -202,6 +215,9 @@ function App() {
     setError(null)
     try {
       await api.setEnabled(plugin.id, enabled)
+      if (!enabled) {
+        setOpenedPluginIds(prev => prev.filter(id => id !== plugin.id))
+      }
       await refreshState()
     } catch (reason) {
       setError(errorMessage(reason))
@@ -216,6 +232,12 @@ function App() {
     setError(null)
     try {
       await api.uninstall(plugin.id, false)
+      setOpenedPluginIds(prev => prev.filter(id => id !== plugin.id))
+      setPluginHtmlMap(prev => {
+        const next = { ...prev }
+        delete next[plugin.id]
+        return next
+      })
       await refreshState()
       setPage('home')
     } catch (reason) {
@@ -273,26 +295,51 @@ function App() {
           {error && <Status tone="error" className="error-banner"><CircleAlert /><span>{error}</span><Button onClick={() => setError(null)}>关闭</Button></Status>}
 
           <section className="content">
-            <AnimatePresence initial={false} mode={reduceMotion ? 'sync' : 'wait'}>
-              <motion.div
-                key={typeof page === 'string' ? page : `plugin:${page.pluginId}`}
-                className="page-transition"
-                initial={reduceMotion ? false : { opacity: 0, y: 8, scale: .985 }}
-                animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
-                exit={reduceMotion ? { opacity: 1, x: 0, scale: 1 } : { opacity: 0, x: -6, scale: .995 }}
-                transition={reduceMotion ? { duration: 0 } : { duration: .18, ease: [.2, .8, .2, 1] }}
-              >
-                {page === 'home' && <Home plugins={state?.plugins ?? []} version={state?.version} onCatalog={() => setPage('catalog')} onOpen={id => setPage({ pluginId: id })} onRefresh={() => { void refreshState().catch(reason => setError(errorMessage(reason))) }} reducedMotion={Boolean(reduceMotion)} />}
-                {page === 'catalog' && <Catalog catalog={catalog} installed={installed} busy={busy} onInstall={setConfirmInstall} onRefresh={() => refreshCatalog(true)} onOpen={id => setPage({ pluginId: id })} currentTarget={state?.target} />}
-                {page === 'settings' && state && <SettingsPage state={state} progress={updateProgress} onProgressReset={() => setUpdateProgress(null)} onPluginsUpdated={refreshState} textScale={textScale} onTextScaleChange={setTextScale} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} colorSchemeId={colorSchemeId} onColorSchemeChange={setColorSchemeId} fontThemeId={fontThemeId} onFontThemeChange={setFontThemeId} fontWeight={fontWeight} onFontWeightChange={setFontWeight} glassMode={glassMode} onGlassModeChange={setGlassMode} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
-                {pluginOpen && (
-                  !selectedPlugin ? <Loading label="载入插件" />
-                    : selectedPlugin.enabled
-                      ? (pluginHtml ? <PluginFrame pluginId={page.pluginId} html={pluginHtml} theme={selectedPlugin?.uiDesignVersion === 1 ? activeTheme : pluginTheme(getAccentTheme('catppuccin-latte'), fontTheme, fontWeight, glassMode, textScale)} /> : <Loading label="载入界面" />)
-                      : <div className="plugin-disabled"><Pause /><h2>已停用</h2></div>
-                )}
-              </motion.div>
-            </AnimatePresence>
+            {!pluginOpen && (
+              <AnimatePresence initial={false} mode={reduceMotion ? 'sync' : 'wait'}>
+                <motion.div
+                  key={page}
+                  className="page-transition"
+                  initial={reduceMotion ? false : { opacity: 0, y: 8, scale: .985 }}
+                  animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+                  exit={reduceMotion ? { opacity: 1, x: 0, scale: 1 } : { opacity: 0, x: -6, scale: .995 }}
+                  transition={reduceMotion ? { duration: 0 } : { duration: .18, ease: [.2, .8, .2, 1] }}
+                >
+                  {page === 'home' && <Home plugins={state?.plugins ?? []} version={state?.version} onCatalog={() => setPage('catalog')} onOpen={id => setPage({ pluginId: id })} onRefresh={() => { void refreshState().catch(reason => setError(errorMessage(reason))) }} reducedMotion={Boolean(reduceMotion)} />}
+                  {page === 'catalog' && <Catalog catalog={catalog} installed={installed} busy={busy} onInstall={setConfirmInstall} onRefresh={() => refreshCatalog(true)} onOpen={id => setPage({ pluginId: id })} currentTarget={state?.target} />}
+                  {page === 'settings' && state && <SettingsPage state={state} progress={updateProgress} onProgressReset={() => setUpdateProgress(null)} onPluginsUpdated={refreshState} textScale={textScale} onTextScaleChange={setTextScale} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} colorSchemeId={colorSchemeId} onColorSchemeChange={setColorSchemeId} fontThemeId={fontThemeId} onFontThemeChange={setFontThemeId} fontWeight={fontWeight} onFontWeightChange={setFontWeight} glassMode={glassMode} onGlassModeChange={setGlassMode} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
+                </motion.div>
+              </AnimatePresence>
+            )}
+
+            {(pluginOpen && !openedPluginIds.includes(page.pluginId) ? [...openedPluginIds, page.pluginId] : openedPluginIds).map(id => {
+              const plugin = installed.get(id)
+              const isCurrent = pluginOpen && page.pluginId === id
+              const cached = pluginHtmlMap[id]
+              const html = cached && (!plugin || cached.version === plugin.version) ? cached.html : undefined
+              return (
+                <div
+                  key={id}
+                  className="plugin-host-layer"
+                  style={{ display: isCurrent ? 'block' : 'none', width: '100%', height: '100%' }}
+                >
+                  {!plugin ? (
+                    <Loading label="载入插件" />
+                  ) : !plugin.enabled ? (
+                    <div className="plugin-disabled"><Pause /><h2>已停用</h2></div>
+                  ) : html ? (
+                    <PluginFrame
+                      pluginId={id}
+                      html={html}
+                      active={isCurrent}
+                      theme={plugin?.uiDesignVersion === 1 ? activeTheme : pluginTheme(getAccentTheme('catppuccin-latte'), fontTheme, fontWeight, glassMode, textScale)}
+                    />
+                  ) : (
+                    <Loading label="载入界面" />
+                  )}
+                </div>
+              )
+            })}
           </section>
         </main>
       </div>

@@ -73,4 +73,28 @@ describe('PluginFrame theme', () => {
 
     await act(async () => root.unmount())
   })
+
+  it('notifies plugin of visibility changes', async () => {
+    const root = createRoot(container)
+    const theme = pluginTheme(getAccentTheme('catppuccin-latte'))
+    await act(async () => root.render(<PluginFrame pluginId="sample" html="<main />" theme={theme} active={true} />))
+
+    const iframe = container.querySelector('iframe')!
+    const postMessage = vi.spyOn(iframe.contentWindow!, 'postMessage')
+    await act(async () => window.dispatchEvent(new MessageEvent('message', {
+      source: iframe.contentWindow,
+      data: { source: 'digiworld-plugin', pluginId: 'sample', kind: 'ready' },
+    })))
+
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      kind: 'event', method: 'host.visibility', payload: { active: true },
+    }), '*')
+
+    await act(async () => root.render(<PluginFrame pluginId="sample" html="<main />" theme={theme} active={false} />))
+    expect(postMessage).toHaveBeenLastCalledWith(expect.objectContaining({
+      kind: 'event', method: 'host.visibility', payload: { active: false },
+    }), '*')
+
+    await act(async () => root.unmount())
+  })
 })
