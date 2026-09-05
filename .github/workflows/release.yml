@@ -87,6 +87,24 @@ jobs:
           DIGIWORLD_TARGET: windows-x86_64
           DIGIWORLD_RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: pnpm package:mail
+      - name: Package signed Git Actions plugin
+        shell: pwsh
+        env:
+          DIGIWORLD_TARGET: windows-x86_64
+          DIGIWORLD_RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: pnpm package:github-actions
+      - name: Package signed Servers plugin
+        shell: pwsh
+        env:
+          DIGIWORLD_TARGET: windows-x86_64
+          DIGIWORLD_RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: pnpm package:server-monitor
+      - name: Package signed Calendar & Todo plugin
+        shell: pwsh
+        env:
+          DIGIWORLD_TARGET: windows-x86_64
+          DIGIWORLD_RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: pnpm package:calendar-todo
       - name: Build signed plugin catalog
         env:
           DIGIWORLD_CATALOG_SEQUENCE: ${{ github.run_number }}
