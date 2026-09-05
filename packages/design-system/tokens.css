@@ -1,5 +1,11 @@
 :root {
   color-scheme: light;
+  --type-caption: 12px;
+  --type-body-sm: 13px;
+  --type-body: 14px;
+  --type-title-sm: 15px;
+  --type-title: 17px;
+  --type-page: 20px;
 
   --dw-bg: #f5f7fb;
   --dw-surface: #ffffff;

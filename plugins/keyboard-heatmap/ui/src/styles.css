@@ -6,11 +6,6 @@
   color: var(--dw-text, #172033);
   background: var(--dw-bg, #f5f7fb);
   font-synthesis: none;
-  --type-caption: 12px;
-  --type-body-sm: 13px;
-  --type-body: 14px;
-  --type-title-sm: 15px;
-  --type-title: 17px;
   --weight-regular: var(--dw-weight-regular, 500);
   --weight-medium: var(--dw-weight-medium, 500);
   --weight-semibold: var(--dw-weight-semibold, 600);

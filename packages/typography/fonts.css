@@ -25,7 +25,7 @@
 @font-face {
   font-family: "Digiworld Smiley Sans";
   src: url("./fonts/SmileySans-Oblique.ttf.woff2") format("woff2");
-  font-style: normal;
+  font-style: oblique;
   font-weight: 400 800;
   font-display: swap;
 }
@@ -50,11 +50,11 @@
   --font-sans: "Digiworld Inter Variable", "Digiworld Plex Sans SC", "Segoe UI Variable Text", "Microsoft YaHei UI", sans-serif;
   --font-display: "Digiworld Inter Variable", "Digiworld Plex Sans SC", "Segoe UI Variable Display", "Microsoft YaHei UI", sans-serif;
   --font-brand: "Digiworld Smiley Sans", "Digiworld Inter Variable", "Digiworld Plex Sans SC", "Microsoft YaHei UI", sans-serif;
-  --type-caption: 11px;
-  --type-body-sm: 12px;
-  --type-body: 13px;
-  --type-title-sm: 14px;
-  --type-title: 16px;
+  --type-caption: 12px;
+  --type-body-sm: 13px;
+  --type-body: 14px;
+  --type-title-sm: 15px;
+  --type-title: 17px;
   --type-page: 20px;
   --weight-regular: 400;
   --weight-medium: 500;
