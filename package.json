@@ -1,6 +1,6 @@
 {
   "name": "digiworld",
-  "version": "0.2.26",
+  "version": "0.2.27",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.21.0",

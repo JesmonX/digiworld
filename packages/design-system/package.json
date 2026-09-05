@@ -1,6 +1,6 @@
 {
   "name": "@digiworld/design-system",
-  "version": "0.2.26",
+  "version": "0.2.27",
   "private": true,
   "type": "module",
   "exports": {
@@ -10,6 +10,10 @@
     "./react": "./components.tsx",
     "./themes": "./themes.ts"
   },
-  "peerDependencies": { "react": "^19.1.0" },
-  "devDependencies": { "@types/react": "^19.1.0" }
+  "peerDependencies": {
+    "react": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0"
+  }
 }
