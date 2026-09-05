@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { THEMES } from '../../packages/design-system/themes'
+import { gotoWithRetry } from './nav'
 
 for (const theme of THEMES) for (const scale of [100, 110, 125]) for (const [width, height] of [[900, 600], [1280, 800], [1600, 1000]]) {
   test(`${theme.id} ${scale}% ${width}x${height}`, async ({ page }, info) => {
@@ -11,7 +12,7 @@ for (const theme of THEMES) for (const scale of [100, 110, 125]) for (const [wid
       localStorage.setItem('digiworld.theme.v2', id)
       localStorage.setItem('digiworld.text-scale.v1', String(scale))
     }, { id: theme.id, scale })
-    await page.goto('/design.html')
+    await gotoWithRetry(page, '/design.html')
     await expect(page.locator('.home-dashboard')).toBeVisible()
     await page.evaluate(() => document.fonts.ready)
     await page.screenshot({ path: info.outputPath('home.png') })
@@ -36,7 +37,7 @@ for (const theme of THEMES) for (const scale of [100, 110, 125]) for (const [wid
 }
 
 test('live theme and typography update preserves plugin document and UI state', async ({ page }) => {
-  await page.goto('/design.html')
+  await gotoWithRetry(page, '/design.html')
   await page.getByRole('button', { name: '邮件助手', exact: true }).click()
   const frame = page.frameLocator('iframe')
   await frame.locator('.mail-row').first().click()
@@ -50,7 +51,7 @@ test('live theme and typography update preserves plugin document and UI state', 
 })
 
 for (const state of ['empty', 'error']) test(`plugin ${state} states`, async ({ page }) => {
-  await page.goto(`/design.html?state=${state}`)
+  await gotoWithRetry(page, `/design.html?state=${state}`)
   for (const label of ['键盘热力图', 'Agent Overview', '邮件助手', 'Git Actions', 'Servers', '日历与 Todo']) {
     await page.getByRole('button', { name: label, exact: true }).click()
     await expect(page.frameLocator('iframe').locator('#root')).not.toBeEmpty()
@@ -59,7 +60,7 @@ for (const state of ['empty', 'error']) test(`plugin ${state} states`, async ({ 
 })
 
 test('shared controls retain keyboard focus and modal focus containment', async ({ page }) => {
-  await page.goto('/design.html?gallery&theme=catppuccin-mocha')
+  await gotoWithRetry(page, '/design.html?gallery&theme=catppuccin-mocha')
   await page.getByRole('button', { name: '打开对话框' }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
   await page.keyboard.press('Escape')
@@ -68,7 +69,7 @@ test('shared controls retain keyboard focus and modal focus containment', async 
 })
 
 test('servers plugin layout switching, GPU metrics and disk device display', async ({ page }) => {
-  await page.goto('/design.html')
+  await gotoWithRetry(page, '/design.html')
   await page.getByRole('button', { name: 'Servers', exact: true }).click()
   const frame = page.frameLocator('iframe')
   await expect(frame.locator('.devices')).toBeVisible()
@@ -94,7 +95,7 @@ test('servers plugin layout switching, GPU metrics and disk device display', asy
 })
 
 test('calendar plugin filters past events, displays month calendar and supports date selection', async ({ page }) => {
-  await page.goto('/design.html')
+  await gotoWithRetry(page, '/design.html')
   await page.getByRole('button', { name: '日历与 Todo', exact: true }).click()
   const frame = page.frameLocator('iframe')
   await expect(frame.locator('.agenda')).toBeVisible()
@@ -125,7 +126,7 @@ test('calendar plugin filters past events, displays month calendar and supports 
 })
 
 test('agent overview auto-refresh interval selector', async ({ page }) => {
-  await page.goto('/design.html')
+  await gotoWithRetry(page, '/design.html')
   await page.getByRole('button', { name: 'Agent Overview', exact: true }).click()
   const frame = page.frameLocator('iframe')
   await expect(frame.locator('.weekly-card')).toBeVisible()

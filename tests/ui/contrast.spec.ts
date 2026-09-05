@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test'
 import { THEMES } from '../../packages/design-system/themes'
+import { gotoWithRetry } from './nav'
 
 for (const theme of THEMES) test(`${theme.id} readable semantic pairs`, async ({ page }) => {
-  await page.goto(`/design.html?gallery&theme=${theme.id}`)
+  await gotoWithRetry(page, `/design.html?gallery&theme=${theme.id}`)
   const pairs = await page.evaluate(() => {
     const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1
     const ctx = canvas.getContext('2d')!

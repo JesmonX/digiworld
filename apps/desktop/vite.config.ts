@@ -22,6 +22,7 @@ export default defineConfig({
     port: 1420,
     strictPort: true,
     cors: true,
+    hmr: !process.env.CI,
   },
   envPrefix: ['VITE_', 'TAURI_ENV_'],
   build: {
