@@ -1,5 +1,5 @@
 import { Button, Input, Select, Textarea, Card, Dialog, Status } from '@digiworld/design-system/react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Check, Clock3, Database, Gauge, HardDrive, PieChart, Plus, RefreshCw, Server, Settings2, Ticket, Trash2, X } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import { cacheRateScale, calendarCells, formatTokens, heatLevel, weeklyModelCategories, weeklyUsage, type Metric, type UsageDay, type WeeklyUsagePoint } from './heatmap'
@@ -22,6 +22,7 @@ interface UsageSettings {
   localAgents: Agent[]
   localRoots: Partial<Record<Agent, string>>
   sshSources: SshSource[]
+  autoRefreshIntervalSeconds?: number | null
   codexQuota: CodexQuotaSettings
   selectedAgents?: Agent[]
   selectedSources?: string[]
@@ -190,27 +191,27 @@ export default function App() {
     if (settings) void loadSnapshot().catch(reason => setError(String(reason)))
   }, [agents, range, sources]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const watchRefresh = async (status: RefreshStatus): Promise<RefreshStatus> => {
-      setRefresh(status)
-      while (true) {
-        await new Promise(resolve => window.setTimeout(resolve, 700))
-        const next = await bridge.request<RefreshStatus>('usage.refreshStatus')
-        setRefresh(next)
-        if (!next.running) {
-          await loadSnapshot()
-          return next
-        }
+  const watchRefresh = useCallback(async (status: RefreshStatus): Promise<RefreshStatus> => {
+    setRefresh(status)
+    while (true) {
+      await new Promise(resolve => window.setTimeout(resolve, 700))
+      const next = await bridge.request<RefreshStatus>('usage.refreshStatus')
+      setRefresh(next)
+      if (!next.running) {
+        await loadSnapshot()
+        return next
       }
-  }
+    }
+  }, [loadSnapshot])
 
-  const startRefresh = async (sourceId?: string) => {
+  const startRefresh = useCallback(async (sourceId?: string) => {
     setError(null)
     try {
       await watchRefresh(await bridge.request<RefreshStatus>('usage.startRefresh', sourceId ? { sourceId } : {}))
     } catch (reason) {
       setError(String(reason))
     }
-  }
+  }, [watchRefresh])
 
   const loadQuota = useCallback(async (force = false) => {
     const sourceId = settings?.codexQuota.sourceId ?? null
@@ -234,6 +235,62 @@ export default function App() {
     if (!settings) return
     void loadQuota()
   }, [loadQuota, settings])
+
+  const autoRefreshRunningRef = useRef(false)
+  const lastRefreshedAtRef = useRef<number>(Date.now())
+  const autoRefreshInterval = settings?.autoRefreshIntervalSeconds ?? 0
+
+  const refreshAll = useCallback(async () => {
+    if (autoRefreshRunningRef.current) return
+    if (document.visibilityState === 'hidden') return
+    autoRefreshRunningRef.current = true
+    try {
+      const status = await bridge.request<RefreshStatus>('usage.refreshStatus')
+      if (!status.running) {
+        await startRefresh()
+      }
+      await loadQuota(true)
+      lastRefreshedAtRef.current = Date.now()
+    } finally {
+      autoRefreshRunningRef.current = false
+    }
+  }, [loadQuota, startRefresh])
+
+  useEffect(() => {
+    if (!autoRefreshInterval || autoRefreshInterval <= 0) return
+    const timer = window.setInterval(() => {
+      void refreshAll()
+    }, autoRefreshInterval * 1000)
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'hidden') {
+        const elapsed = Date.now() - lastRefreshedAtRef.current
+        if (elapsed >= autoRefreshInterval * 1000) {
+          void refreshAll()
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [autoRefreshInterval, refreshAll])
+
+  const changeAutoRefreshInterval = async (seconds: number) => {
+    if (!settings) return
+    const next: UsageSettings = {
+      ...settings,
+      autoRefreshIntervalSeconds: seconds <= 0 ? null : seconds,
+    }
+    setSettings(next)
+    try {
+      await bridge.request('usage.saveSettings', { settings: next })
+    } catch (e) {
+      setError(String(e))
+    }
+  }
 
   useEffect(() => {
     const seconds = settings?.codexQuota.refreshIntervalSeconds
@@ -292,8 +349,25 @@ export default function App() {
   return (
     <div className="usage-app">
       <header className="dw-toolbar usage-header">
-
-        <div className="header-buttons"><Button className="secondary" onClick={() => setSettingsOpen(true)}><Settings2 />数据源</Button><Button className="primary" disabled={refresh.running} onClick={() => void startRefresh()}><RefreshCw className={refresh.running ? 'spin' : ''} />{refresh.running ? `${refresh.completed}/${refresh.total} ${refresh.currentSource ?? ''}` : '手动刷新'}</Button></div>
+        <div className="header-buttons">
+          <div className="auto-refresh-control">
+            <Clock3 size={14} />
+            <Select
+              aria-label="自动刷新间隔"
+              value={String(autoRefreshInterval)}
+              onChange={e => void changeAutoRefreshInterval(Number(e.target.value))}
+            >
+              <option value="0">自动刷新：关闭</option>
+              <option value="60">自动刷新：1 分钟</option>
+              <option value="300">自动刷新：5 分钟</option>
+              <option value="900">自动刷新：15 分钟</option>
+              <option value="1800">自动刷新：30 分钟</option>
+              <option value="3600">自动刷新：1 小时</option>
+            </Select>
+          </div>
+          <Button className="secondary" onClick={() => setSettingsOpen(true)}><Settings2 />数据源</Button>
+          <Button className="primary" disabled={refresh.running} onClick={() => void startRefresh()}><RefreshCw className={refresh.running ? 'spin' : ''} />{refresh.running ? `${refresh.completed}/${refresh.total} ${refresh.currentSource ?? ''}` : '手动刷新'}</Button>
+        </div>
       </header>
 
       {(error || refresh.errors.length > 0) && <Status tone="error" className="error-banner"><AlertTriangle /><span>{error ?? refresh.errors.join('；')}</span><Button onClick={() => { setError(null); setRefresh(current => ({ ...current, errors: [] })) }}><X /></Button></Status>}
@@ -576,6 +650,29 @@ function SourceDialog({ settings, refreshRunning, onClose, onSave, onScan, onQuo
     {draft.sshSources.map((source, index) => <section className="source-block" key={source.id}><div className="source-heading"><div><Server /><span><strong>{source.label || 'SSH 设备'}</strong><small>{source.host || '尚未填写 Host'}</small></span></div><Button className="icon danger" title="移除设备" onClick={() => setDraft(current => ({ ...current, sshSources: current.sshSources.filter((_, item) => item !== index), codexQuota: current.codexQuota.sourceId === source.id ? { ...current.codexQuota, sourceId: null } : current.codexQuota }))}><Trash2 /></Button></div><div className="ssh-fields"><label>名称<Input value={source.label} onChange={event => updateSource(index, { ...source, label: event.target.value })} /></label><label>SSH Config Host<Input value={source.host} onChange={event => updateSource(index, { ...source, host: event.target.value })} placeholder="gpu-server" /></label></div><div className="agent-checks">{AGENTS.map(agent => <label key={agent}><Input type="checkbox" checked={source.enabledAgents.includes(agent)} onChange={() => updateSource(index, { ...source, enabledAgents: toggleRequired(source.enabledAgents, agent) })} /><AgentIcon agent={agent} /><span>{agentLabel[agent]}</span></label>)}</div><div className="root-grid">{AGENTS.map(agent => <label key={agent}>{agentLabel[agent]}<Input value={source.roots[agent] ?? ''} onChange={event => updateSource(index, { ...source, roots: { ...source.roots, [agent]: event.target.value } })} placeholder={defaultRoot[agent]} /></label>)}</div><Button className="secondary scan-source" disabled={refreshRunning || !source.host} onClick={async () => { setScanning(source.id); setScanMessage(null); setDialogError(null); try { await onScan(source); setScanMessage(`${source.label || source.host} 扫描成功`) } catch (reason) { setDialogError(String(reason)) } finally { setScanning(null) } }}><RefreshCw className={scanning === source.id ? 'spin' : ''} />{scanning === source.id ? '扫描中…' : '测试并扫描'}</Button></section>)}
     {scanMessage && <Status tone="success" className="dialog-success">{scanMessage}</Status>}
     {adding ? <div className="add-confirm"><span>将添加一个使用 SSH config 和密钥认证的 Unix 设备。</span><Button className="primary" onClick={addSource}>继续</Button><Button className="secondary" onClick={() => setAdding(false)}>取消</Button></div> : <Button className="add-source" onClick={() => setAdding(true)}><Plus />添加 SSH 设备</Button>}
+    <section className="source-block">
+      <div className="source-heading">
+        <div><Clock3 /><span><strong>整体用量自动刷新</strong><small>处于插件页时按设定周期自动同步 Token 用量与限额</small></span></div>
+      </div>
+      <div className="quota-setting-grid">
+        <label>刷新间隔
+          <Select
+            value={String(draft.autoRefreshIntervalSeconds ?? 0)}
+            onChange={event => {
+              const val = Number(event.target.value)
+              setDraft(current => ({ ...current, autoRefreshIntervalSeconds: val <= 0 ? null : val }))
+            }}
+          >
+            <option value="0">关闭</option>
+            <option value="60">1 分钟</option>
+            <option value="300">5 分钟</option>
+            <option value="900">15 分钟</option>
+            <option value="1800">30 分钟</option>
+            <option value="3600">1 小时</option>
+          </Select>
+        </label>
+      </div>
+    </section>
     <section className="source-block quota-settings"><div className="source-heading"><div><Gauge /><span><strong>Codex 限额查询</strong><small>仅显示所选设备登录的一个 Codex 账号</small></span></div></div>
       <div className="quota-setting-grid">
         <label>查询设备<Select value={draft.codexQuota.sourceId ?? ''} onChange={event => setDraft(current => ({ ...current, codexQuota: { ...current.codexQuota, sourceId: event.target.value || null } }))}><option value="">不查询</option>{sourceOptions.map(source => <option key={source.id} value={source.id}>{source.label}</option>)}</Select></label>

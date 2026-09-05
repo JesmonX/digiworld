@@ -30,6 +30,12 @@ struct Device {
     show_traffic: bool,
     #[serde(default)]
     interfaces: Vec<String>,
+    #[serde(default = "yes")]
+    show_disk_device: bool,
+    #[serde(default)]
+    show_gpu_labels: bool,
+    #[serde(default)]
+    show_gpu_power: bool,
 }
 #[derive(Default, Serialize, Deserialize)]
 struct Settings {
@@ -48,6 +54,9 @@ def read(p):
 def cmd(a):
  try:return subprocess.run(a,text=True,capture_output=True,timeout=5).stdout.strip()
  except:return ''
+def num(v):
+ try:return float(v)
+ except:return None
 mem={}
 for x in read('/proc/meminfo').splitlines():
  k,_,v=x.partition(':'); mem[k]=int((v.strip().split() or ['0'])[0])*1024
@@ -58,11 +67,20 @@ for line in raw.splitlines()[1:]:
  p=line.split()
  if len(p)>=6: disks.append({'device':p[0],'total':int(p[1]),'used':int(p[2]),'available':int(p[3]),'percent':float(p[4][:-1]),'mount':' '.join(p[5:])})
 gpu=[]
-raw=cmd(['nvidia-smi','--query-gpu=index,name,utilization.gpu,memory.used,memory.total,temperature.gpu','--format=csv,noheader,nounits'])
+raw=cmd(['nvidia-smi','--query-gpu=index,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw','--format=csv,noheader,nounits'])
 for line in raw.splitlines():
  p=[x.strip() for x in line.split(',')]
- if len(p)==6:
-  try:gpu.append({'index':int(p[0]),'name':p[1],'utilization':float(p[2]),'memoryUsedMiB':float(p[3]),'memoryTotalMiB':float(p[4]),'temperatureC':float(p[5])})
+ if len(p)>=6:
+  try:
+   gpu.append({
+    'index':int(p[0]),
+    'name':p[1],
+    'utilization':float(p[2]),
+    'memoryUsedMiB':float(p[3]),
+    'memoryTotalMiB':float(p[4]),
+    'temperatureC':num(p[5]),
+    'powerDrawW':num(p[6]) if len(p)>=7 else None
+   })
   except:pass
 net=[]
 for line in read('/proc/net/dev').splitlines()[2:]:
@@ -97,11 +115,21 @@ impl App {
         let s = self.settings()?;
         let mut out = vec![];
         for d in s.devices.iter().filter(|d| id.is_none_or(|x| x == d.id)) {
+            let selection = json!({
+                "disks": d.disks,
+                "interfaces": d.interfaces,
+                "showCpu": d.show_cpu,
+                "showGpu": d.show_gpu,
+                "showTraffic": d.show_traffic,
+                "showDiskDevice": d.show_disk_device,
+                "showGpuLabels": d.show_gpu_labels,
+                "showGpuPower": d.show_gpu_power,
+            });
             match ssh(&d.host, HELPER) {
                 Ok(mut v) => {
                     v["id"] = json!(d.id);
                     v["label"] = json!(d.label);
-                    v["selection"] = json!({"disks":d.disks,"interfaces":d.interfaces,"showCpu":d.show_cpu,"showGpu":d.show_gpu,"showTraffic":d.show_traffic});
+                    v["selection"] = selection;
                     out.push(v);
                 }
                 Err(e) => {
@@ -109,7 +137,7 @@ impl App {
                         "id": d.id,
                         "label": d.label,
                         "error": e.to_string(),
-                        "selection": {"disks":d.disks,"interfaces":d.interfaces,"showCpu":d.show_cpu,"showGpu":d.show_gpu,"showTraffic":d.show_traffic},
+                        "selection": selection,
                     }));
                 }
             }

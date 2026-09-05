@@ -4,9 +4,25 @@ main { padding: var(--dw-space-3); display: grid; gap: var(--dw-space-3); }
 .dw-toolbar > div { display: flex; align-items: center; gap: var(--dw-space-2); margin-right: auto; }
 .devices {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: var(--dw-space-3);
   align-items: start;
+}
+.devices.layout-auto {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+}
+.devices.layout-compact {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+}
+.devices.layout-double {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.devices.layout-single {
+  grid-template-columns: 1fr;
+}
+@media (max-width: 700px) {
+  .devices.layout-double {
+    grid-template-columns: 1fr;
+  }
 }
 .devices > .dw-card { display: grid; gap: var(--dw-space-2); padding: var(--dw-space-3); }
 .devices > .dw-card > header, .editor header { display: flex; justify-content: space-between; align-items: center; }
@@ -28,7 +44,28 @@ main { padding: var(--dw-space-3); display: grid; gap: var(--dw-space-3); }
 .metric span { display: grid; flex: 1; min-width: 0; }
 .metric small { font-size: var(--dw-type-caption); color: var(--dw-text-muted); }
 .metric strong { font-size: var(--dw-type-body-sm); }
-.metric progress { width: 100%; height: 5px; margin-top: var(--dw-space-1); accent-color: var(--dw-accent); }
+.metric progress {
+  width: 100%;
+  height: 8px;
+  margin-top: var(--dw-space-1);
+  accent-color: var(--dw-accent);
+  border-radius: var(--dw-radius-sm);
+  overflow: hidden;
+}
+.metric progress::-webkit-progress-bar {
+  background: var(--dw-surface);
+  border-radius: var(--dw-radius-sm);
+}
+.metric progress::-webkit-progress-value {
+  background: var(--dw-accent);
+  border-radius: var(--dw-radius-sm);
+}
+.metric progress::-moz-progress-bar {
+  background: var(--dw-accent);
+  border-radius: var(--dw-radius-sm);
+}
+.layout-select { display: flex; align-items: center; }
+.sub-toggles { flex-wrap: wrap; }
 .traffic {
   display: grid;
   gap: var(--dw-space-1);

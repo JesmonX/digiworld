@@ -66,3 +66,77 @@ test('shared controls retain keyboard focus and modal focus containment', async 
   await expect(page.getByRole('dialog')).not.toBeVisible()
   await expect(page.getByRole('button', { name: '打开对话框' })).toBeFocused()
 })
+
+test('servers plugin layout switching, GPU metrics and disk device display', async ({ page }) => {
+  await page.goto('/design.html')
+  await page.getByRole('button', { name: 'Servers', exact: true }).click()
+  const frame = page.frameLocator('iframe')
+  await expect(frame.locator('.devices')).toBeVisible()
+
+  // Clean GPU name and power display
+  await expect(frame.getByText('L40', { exact: false })).toBeVisible()
+  await expect(frame.getByText('RTX 4090', { exact: false })).toBeVisible()
+  await expect(frame.getByText('180W', { exact: false })).toBeVisible()
+
+  // Disk device display
+  await expect(frame.getByText('/dev/nvme0n1p2', { exact: false })).toBeVisible()
+
+  // Layout mode switcher
+  const layoutSelect = frame.locator('select[aria-label="排布方式"]')
+  await expect(layoutSelect).toBeVisible()
+
+  for (const mode of ['compact', 'double', 'single', 'auto'] as const) {
+    await layoutSelect.selectOption(mode)
+    await expect(frame.locator('.devices')).toHaveClass(new RegExp(`layout-${mode}`))
+    const noOverflow = await frame.locator('body').evaluate(el => el.scrollWidth <= el.clientWidth + 1)
+    expect(noOverflow).toBe(true)
+  }
+})
+
+test('calendar plugin filters past events, displays month calendar and supports date selection', async ({ page }) => {
+  await page.goto('/design.html')
+  await page.getByRole('button', { name: '日历与 Todo', exact: true }).click()
+  const frame = page.frameLocator('iframe')
+  await expect(frame.locator('.agenda')).toBeVisible()
+  await expect(frame.locator('.month-card')).toBeVisible()
+
+  // Past event should be filtered out
+  await expect(frame.getByText('昨日总结')).not.toBeVisible()
+
+  // Today events should be visible
+  await expect(frame.getByText('产品评审')).toBeVisible()
+  await expect(frame.getByText('架构讨论')).toBeVisible()
+
+  // Month calendar dots should exist
+  await expect(frame.locator('.event-dot').first()).toBeVisible()
+
+  // Date selection interaction
+  const day7Btn = frame.getByRole('button', { name: /2026-09-07/ })
+  await expect(day7Btn).toBeVisible()
+  await day7Btn.click()
+  await expect(frame.getByText('周一同步')).toBeVisible()
+
+  // Event creation editor
+  await frame.getByRole('button', { name: '新建日程' }).first().click()
+  await expect(frame.locator('.editor')).toBeVisible()
+  await expect(frame.getByRole('heading', { name: '新建事件' })).toBeVisible()
+  await frame.getByRole('button', { name: '取消' }).click()
+  await expect(frame.locator('.editor')).not.toBeVisible()
+})
+
+test('agent overview auto-refresh interval selector', async ({ page }) => {
+  await page.goto('/design.html')
+  await page.getByRole('button', { name: 'Agent Overview', exact: true }).click()
+  const frame = page.frameLocator('iframe')
+  await expect(frame.locator('.weekly-card')).toBeVisible()
+
+  const refreshSelect = frame.locator('.auto-refresh-control select')
+  await expect(refreshSelect).toBeVisible()
+  // Fixture has 300 seconds default
+  await expect(refreshSelect).toHaveValue('300')
+
+  // Switch to 1 minute
+  await refreshSelect.selectOption('60')
+  await expect(refreshSelect).toHaveValue('60')
+})
+

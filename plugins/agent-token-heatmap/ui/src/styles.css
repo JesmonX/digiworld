@@ -7,8 +7,9 @@ button { cursor: pointer; }
 .usage-app { width: 100%; height: 100%; padding: 0 3px 22px 0; overflow: auto; scrollbar-gutter: stable; }
 .usage-header { min-height: 55px; display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 12px; }
 .usage-header h1 { margin: 0 0 4px; font-family: var(--dw-font-display); font-size: var(--dw-type-page); font-weight: var(--weight-semibold); letter-spacing: 0; }
-.usage-header p, .card-title p { margin: 0; color: var(--dw-text-muted); font-size: var(--type-body-sm); }
-.header-buttons, .proxy-actions { display: flex; gap: 7px; }
+.header-buttons, .proxy-actions { display: flex; gap: 7px; align-items: center; }
+.auto-refresh-control { display: flex; align-items: center; gap: 5px; }
+.auto-refresh-control select { font-size: var(--type-body-sm); height: 32px; }
 button:disabled { opacity: .55; cursor: default; }
 button svg { width: 14px; height: 14px; }
 .spin { animation: spin 1s linear infinite; }

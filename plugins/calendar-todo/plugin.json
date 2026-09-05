@@ -1,6 +1,6 @@
 {
   "id": "io.github.jesmonx.digiworld.calendar-todo",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "uiDesignVersion": 1,
   "name": "日历与 Todo",
   "description": "双向同步 iCloud 日历事件，并管理本地 Todo。",

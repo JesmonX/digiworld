@@ -1,7 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Button, Input, Card, Status, Textarea, Select } from '@digiworld/design-system/react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
-import { CalendarDays, CheckSquare, Plus, RefreshCw, Settings, Trash2, X } from 'lucide-react'
+import { CalendarDays, CheckSquare, Plus, RefreshCw, Settings, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import {
+  DateKey,
+  dateKey,
+  todayKey,
+  toIcalDate,
+  toIcalDateTime,
+  nextDayKey,
+  formatDisplayDate,
+  formatDisplayMonth,
+  monthDays,
+} from './date'
 
 const bridge = createPluginBridge('io.github.jesmonx.digiworld.calendar-todo')
 
@@ -35,21 +46,25 @@ type Todo = {
   updatedAt: string
 }
 
-const blank = (cal = ''): Event => ({
-  id: '',
-  calendarId: cal,
-  href: '',
-  etag: '',
-  title: '',
-  start: '',
-  end: '',
-  allDay: false,
-  location: '',
-  notes: '',
-  recurring: false,
-})
+const blank = (cal = '', dk?: DateKey): Event => {
+  const targetDay = dk || todayKey()
+  return {
+    id: '',
+    calendarId: cal,
+    href: '',
+    etag: '',
+    title: '',
+    start: toIcalDateTime(targetDay, 9, 0),
+    end: toIcalDateTime(targetDay, 10, 0),
+    allDay: false,
+    location: '',
+    notes: '',
+    recurring: false,
+  }
+}
 
 export default function App() {
+  const today = todayKey()
   const [account, setAccount] = useState<{ username: string; serverUrl: string; selectedCalendars: string[] } | null>(null)
   const [accountDraft, setAccountDraft] = useState({ username: '', serverUrl: 'https://caldav.icloud.com', selectedCalendars: [] as string[] })
   const [secret, setSecret] = useState('')
@@ -62,6 +77,40 @@ export default function App() {
   const [todoDue, setTodoDue] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+
+  const [viewYear, setViewYear] = useState(() => Number(today.slice(0, 4)))
+  const [viewMonth, setViewMonth] = useState(() => Number(today.slice(5, 7)))
+  const [selectedDate, setSelectedDate] = useState<DateKey | null>(null)
+
+  const prevMonth = () => {
+    if (viewMonth === 1) {
+      setViewYear(y => y - 1)
+      setViewMonth(12)
+    } else {
+      setViewMonth(m => m - 1)
+    }
+  }
+
+  const nextMonth = () => {
+    if (viewMonth === 12) {
+      setViewYear(y => y + 1)
+      setViewMonth(1)
+    } else {
+      setViewMonth(m => m + 1)
+    }
+  }
+
+  const jumpToToday = () => {
+    const t = todayKey()
+    setViewYear(Number(t.slice(0, 4)))
+    setViewMonth(Number(t.slice(5, 7)))
+    setSelectedDate(t)
+  }
+
+  const createEventForDate = (dk: DateKey) => {
+    setSelectedDate(dk)
+    setEdit(blank(cals[0]?.id, dk))
+  }
 
   const load = async (sync = false) => {
     setBusy(true)
@@ -93,14 +142,31 @@ export default function App() {
     return () => clearInterval(t)
   }, [account?.username])
 
-  const days = useMemo(() => {
-    const m = new Map<string, Event[]>()
+  const eventMap = useMemo(() => {
+    const m = new Map<DateKey, Event[]>()
     for (const e of events) {
-      const d = formatDate(e.start)
-      m.set(d, [...(m.get(d) || []), e])
+      const k = dateKey(e.start)
+      const list = m.get(k) || []
+      list.push(e)
+      m.set(k, list)
     }
-    return [...m].sort((a, b) => a[0].localeCompare(b[0]))
+    return m
   }, [events])
+
+  const upcomingDays = useMemo(() => {
+    const currentDay = todayKey()
+    return [...eventMap.entries()]
+      .filter(([d]) => d >= currentDay)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+  }, [eventMap])
+
+  const displayDays = useMemo(() => {
+    if (selectedDate) {
+      const list = eventMap.get(selectedDate)
+      return list && list.length > 0 ? [[selectedDate, list] as [DateKey, Event[]]] : []
+    }
+    return upcomingDays
+  }, [eventMap, selectedDate, upcomingDays])
 
   const connect = async () => {
     setBusy(true)
@@ -212,43 +278,127 @@ export default function App() {
       {error && <Status tone="error">{error}</Status>}
 
       {tab === 'calendar' ? (
-        <>
-          <div className="calendar-actions">
-            <span>{events.length} 个事件 · {cals.length} 个日历</span>
-            <div className="calendar-picker">
-              {cals.map(c => (
-                <label key={c.id}>
-                  <input type="checkbox" checked={account.selectedCalendars.includes(c.id)} onChange={e => void selectCalendar(c.id, e.target.checked)} />
-                  {c.name}
-                </label>
-              ))}
+        <div className="calendar-view">
+          <div className="calendar-sidebar">
+            <Card className="month-card">
+              <header className="month-header">
+                <h3>{formatDisplayMonth(viewYear, viewMonth)}</h3>
+                <div className="month-nav">
+                  <Button aria-label="上一月" onClick={prevMonth}><ChevronLeft size={15} /></Button>
+                  <Button onClick={jumpToToday}>今天</Button>
+                  <Button aria-label="下一月" onClick={nextMonth}><ChevronRight size={15} /></Button>
+                  <Button
+                    variant="primary"
+                    aria-label="新建日程"
+                    title="在选定日期新建日程"
+                    disabled={!cals.length}
+                    onClick={() => createEventForDate(selectedDate || today)}
+                  >
+                    <Plus size={15} />
+                  </Button>
+                </div>
+              </header>
+
+              <div className="calendar-weekdays" aria-hidden="true">
+                {['一', '二', '三', '四', '五', '六', '日'].map(w => (
+                  <span key={w}>{w}</span>
+                ))}
+              </div>
+
+              <div className="calendar-grid" role="grid" aria-label="月份日历">
+                {monthDays(viewYear, viewMonth).map(cell => {
+                  const dayEvents = eventMap.get(cell.key) || []
+                  const dotCount = Math.min(3, dayEvents.length)
+                  const isSelected = selectedDate === cell.key
+                  return (
+                    <button
+                      type="button"
+                      key={cell.key}
+                      className={`calendar-cell ${cell.inMonth ? '' : 'other-month'} ${cell.isToday ? 'is-today' : ''} ${isSelected ? 'is-selected' : ''}`}
+                      onClick={() => setSelectedDate(cell.key)}
+                      onDoubleClick={() => createEventForDate(cell.key)}
+                      aria-label={`${cell.key}${dayEvents.length ? `，有 ${dayEvents.length} 个日程` : ''}`}
+                      aria-selected={isSelected}
+                    >
+                      <span className="cell-day">{cell.dayNum}</span>
+                      <span className="cell-dots">
+                        {Array.from({ length: dotCount }).map((_, i) => (
+                          <span key={i} className="event-dot" />
+                        ))}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </Card>
+
+            <div className="calendar-meta-card">
+              <div className="meta-head">
+                <small>{events.length} 个日程 · {cals.length} 个日历</small>
+              </div>
+              <div className="calendar-picker">
+                {cals.map(c => (
+                  <label key={c.id}>
+                    <input
+                      type="checkbox"
+                      checked={account.selectedCalendars.includes(c.id)}
+                      onChange={e => void selectCalendar(c.id, e.target.checked)}
+                    />
+                    {c.name}
+                  </label>
+                ))}
+              </div>
             </div>
-            <Button variant="primary" onClick={() => setEdit(blank(cals[0]?.id))} disabled={!cals.length}>
-              <Plus size={15} />新事件
-            </Button>
           </div>
 
-          <section className="agenda">
-            {days.length ? (
-              days.map(([day, list]) => (
-                <Card key={day}>
-                  <time>{day}</time>
-                  {list.map(e => (
-                    <Button key={`${e.href}-${e.id}`} className="event" onClick={() => setEdit(e)}>
-                      <span>
-                        <strong>{e.title || '无标题'}</strong>
-                        <small>{e.allDay ? '全天' : formatTime(e.start)}{e.location ? ` · ${e.location}` : ''}</small>
-                      </span>
-                      {e.recurring && <small>重复</small>}
-                    </Button>
-                  ))}
-                </Card>
-              ))
-            ) : (
-              <Status>没有缓存事件，点击同步从 iCloud 读取。</Status>
-            )}
-          </section>
-        </>
+          <div className="calendar-agenda-pane">
+            <header className="agenda-header">
+              <div>
+                <strong>{selectedDate ? `${formatDisplayDate(selectedDate)}${selectedDate === today ? ' (今天)' : ''}` : '当前及之后日程'}</strong>
+                <small>{displayDays.reduce((acc, [, list]) => acc + list.length, 0)} 个日程</small>
+              </div>
+              <div className="agenda-actions">
+                {selectedDate && (
+                  <Button onClick={() => setSelectedDate(null)}>
+                    查看全部后续
+                  </Button>
+                )}
+                <Button
+                  variant="primary"
+                  onClick={() => createEventForDate(selectedDate || today)}
+                  disabled={!cals.length}
+                >
+                  <Plus size={15} />新建日程
+                </Button>
+              </div>
+            </header>
+
+            <section className="agenda">
+              {displayDays.length ? (
+                displayDays.map(([day, list]) => (
+                  <Card key={day} className="agenda-day-card">
+                    <time>{formatDisplayDate(day)}</time>
+                    <div className="agenda-day-events">
+                      {list.map(e => (
+                        <Button key={`${e.href}-${e.id}`} className="event" onClick={() => setEdit(e)}>
+                          <span>
+                            <strong>{e.title || '无标题'}</strong>
+                            <small>{e.allDay ? '全天' : formatTime(e.start)}{e.location ? ` · ${e.location}` : ''}</small>
+                          </span>
+                          {e.recurring && <small>重复</small>}
+                        </Button>
+                      ))}
+                    </div>
+                  </Card>
+                ))
+              ) : (
+                <Status>
+                  {selectedDate ? `${formatDisplayDate(selectedDate)} 暂无日程` : '当前及之后暂无日程安排'}
+                </Status>
+              )}
+            </section>
+          </div>
+        </div>
       ) : (
         <section className="todo">
           <Card className="todo-add">
@@ -289,16 +439,39 @@ export default function App() {
             </Select>
           </label>
           <label className="check">
-            <input disabled={edit.recurring} type="checkbox" checked={edit.allDay} onChange={e => setEdit({ ...edit, allDay: e.target.checked })} />
+            <input
+              disabled={edit.recurring}
+              type="checkbox"
+              checked={edit.allDay}
+              onChange={e => {
+                const allDay = e.target.checked
+                const dk = dateKey(edit.start) || todayKey()
+                if (allDay) {
+                  setEdit({
+                    ...edit,
+                    allDay: true,
+                    start: toIcalDate(dk),
+                    end: toIcalDate(nextDayKey(dk)),
+                  })
+                } else {
+                  setEdit({
+                    ...edit,
+                    allDay: false,
+                    start: toIcalDateTime(dk, 9, 0),
+                    end: toIcalDateTime(dk, 10, 0),
+                  })
+                }
+              }}
+            />
             全天
           </label>
           <label>
             开始
-            <Input disabled={edit.recurring} value={edit.start} onChange={e => setEdit({ ...edit, start: e.target.value })} placeholder={edit.allDay ? '20260905' : '20260905T090000Z'} />
+            <Input disabled={edit.recurring} value={edit.start} onChange={e => setEdit({ ...edit, start: e.target.value })} placeholder={edit.allDay ? '20260905' : '20260905T090000'} />
           </label>
           <label>
             结束
-            <Input disabled={edit.recurring} value={edit.end} onChange={e => setEdit({ ...edit, end: e.target.value })} placeholder={edit.allDay ? '20260906' : '20260905T100000Z'} />
+            <Input disabled={edit.recurring} value={edit.end} onChange={e => setEdit({ ...edit, end: e.target.value })} placeholder={edit.allDay ? '20260906' : '20260905T100000'} />
           </label>
           <label>
             地点
@@ -323,12 +496,6 @@ export default function App() {
       )}
     </main>
   )
-}
-
-function formatDate(v: string) {
-  if (/^\d{8}/.test(v)) return `${v.slice(0, 4)}-${v.slice(4, 6)}-${v.slice(6, 8)}`
-  const d = new Date(v)
-  return Number.isNaN(+d) ? v : new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
 }
 
 function formatTime(v: string) {

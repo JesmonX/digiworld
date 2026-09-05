@@ -94,6 +94,8 @@ pub struct UsageSettings {
     #[serde(default)]
     pub ssh_sources: Vec<SshSource>,
     #[serde(default)]
+    pub auto_refresh_interval_seconds: Option<u64>,
+    #[serde(default)]
     pub codex_quota: CodexQuotaSettings,
     #[serde(default)]
     pub selected_agents: Option<Vec<AgentKind>>,
@@ -107,6 +109,7 @@ impl Default for UsageSettings {
             local_agents: all_agents(),
             local_roots: BTreeMap::new(),
             ssh_sources: Vec::new(),
+            auto_refresh_interval_seconds: None,
             codex_quota: CodexQuotaSettings::default(),
             selected_agents: None,
             selected_sources: None,

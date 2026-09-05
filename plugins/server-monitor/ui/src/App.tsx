@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Button, Input, Card, Status } from '@digiworld/design-system/react'
+import { Button, Input, Card, Status, Select } from '@digiworld/design-system/react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import { Server, Plus, RefreshCw, HardDrive, MemoryStick, Cpu, Gauge, Network, Settings, X, LoaderCircle, AlertCircle } from 'lucide-react'
 
@@ -14,6 +14,9 @@ type Config = {
   showCpu: boolean
   showGpu: boolean
   showTraffic: boolean
+  showDiskDevice?: boolean
+  showGpuLabels?: boolean
+  showGpuPower?: boolean
 }
 
 type Disk = {
@@ -42,11 +45,21 @@ type Device = {
   memory?: { total: number; used: number }
   cpu?: { logicalCores: number; load1: number; load5: number }
   disks?: Disk[]
-  gpus?: { index: number; name: string; utilization: number; memoryUsedMiB: number; memoryTotalMiB: number; temperatureC: number }[]
+  gpus?: {
+    index: number
+    name: string
+    utilization: number
+    memoryUsedMiB: number
+    memoryTotalMiB: number
+    temperatureC?: number | null
+    powerDrawW?: number | null
+  }[]
   network?: Net[]
   vnstat?: { interfaces?: { name: string; traffic?: { day?: { date: { year: number; month: number; day: number }; rx: number; tx: number }[] } }[] }
   selection: Config
 }
+
+type LayoutMode = 'auto' | 'compact' | 'double' | 'single'
 
 const previous = new Map<string, { at: number; rx: number; tx: number }>()
 const size = (v: number) => `${(v / 1024 ** 3).toFixed(1)} GB`
@@ -61,6 +74,21 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [actionBusy, setActionBusy] = useState<'detect' | 'install' | 'save' | null>(null)
   const [setup, setSetup] = useState('')
+  const [layout, setLayout] = useState<LayoutMode>(() => {
+    try {
+      const saved = localStorage.getItem('digiworld.server-monitor.layout')
+      return (saved === 'compact' || saved === 'double' || saved === 'single' || saved === 'auto') ? saved : 'auto'
+    } catch {
+      return 'auto'
+    }
+  })
+
+  const changeLayout = (mode: LayoutMode) => {
+    setLayout(mode)
+    try {
+      localStorage.setItem('digiworld.server-monitor.layout', mode)
+    } catch {}
+  }
 
   const isActiveRef = useRef(true)
   const isRefreshingRef = useRef(false)
@@ -146,7 +174,12 @@ export default function App() {
   const edit = (c?: Config) => {
     setSetup('')
     setError('')
-    setDraft(c ? { ...c } : {
+    setDraft(c ? {
+      showDiskDevice: c.showDiskDevice ?? true,
+      showGpuLabels: c.showGpuLabels ?? false,
+      showGpuPower: c.showGpuPower ?? false,
+      ...c,
+    } : {
       id: crypto.randomUUID().replaceAll('-', '').slice(0, 12),
       label: '',
       host: '',
@@ -155,6 +188,9 @@ export default function App() {
       showCpu: true,
       showGpu: true,
       showTraffic: true,
+      showDiskDevice: true,
+      showGpuLabels: false,
+      showGpuPower: false,
     })
   }
 
@@ -222,6 +258,14 @@ export default function App() {
           <Server size={18} />
           <strong>远程 Linux 设备</strong>
         </div>
+        <div className="layout-select">
+          <Select aria-label="排布方式" value={layout} onChange={e => changeLayout(e.target.value as LayoutMode)}>
+            <option value="auto">自适应排布</option>
+            <option value="compact">紧凑多列</option>
+            <option value="double">标准双列</option>
+            <option value="single">单列全宽</option>
+          </Select>
+        </div>
         <Button onClick={() => edit()}><Plus size={15} />添加设备</Button>
         <Button onClick={() => void loadSettings()} disabled={busy}>
           <RefreshCw className={busy ? 'spin' : ''} size={15} />刷新
@@ -230,7 +274,7 @@ export default function App() {
 
       {error && <Status tone="error">{error}</Status>}
 
-      <section className="devices">
+      <section className={`devices layout-${layout}`}>
         {configs.length === 0 ? (
           <Status>使用 OpenSSH 配置别名添加第一台 Linux 设备。</Status>
         ) : (
@@ -287,7 +331,7 @@ export default function App() {
                           <Metric
                             key={x.mount}
                             icon={<HardDrive size={15} />}
-                            title={`${x.mount} · ${x.device}`}
+                            title={d.selection.showDiskDevice !== false ? `${x.mount} · ${x.device}` : x.mount}
                             value={`${size(x.used)} / ${size(x.total)}`}
                             percent={x.percent}
                           />
@@ -298,17 +342,26 @@ export default function App() {
                     {d.selection.showGpu && (
                       <div className="gpu-grid">
                         {d.gpus && d.gpus.length > 0 ? (
-                          d.gpus.map(g => (
-                            <Metric
-                              key={g.index}
-                              icon={<Gauge size={15} />}
-                              title={`GPU ${g.index} · ${g.name}`}
-                              value={`${g.utilization}% · ${g.memoryUsedMiB}/${g.memoryTotalMiB} MiB · ${g.temperatureC}°C`}
-                              percent={g.utilization}
-                            />
-                          ))
+                          d.gpus.map(g => {
+                            const cleanName = g.name.replace(/^NVIDIA\s+/i, '').trim()
+                            const details = [
+                              d.selection.showGpuLabels ? `利用率: ${g.utilization}%` : `${g.utilization}%`,
+                              d.selection.showGpuLabels ? `显存: ${size(g.memoryUsedMiB * 1024 * 1024)} / ${size(g.memoryTotalMiB * 1024 * 1024)}` : `${g.memoryUsedMiB}/${g.memoryTotalMiB} MiB`,
+                              g.temperatureC != null ? (d.selection.showGpuLabels ? `温度: ${g.temperatureC}°C` : `${g.temperatureC}°C`) : null,
+                              (d.selection.showGpuPower && g.powerDrawW != null) ? (d.selection.showGpuLabels ? `功率: ${Math.round(g.powerDrawW)}W` : `${Math.round(g.powerDrawW)}W`) : null,
+                            ].filter(Boolean).join(' · ')
+                            return (
+                              <Metric
+                                key={g.index}
+                                icon={<Gauge size={15} />}
+                                title={`GPU ${g.index} · ${cleanName}`}
+                                value={details}
+                                percent={g.utilization}
+                              />
+                            )
+                          })
                         ) : (
-                          <small className="gpu-unavailable">NVIDIA GPU 不可用</small>
+                          <small className="gpu-unavailable">GPU 不可用</small>
                         )}
                       </div>
                     )}
@@ -376,9 +429,35 @@ export default function App() {
                   checked={draft[k]}
                   onChange={e => setDraft({ ...draft, [k]: e.target.checked })}
                 />
-                {['CPU', 'NVIDIA GPU', 'Traffic'][i]}
+                {['CPU', 'GPU', 'Traffic'][i]}
               </label>
             ))}
+          </div>
+          <div className="toggles sub-toggles">
+            <label>
+              <input
+                type="checkbox"
+                checked={draft.showDiskDevice !== false}
+                onChange={e => setDraft({ ...draft, showDiskDevice: e.target.checked })}
+              />
+              显示硬盘设备号
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={!!draft.showGpuLabels}
+                onChange={e => setDraft({ ...draft, showGpuLabels: e.target.checked })}
+              />
+              GPU 显示详细文字标签
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={!!draft.showGpuPower}
+                onChange={e => setDraft({ ...draft, showGpuPower: e.target.checked })}
+              />
+              GPU 显示功率
+            </label>
           </div>
           <p>选择要并列显示的挂载点和网卡；空选择表示全部显示。</p>
           {devices.find(x => x.id === draft.id && x.disks && x.network) && (
