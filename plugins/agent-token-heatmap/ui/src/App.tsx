@@ -313,7 +313,7 @@ function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
   const yForRate = (rate: number) => top + (cacheAxisMaximum - Math.max(cacheAxisMinimum, Math.min(cacheAxisMaximum, rate))) / cacheAxisRange * plotHeight
 
   return <Card className="dw-card weekly-card">
-    <div className="panel-heading"><div><h2>Last 7 Days</h2></div><div className="chart-legend" aria-label="图例">{modelCategories.length ? modelCategories.map((category, index) => <span className="legend-item" key={category.key} title={`${category.label} · ${formatTokens(category.totalTokens)}`}><i className={`model-key model-key-${index}`} /><b>{category.label}</b><small>{formatTokens(category.totalTokens)}</small></span>) : <span className="legend-item"><i className="bar-key" /><b>Token</b></span>}</div></div>
+    <div className="panel-heading"><div><h2>Last 7 Days</h2></div><div className="chart-legend" aria-label="图例">{modelCategories.length ? modelCategories.map((category, index) => <span className="legend-item" key={category.key} title={`${category.label} · ${formatTokens(category.totalTokens)}`}><i className={`model-key model-key-${index % 8}`} /><b>{category.label}</b><small>{formatTokens(category.totalTokens)}</small></span>) : <span className="legend-item"><i className="bar-key" /><b>Token</b></span>}</div></div>
     {points.length ? <svg className="weekly-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="近七天按模型堆叠的 Token 用量柱形图和缓存率折线图">
       <text x={left} y={top - 13} className="chart-axis-title">Token</text>
       <text x={width - right} y={top - 13} textAnchor="end" className="chart-axis-title">缓存率</text>
@@ -340,7 +340,7 @@ function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
           const segmentHeight = value * scale
           const y = top + plotHeight - offset - segmentHeight
           offset += segmentHeight
-          return <rect key={`${point.day}-${category.key}`} x={x - barWidth / 2} y={y} width={barWidth} height={segmentHeight} className={`token-segment model-${categoryIndex}`}><title>{`${point.day} · ${category.label} · ${formatTokens(value)} Token (${point.totalTokens > 0 ? (value / point.totalTokens * 100).toFixed(1) : '0.0'}%)`}</title></rect>
+          return <rect key={`${point.day}-${category.key}`} x={x - barWidth / 2} y={y} width={barWidth} height={segmentHeight} className={`token-segment model-${categoryIndex % 8}`}><title>{`${point.day} · ${category.label} · ${formatTokens(value)} Token (${point.totalTokens > 0 ? (value / point.totalTokens * 100).toFixed(1) : '0.0'}%)`}</title></rect>
         })}</g><text x={x} y={height - 18} textAnchor="middle" className="chart-day-label">{point.day.slice(5).replace('-', '/')}</text></g>
       })}
       {segments.map((segment, index) => segment.length > 1 && <polyline key={index} points={segment.map(point => `${xFor(point)},${yForRate(point.cacheRate!)}`).join(' ')} className="cache-line" />)}
@@ -355,7 +355,16 @@ function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
   </Card>
 }
 
-const modelPieColors = ['var(--dw-chart-1)', 'var(--dw-chart-2)', 'var(--dw-chart-3)', 'var(--dw-chart-4)', 'var(--dw-danger)', 'var(--dw-accent-secondary)', 'var(--dw-text-muted)', 'var(--dw-border-strong)']
+const modelPieColors = [
+  'var(--dw-chart-1)',
+  'var(--dw-chart-2)',
+  'var(--dw-chart-3)',
+  'var(--dw-chart-4)',
+  'var(--dw-chart-5)',
+  'var(--dw-chart-6)',
+  'var(--dw-chart-7)',
+  'var(--dw-chart-8)',
+]
 
 function ModelPieChart({ rows }: { rows: ModelTotal[] }) {
   if (!rows.length) return <Empty />

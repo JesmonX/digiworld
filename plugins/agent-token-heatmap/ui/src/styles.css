@@ -41,19 +41,20 @@ button svg { width: 14px; height: 14px; }
 .panel-heading p { margin: 0; color: var(--dw-text-muted); font-size: var(--type-caption); }
 .chart-legend { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px 11px; color: var(--dw-text-muted); font-size: var(--type-caption); font-weight: var(--weight-medium); }
 .chart-legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
-.chart-legend .legend-item { min-height: 23px; padding: 3px 6px; border: 1px solid var(--dw-border); border-radius: var(--dw-radius-sm); background: var(--dw-surface); }
-.chart-legend .legend-item b { color: var(--dw-text-muted); font-size: var(--type-caption); font-weight: var(--weight-semibold); }
+.chart-legend .legend-item { min-height: 23px; padding: 3px 7px; border: 1px solid var(--dw-border); border-radius: var(--dw-radius-sm); background: var(--dw-surface); }
+.chart-legend .legend-item b { color: var(--dw-text); font-size: var(--type-caption); font-weight: var(--weight-semibold); }
 .chart-legend .legend-item small { color: var(--dw-text-muted); font-size: var(--type-caption); font-variant-numeric: tabular-nums; }
 .chart-legend i { display: block; width: 13px; height: 8px; border-radius: var(--dw-radius-sm); }
-.chart-legend .bar-key { background: var(--dw-accent); }
-.chart-legend .model-key { width: 10px; height: 10px; border: 1px solid var(--dw-overlay); }
-.model-key-0, .token-segment.model-0 { background: var(--dw-accent); fill: var(--dw-accent); }
-.model-key-1, .token-segment.model-1 { background: var(--dw-warning); fill: var(--dw-warning); }
-.model-key-2, .token-segment.model-2 { background: var(--dw-success); fill: var(--dw-success); }
-.model-key-3, .token-segment.model-3 { background: var(--dw-accent); fill: var(--dw-accent); }
-.model-key-4, .token-segment.model-4 { background: var(--dw-danger); fill: var(--dw-danger); }
-.model-key-5, .token-segment.model-5 { background: var(--dw-warning); fill: var(--dw-warning); }
-.model-key-6, .token-segment.model-6 { background: var(--dw-text-muted); fill: var(--dw-text-muted); }
+.chart-legend .bar-key { background: var(--dw-chart-1); }
+.chart-legend .model-key { width: 10px; height: 10px; border-radius: var(--dw-radius-sm); }
+.model-key-0, .token-segment.model-0 { background: var(--dw-chart-1); fill: var(--dw-chart-1); }
+.model-key-1, .token-segment.model-1 { background: var(--dw-chart-2); fill: var(--dw-chart-2); }
+.model-key-2, .token-segment.model-2 { background: var(--dw-chart-3); fill: var(--dw-chart-3); }
+.model-key-3, .token-segment.model-3 { background: var(--dw-chart-4); fill: var(--dw-chart-4); }
+.model-key-4, .token-segment.model-4 { background: var(--dw-chart-5); fill: var(--dw-chart-5); }
+.model-key-5, .token-segment.model-5 { background: var(--dw-chart-6); fill: var(--dw-chart-6); }
+.model-key-6, .token-segment.model-6 { background: var(--dw-chart-7); fill: var(--dw-chart-7); }
+.model-key-7, .token-segment.model-7 { background: var(--dw-chart-8); fill: var(--dw-chart-8); }
 .weekly-chart { display: block; width: 100%; height: 272px; overflow: visible; }
 .chart-grid-line { stroke: var(--dw-surface-subtle); stroke-width: 1; stroke-dasharray: 3 4; }
 .chart-axis-line { stroke: var(--dw-surface-subtle); stroke-width: 1.2; }

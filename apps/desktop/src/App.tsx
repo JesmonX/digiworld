@@ -14,9 +14,10 @@ import {
   type ProxySettings, type UpdateProgress,
 } from './lib/api'
 import {
-  ACCENT_THEMES, FONT_THEMES, themeStyle, loadTextScale, saveTextScale, type TextScale, getAccentTheme,
-  getFontTheme, loadAccentThemeId, loadFontThemeId, loadFontWeight, pluginTheme, saveAccentThemeId,
-  saveFontThemeId, saveFontWeight, loadGlassMode, saveGlassMode, type AccentThemeId, type FontThemeId, type FontWeight, type GlassMode,
+  ACCENT_THEMES, FONT_THEMES, COLOR_SCHEMES, getColorSchemePreview, themeStyle, loadTextScale, saveTextScale,
+  type TextScale, type ColorSchemeId, getAccentTheme, getFontTheme, loadAccentThemeId, loadColorSchemeId,
+  loadFontThemeId, loadFontWeight, pluginTheme, saveAccentThemeId, saveColorSchemeId, saveFontThemeId,
+  saveFontWeight, loadGlassMode, saveGlassMode, type AccentThemeId, type FontThemeId, type FontWeight, type GlassMode,
 } from './theme'
 import './styles.css'
 
@@ -99,12 +100,13 @@ function App() {
   const [confirmInstall, setConfirmInstall] = useState<CatalogPlugin | null>(null)
   const [updateProgress, setUpdateProgress] = useState<UpdateProgress | null>(null)
   const [accentThemeId, setAccentThemeId] = useState<AccentThemeId>(loadAccentThemeId)
+  const [colorSchemeId, setColorSchemeId] = useState<ColorSchemeId>(loadColorSchemeId)
   const [fontThemeId, setFontThemeId] = useState<FontThemeId>(loadFontThemeId)
   const [fontWeight, setFontWeight] = useState<FontWeight>(loadFontWeight)
   const [glassMode, setGlassMode] = useState<GlassMode>(loadGlassMode)
   const [textScale, setTextScale] = useState<TextScale>(loadTextScale)
   useEffect(() => saveTextScale(textScale), [textScale])
-  const accentTheme = getAccentTheme(accentThemeId)
+  const accentTheme = getAccentTheme(accentThemeId, colorSchemeId)
   const fontTheme = getFontTheme(fontThemeId)
   const activeTheme = useMemo(() => pluginTheme(accentTheme, fontTheme, fontWeight, glassMode, textScale), [accentTheme, fontTheme, fontWeight, glassMode, textScale])
 
@@ -115,6 +117,7 @@ function App() {
   }, [activeTheme, glassMode])
 
   useEffect(() => saveAccentThemeId(accentThemeId), [accentThemeId])
+  useEffect(() => saveColorSchemeId(colorSchemeId), [colorSchemeId])
   useEffect(() => saveFontThemeId(fontThemeId), [fontThemeId])
   useEffect(() => saveFontWeight(fontWeight), [fontWeight])
   useEffect(() => saveGlassMode(glassMode), [glassMode])
@@ -254,7 +257,7 @@ function App() {
               >
                 {page === 'home' && <Home plugins={state?.plugins ?? []} version={state?.version} onCatalog={() => setPage('catalog')} onOpen={id => setPage({ pluginId: id })} onRefresh={() => { void refreshState().catch(reason => setError(errorMessage(reason))) }} reducedMotion={Boolean(reduceMotion)} />}
                 {page === 'catalog' && <Catalog catalog={catalog} installed={installed} busy={busy} onInstall={setConfirmInstall} onRefresh={() => refreshCatalog(true)} onOpen={id => setPage({ pluginId: id })} currentTarget={state?.target} />}
-                {page === 'settings' && state && <SettingsPage state={state} progress={updateProgress} onProgressReset={() => setUpdateProgress(null)} onPluginsUpdated={refreshState} textScale={textScale} onTextScaleChange={setTextScale} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} fontThemeId={fontThemeId} onFontThemeChange={setFontThemeId} fontWeight={fontWeight} onFontWeightChange={setFontWeight} glassMode={glassMode} onGlassModeChange={setGlassMode} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
+                {page === 'settings' && state && <SettingsPage state={state} progress={updateProgress} onProgressReset={() => setUpdateProgress(null)} onPluginsUpdated={refreshState} textScale={textScale} onTextScaleChange={setTextScale} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} colorSchemeId={colorSchemeId} onColorSchemeChange={setColorSchemeId} fontThemeId={fontThemeId} onFontThemeChange={setFontThemeId} fontWeight={fontWeight} onFontWeightChange={setFontWeight} glassMode={glassMode} onGlassModeChange={setGlassMode} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
                 {pluginOpen && (
                   !selectedPlugin ? <Loading label="载入插件" />
                     : selectedPlugin.enabled
@@ -371,7 +374,7 @@ type UpdateDialog =
   | { kind: 'plugins'; updates: PluginUpdateInfo[] }
   | { kind: 'core'; update: CoreUpdateInfo }
 
-function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, textScale, onTextScaleChange, accentThemeId, onAccentThemeChange, fontThemeId, onFontThemeChange, fontWeight, onFontWeightChange, glassMode, onGlassModeChange, onChange }: {
+function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, textScale, onTextScaleChange, accentThemeId, onAccentThemeChange, colorSchemeId, onColorSchemeChange, fontThemeId, onFontThemeChange, fontWeight, onFontWeightChange, glassMode, onGlassModeChange, onChange }: {
   state: AppState
   progress: UpdateProgress | null
   onProgressReset(): void
@@ -380,6 +383,8 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, text
   onTextScaleChange(scale: TextScale): void
   accentThemeId: AccentThemeId
   onAccentThemeChange(id: AccentThemeId): void
+  colorSchemeId: ColorSchemeId
+  onColorSchemeChange(id: ColorSchemeId): void
   fontThemeId: FontThemeId
   onFontThemeChange(id: FontThemeId): void
   fontWeight: FontWeight
@@ -524,6 +529,34 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, text
               <span className="theme-miniature" aria-hidden="true"><i /><b><em />Aa 123</b></span>
               <small>{theme.label}</small>
               {accentThemeId === theme.id && <Check />}
+            </Button>
+          ))}
+        </RadioGroup>
+      </Card>
+      <Card className="settings-card scheme-card">
+        <div className="theme-copy">
+          <h3><Palette />主题配色</h3>
+          <p>在当前主题风格下自定义主色调与图表色彩</p>
+        </div>
+        <RadioGroup className="scheme-options" aria-label="主题配色">
+          {COLOR_SCHEMES.map(scheme => (
+            <Button
+              key={scheme.id}
+              type="button"
+              className={colorSchemeId === scheme.id ? 'active' : ''}
+              role="radio"
+              aria-checked={colorSchemeId === scheme.id}
+              tabIndex={colorSchemeId === scheme.id ? 0 : -1}
+              aria-label={scheme.label}
+              title={scheme.label}
+              onClick={() => onColorSchemeChange(scheme.id)}
+            >
+              <span className="scheme-swatch" style={{ background: getColorSchemePreview(accentThemeId, scheme.id) }} aria-hidden="true" />
+              <div className="scheme-label-wrap">
+                <strong>{scheme.label}</strong>
+                <small>{scheme.description}</small>
+              </div>
+              {colorSchemeId === scheme.id && <Check />}
             </Button>
           ))}
         </RadioGroup>

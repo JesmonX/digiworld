@@ -1,8 +1,12 @@
 import type { CSSProperties } from 'react'
 import type { PluginTheme } from '@digiworld/plugin-sdk'
 
-import { THEMES, getTheme, resolveColors, type ThemeId, type ThemePreset, type TextScale } from '@digiworld/design-system/themes'
-export type { TextScale }
+import {
+  THEMES, getTheme, resolveColors, type ThemeId, type ThemePreset, type TextScale,
+  type ColorSchemeId, COLOR_SCHEMES, DEFAULT_COLOR_SCHEME_ID, getColorSchemePreview,
+} from '@digiworld/design-system/themes'
+export type { TextScale, ColorSchemeId }
+export { COLOR_SCHEMES, DEFAULT_COLOR_SCHEME_ID, getColorSchemePreview }
 export type AccentThemeId = ThemeId
 export type FontThemeId = 'plex' | 'wenkai' | 'system'
 export type FontWeight = 400 | 500 | 600
@@ -62,9 +66,26 @@ export function saveTextScale(value: TextScale, storage?: Pick<Storage, 'setItem
   try { (storage ?? window.localStorage).setItem(TEXT_SCALE_STORAGE_KEY, String(value)) } catch { /* presentation only */ }
 }
 export const GLASS_STORAGE_KEY = 'digiworld.glass.v1'
+export const COLOR_SCHEME_STORAGE_KEY = 'digiworld.color-scheme.v1'
+export function loadColorSchemeId(storage?: Pick<Storage, 'getItem'>): ColorSchemeId {
+  try {
+    const value = (storage ?? window.localStorage).getItem(COLOR_SCHEME_STORAGE_KEY)
+    return COLOR_SCHEMES.some(scheme => scheme.id === value) ? value as ColorSchemeId : DEFAULT_COLOR_SCHEME_ID
+  } catch {
+    return DEFAULT_COLOR_SCHEME_ID
+  }
+}
 
-export function getAccentTheme(id: AccentThemeId): AccentTheme {
-  return getTheme(id)
+export function saveColorSchemeId(id: ColorSchemeId, storage?: Pick<Storage, 'setItem'>): void {
+  try {
+    (storage ?? window.localStorage).setItem(COLOR_SCHEME_STORAGE_KEY, id)
+  } catch {
+    // A palette preference should never prevent the desktop UI from working.
+  }
+}
+
+export function getAccentTheme(id: AccentThemeId, schemeId: ColorSchemeId = DEFAULT_COLOR_SCHEME_ID): AccentTheme {
+  return getTheme(id, schemeId)
 }
 
 export function getFontTheme(id: FontThemeId): FontTheme {
@@ -180,6 +201,15 @@ export function pluginTheme(theme: AccentTheme, font: FontTheme = getFontTheme(D
     'success': theme.colors['success']!,
     'warning': theme.colors['warning']!,
     'danger': theme.colors['danger']!,
+    'chart-grid': theme.colors['chart-grid']!,
+    'chart-1': theme.colors['chart-1']!,
+    'chart-2': theme.colors['chart-2']!,
+    'chart-3': theme.colors['chart-3']!,
+    'chart-4': theme.colors['chart-4']!,
+    'chart-5': theme.colors['chart-5']!,
+    'chart-6': theme.colors['chart-6']!,
+    'chart-7': theme.colors['chart-7']!,
+    'chart-8': theme.colors['chart-8']!,
     'font-sans': font.fontSans,
     'font-display': font.fontDisplay,
     'font-brand': font.fontBrand,

@@ -65,6 +65,14 @@
   --dw-focus: #8839ef;
   --dw-overlay: rgba(15, 17, 26, .48);
   --dw-chart-grid: #dde3ec;
+  --dw-chart-1: #8839ef;
+  --dw-chart-2: #176b85;
+  --dw-chart-3: #7287fd;
+  --dw-chart-4: #209fb5;
+  --dw-chart-5: #ea76cb;
+  --dw-chart-6: #d25400;
+  --dw-chart-7: #347a1b;
+  --dw-chart-8: #1e66f5;
   --dw-heat-empty: #f0f3f8;
   --dw-heat-low: #e6ddf9;
   --dw-heat-mid: #c5a8ef;

@@ -137,6 +137,8 @@ describe('token usage layout', () => {
     expect(container.querySelectorAll('.token-segment')).toHaveLength(2)
     expect(container.querySelector('.token-segment')?.textContent).toContain('Token')
     expect(container.querySelector('.token-segment')?.getAttribute('rx')).toBeNull()
+    expect(container.querySelector('.model-key-0')).not.toBeNull()
+    expect(container.querySelector('.token-segment.model-0')).not.toBeNull()
 
     const quotaWindowText = container.querySelector<HTMLElement>('.quota-window span')!.textContent
     expect(quotaWindowText).toBe('剩余 68%')

@@ -4,7 +4,8 @@ import {
   FONT_WEIGHT_STORAGE_KEY, loadTextScale, saveTextScale, TEXT_SCALE_STORAGE_KEY,
   THEME_STORAGE_KEY, getAccentTheme, getFontTheme, loadAccentThemeId,
   loadFontThemeId, loadFontWeight, loadGlassMode, pluginTheme, saveAccentThemeId, saveFontThemeId,
-  saveFontWeight, saveGlassMode, GLASS_STORAGE_KEY,
+  saveFontWeight, saveGlassMode, GLASS_STORAGE_KEY, COLOR_SCHEME_STORAGE_KEY,
+  DEFAULT_COLOR_SCHEME_ID, loadColorSchemeId, saveColorSchemeId,
 } from './theme'
 
 describe('accent themes', () => {
@@ -99,5 +100,28 @@ describe('complete theme preferences', () => {
     expect(values.get(TEXT_SCALE_STORAGE_KEY)).toBe('125')
     expect(loadTextScale(storage)).toBe(125)
     expect(pluginTheme(getAccentTheme('catppuccin-latte'), getFontTheme('plex'), 400, 'disabled', 125)['text-scale']).toBe('1.25')
+  })
+
+  it('loads, saves and applies color scheme preferences', () => {
+    expect(loadColorSchemeId({ getItem: () => 'ocean' })).toBe('ocean')
+    expect(loadColorSchemeId({ getItem: () => 'invalid' })).toBe(DEFAULT_COLOR_SCHEME_ID)
+
+    const setItem = vi.fn()
+    saveColorSchemeId('amber', { setItem })
+    expect(setItem).toHaveBeenCalledWith(COLOR_SCHEME_STORAGE_KEY, 'amber')
+
+    const oceanTheme = getAccentTheme('catppuccin-latte', 'ocean')
+    expect(oceanTheme.colors.accent).toBe('#1e66f5')
+    expect(oceanTheme.colors['chart-1']).toBe('#1e66f5')
+    expect(oceanTheme.colors['chart-2']).toBe('#209fb5')
+
+    const pineMoonTheme = getAccentTheme('rose-pine-moon', 'pine')
+    expect(pineMoonTheme.colors.accent).toBe('#a3c9ad')
+    expect(pineMoonTheme.colors['chart-1']).toBe('#a3c9ad')
+    expect(pineMoonTheme.colors['chart-2']).toBe('#3e8fb0')
+
+    const plugin = pluginTheme(oceanTheme)
+    expect(plugin['chart-1']).toBe('#1e66f5')
+    expect(plugin['chart-8']).toBe('#d25400')
   })
 })

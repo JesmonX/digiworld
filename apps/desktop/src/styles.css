@@ -354,6 +354,14 @@ button, input, select, textarea { font: inherit; }
 .theme-miniature em { width: 45%; height: 6px; border-radius: var(--dw-radius-sm); background: var(--theme-swatch); }
 .theme-options button > small { margin-top: var(--dw-space-2); color: var(--dw-text); }
 .theme-card { flex-direction: column; align-items: stretch; gap: var(--dw-space-4); }
+.scheme-card { flex-direction: column; align-items: stretch; gap: var(--dw-space-4); }
+.scheme-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); width: 100%; gap: var(--dw-space-3); }
+.scheme-options button { display: flex; align-items: center; gap: var(--dw-space-3); height: auto; min-height: 48px; padding: var(--dw-space-3); text-align: left; }
+.scheme-options button .scheme-swatch { width: 18px; height: 18px; border-radius: 50%; flex: 0 0 18px; box-shadow: 0 0 0 1px var(--dw-overlay); }
+.scheme-options button .scheme-label-wrap { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.scheme-options button strong { font-size: var(--type-body-sm); font-weight: var(--weight-semibold); color: var(--dw-text); }
+.scheme-options button small { font-size: var(--type-caption); color: var(--dw-text-muted); }
+.scheme-options button svg { width: 16px; height: 16px; margin-left: auto; flex: 0 0 16px; color: var(--dw-accent); }
 .topbar { min-height: 64px; height: auto; flex-shrink: 0; gap: var(--dw-space-3); }
 .topbar h1 { font-size: var(--dw-type-page); line-height: var(--dw-leading-page); }
 .plugin-management { flex-wrap: wrap; justify-content: flex-end; }

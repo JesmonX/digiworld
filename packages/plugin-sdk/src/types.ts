@@ -85,6 +85,15 @@ export interface PluginTheme {
   'success'?: string
   'warning'?: string
   'danger': string
+  'chart-grid'?: string
+  'chart-1'?: string
+  'chart-2'?: string
+  'chart-3'?: string
+  'chart-4'?: string
+  'chart-5'?: string
+  'chart-6'?: string
+  'chart-7'?: string
+  'chart-8'?: string
   'font-sans': string
   'font-display': string
   'font-brand'?: string

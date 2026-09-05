@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import { FONT_THEME_STORAGE_KEY, FONT_WEIGHT_STORAGE_KEY, GLASS_STORAGE_KEY } from './theme'
+import { COLOR_SCHEME_STORAGE_KEY, FONT_THEME_STORAGE_KEY, FONT_WEIGHT_STORAGE_KEY, GLASS_STORAGE_KEY } from './theme'
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -233,10 +233,24 @@ describe('explicit update consent', () => {
     await navigate(container, '设置')
     const toggle = container.querySelector<HTMLButtonElement>('[aria-label="切换玻璃效果"]')!
     expect(toggle.getAttribute('aria-checked')).toBe('false')
-    await act(async () => toggle.click())
+    await act(async () => { toggle.click(); await flush() })
     expect(toggle.getAttribute('aria-checked')).toBe('true')
     expect(localStorage.getItem(GLASS_STORAGE_KEY)).toBe('enabled')
     expect(container.querySelector('.app-window')?.className).toContain('glass-enabled')
+    await act(async () => root.unmount())
+  })
+
+  it('applies and persists a color scheme across the shell', async () => {
+    const root = createRoot(container)
+    await act(async () => { root.render(<App />); await flush() })
+    await navigate(container, '设置')
+
+    const oceanButton = container.querySelector<HTMLButtonElement>('button[aria-label="海洋湛蓝"]')
+    expect(oceanButton).not.toBeNull()
+    await act(async () => { oceanButton?.click(); await flush() })
+
+    expect(container.querySelector<HTMLElement>('.app-window')?.style.getPropertyValue('--dw-accent')).toBe('#1e66f5')
+    expect(localStorage.getItem(COLOR_SCHEME_STORAGE_KEY)).toBe('ocean')
     await act(async () => root.unmount())
   })
 
