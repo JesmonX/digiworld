@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronDown, Flame, Keyboard, Pause, Play } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import {
-  formatKeyLabel, getKeyboardLayout, keyboardLayouts, layoutKeys, type KeyboardLayoutId, type KeyDefinition,
+  formatKeyLabel, getKeyboardLayout, heatLevel, keyboardLayouts, layoutKeys, type KeyboardLayoutId, type KeyDefinition,
 } from './keyboard'
 import './styles.css'
 
@@ -135,7 +135,7 @@ export default function App() {
         <div className="keyboard-scroll" style={{ '--board-min-width': `${layout.minWidth}px` } as React.CSSProperties}>
           <div className="board-toolbar">
             <div><h2><Keyboard />按键分布</h2></div>
-            <div className="legend"><span>低</span>{[.08, .22, .42, .68, 1].map(value => <i key={value} style={{ '--heat': value } as React.CSSProperties} />)}<span>高</span></div>
+            <div className="legend"><span>低</span>{[1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>高</span></div>
           </div>
           <div className={`keyboard-board layout-${layout.id}`}>
             {layout.functionRow.length > 0 && <><div className="function-row-layout"><KeyboardRow keys={layout.functionRow} counts={snapshot?.counts ?? {}} max={maxCount} /></div><div className="keyboard-gap" /></>}
@@ -167,12 +167,12 @@ function KeyboardRow({ keys, counts, max, className = '' }: { keys: KeyDefinitio
 }
 
 function Keycap({ definition, count, max, grid = false }: { definition: KeyDefinition; count: number; max: number; grid?: boolean }) {
-  const heat = max > 0 ? Math.log1p(count) / Math.log1p(max) : 0
+  const level = heatLevel(count, max)
   const style = grid
-    ? { gridRow: `${definition.row} / span ${definition.rowSpan ?? 1}`, gridColumn: `${definition.column} / span ${definition.columnSpan ?? 1}`, '--heat': heat }
-    : { '--width': definition.width ?? 1, '--spacer': definition.spacer ?? 0, '--heat': heat }
+    ? { gridRow: `${definition.row} / span ${definition.rowSpan ?? 1}`, gridColumn: `${definition.column} / span ${definition.columnSpan ?? 1}` }
+    : { '--width': definition.width ?? 1, '--spacer': definition.spacer ?? 0 }
   return (
-    <div className={`key ${count > 0 ? 'has-count' : ''} ${heat >= .58 ? 'strong-heat' : ''}`} title={`${definition.id}: ${count.toLocaleString()} 次`} aria-label={`${definition.label || definition.id}，${count.toLocaleString()} 次`} style={style as React.CSSProperties}>
+    <div className={`key level-${level} ${count > 0 ? 'has-count' : ''} ${level >= 3 ? 'strong-heat' : ''}`} title={`${definition.id}: ${count.toLocaleString()} 次`} aria-label={`${definition.label || definition.id}，${count.toLocaleString()} 次`} style={style as React.CSSProperties}>
       <span>{definition.label}</span>
       {count > 0 && <small>{count > 999 ? `${(count / 1000).toFixed(1)}k` : count}</small>}
     </div>

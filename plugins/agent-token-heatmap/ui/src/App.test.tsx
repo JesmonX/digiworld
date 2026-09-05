@@ -70,6 +70,7 @@ const quota = {
       {
         id: 'credit-1',
         title: '赠送重置卡',
+        description: '系统补偿额度',
         grantedAt: 1788500000,
         expiresAt: 1789500000,
         status: 'available',
@@ -135,6 +136,11 @@ describe('token usage layout', () => {
     expect(container.querySelector('.weekly-chart')?.getAttribute('viewBox')).toBe('0 0 820 300')
     expect(container.querySelectorAll('.token-segment')).toHaveLength(2)
     expect(container.querySelector('.token-segment')?.textContent).toContain('Token')
+    expect(container.querySelector('.token-segment')?.getAttribute('rx')).toBeNull()
+
+    const quotaWindowText = container.querySelector<HTMLElement>('.quota-window span')!.textContent
+    expect(quotaWindowText).toBe('剩余 68%')
+    expect(quotaWindowText).not.toContain('已用')
 
     const quotaFill = container.querySelector<HTMLElement>('.quota-track i')!
     expect(quotaFill.style.width).toBe('68%')
@@ -145,6 +151,7 @@ describe('token usage layout', () => {
     expect(quotaResets.textContent).toContain('重置卡')
     expect(quotaResets.textContent).toContain('1 张可用')
     expect(quotaResets.textContent).toContain('赠送重置卡')
+    expect(quotaResets.textContent).not.toContain('系统补偿额度')
     expect(quotaResets.textContent).toContain('获得：')
     expect(quotaResets.textContent).toContain('到期：')
 

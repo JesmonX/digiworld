@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatKeyLabel, getKeyboardLayout, keyboardLayouts, layoutKeys, numpadKeys } from './keyboard'
+import { formatKeyLabel, getKeyboardLayout, heatLevel, keyboardLayouts, layoutKeys, numpadKeys } from './keyboard'
 
 describe('keyboard layouts', () => {
   it('covers the mainstream 104, 87, 84, 68 and 61-key distributions', () => {
@@ -28,5 +28,15 @@ describe('keyboard layouts', () => {
     expect(formatKeyLabel('Space')).toBe('空格')
     expect(formatKeyLabel('BracketLeft')).toBe('[')
     expect(formatKeyLabel('UnknownCustomKey')).toBe('UnknownCustomKey')
+  })
+
+  it('allocates distinct heat levels based on frequency ratios', () => {
+    expect(heatLevel(0, 1000)).toBe(0)
+    expect(heatLevel(0, 0)).toBe(0)
+    expect(heatLevel(1, 2000)).toBe(1)
+    expect(heatLevel(5, 1000)).toBe(2)
+    expect(heatLevel(50, 1000)).toBe(3)
+    expect(heatLevel(200, 1000)).toBe(4)
+    expect(heatLevel(600, 1000)).toBe(5)
   })
 })

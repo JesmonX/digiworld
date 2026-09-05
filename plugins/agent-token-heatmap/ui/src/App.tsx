@@ -340,7 +340,7 @@ function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
           const segmentHeight = value * scale
           const y = top + plotHeight - offset - segmentHeight
           offset += segmentHeight
-          return <rect key={`${point.day}-${category.key}`} x={x - barWidth / 2} y={y} width={barWidth} height={segmentHeight} rx="3" className={`token-segment model-${categoryIndex}`}><title>{`${point.day} · ${category.label} · ${formatTokens(value)} Token (${point.totalTokens > 0 ? (value / point.totalTokens * 100).toFixed(1) : '0.0'}%)`}</title></rect>
+          return <rect key={`${point.day}-${category.key}`} x={x - barWidth / 2} y={y} width={barWidth} height={segmentHeight} className={`token-segment model-${categoryIndex}`}><title>{`${point.day} · ${category.label} · ${formatTokens(value)} Token (${point.totalTokens > 0 ? (value / point.totalTokens * 100).toFixed(1) : '0.0'}%)`}</title></rect>
         })}</g><text x={x} y={height - 18} textAnchor="middle" className="chart-day-label">{point.day.slice(5).replace('-', '/')}</text></g>
       })}
       {segments.map((segment, index) => segment.length > 1 && <polyline key={index} points={segment.map(point => `${xFor(point)},${yForRate(point.cacheRate!)}`).join(' ')} className="cache-line" />)}
@@ -412,7 +412,7 @@ function QuotaCard({ quota, loading, configured, onRefresh, onConfigure }: { quo
         : available ? <>
           <div className="quota-windows">{quota.windows.map((window, index) => {
             const remaining = 100 - Math.max(0, Math.min(100, window.usedPercent))
-            return <div key={`${window.windowDurationMins ?? index}-${window.resetsAt ?? index}`} className="quota-window"><div><strong>{formatDuration(window.windowDurationMins)}</strong><span>已用 {window.usedPercent}% · 剩余 {Math.max(0, 100 - window.usedPercent)}%</span></div><div className="quota-track"><i style={{ width: `${remaining}%` }} /></div><small><Clock3 />{formatReset(window.resetsAt)}</small></div>
+            return <div key={`${window.windowDurationMins ?? index}-${window.resetsAt ?? index}`} className="quota-window"><div><strong>{formatDuration(window.windowDurationMins)}</strong><span>剩余 {remaining}%</span></div><div className="quota-track"><i style={{ width: `${remaining}%` }} /></div><small><Clock3 />{formatReset(window.resetsAt)}</small></div>
           })}</div>
           <div className="quota-resets">
             <div className="quota-resets-header">
@@ -427,7 +427,6 @@ function QuotaCard({ quota, loading, configured, onRefresh, onConfigure }: { quo
                   <div key={credit.id || index} className="quota-reset-item">
                     <div className="quota-reset-item-name">
                       <span>{credit.title || '额度重置卡'}</span>
-                      {credit.description && <span className="quota-reset-item-desc">{credit.description}</span>}
                     </div>
                     <div className="quota-reset-item-dates">
                       <span>获得：{formatCardDate(credit.grantedAt)}</span>

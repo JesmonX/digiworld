@@ -115,3 +115,13 @@ export function formatKeyLabel(keyId: string): string {
   return keyId
 }
 
+export function heatLevel(value: number, max: number): number {
+  if (value <= 0 || max <= 0) return 0
+  const ratio = value / max
+  if (ratio >= .5) return 5
+  if (ratio >= .1) return 4
+  if (ratio >= .01) return 3
+  if (ratio >= .001) return 2
+  return 1
+}
+

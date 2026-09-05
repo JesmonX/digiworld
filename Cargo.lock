@@ -924,7 +924,7 @@ dependencies = [
 
 [[package]]
 name = "digiworld"
-version = "0.2.27"
+version = "0.2.28"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -957,7 +957,7 @@ dependencies = [
 
 [[package]]
 name = "digiworld-agent-token-heatmap"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "anyhow",
  "chrono",
@@ -971,7 +971,7 @@ dependencies = [
 
 [[package]]
 name = "digiworld-keyboard-heatmap"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "chrono",
