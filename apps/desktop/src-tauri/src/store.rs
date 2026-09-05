@@ -173,6 +173,7 @@ impl Store {
             let (json, enabled, state, error) = row?;
             let manifest: PluginManifest = serde_json::from_str(&json)?;
             summaries.push(PluginSummary {
+                ui_design_version: manifest.ui_design_version,
                 id: manifest.id,
                 version: manifest.version,
                 name: manifest.name,

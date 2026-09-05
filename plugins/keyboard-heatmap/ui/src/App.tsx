@@ -1,3 +1,4 @@
+import { Button, Card, Menu, Status } from '@digiworld/design-system/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronDown, Flame, Keyboard, Pause, Play } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
@@ -95,22 +96,22 @@ export default function App() {
 
   return (
     <div className="heatmap-app">
-      <header className="plugin-header">
+      <header className="dw-toolbar plugin-header">
         <div className="summary-line" aria-label="键盘统计摘要">
           <div><span>总次数</span><strong>{(snapshot?.total ?? 0).toLocaleString()}</strong></div>
           <div><Flame /><span>最高频</span><strong>{snapshot?.topKey ?? '—'}</strong></div>
         </div>
         <div className="header-actions">
-          <div className="scope-toggle" role="group" aria-label="统计时间范围"><button aria-pressed={scope === 'today'} className={scope === 'today' ? 'active' : ''} onClick={() => setScope('today')}>今天</button><button aria-pressed={scope === 'all'} className={scope === 'all' ? 'active' : ''} onClick={() => setScope('all')}>全部</button></div>
-          <button className={`pause-button ${snapshot?.paused ? 'paused' : ''}`} onClick={() => void togglePause()}>{snapshot?.paused ? <Play /> : <Pause />}{snapshot?.paused ? '继续' : '暂停'}</button>
+          <div className="dw-segmented scope-toggle" role="group" aria-label="统计时间范围"><Button aria-pressed={scope === 'today'} className={scope === 'today' ? 'active' : ''} onClick={() => setScope('today')}>今天</Button><Button aria-pressed={scope === 'all'} className={scope === 'all' ? 'active' : ''} onClick={() => setScope('all')}>全部</Button></div>
+          <Button className={`pause-button ${snapshot?.paused ? 'paused' : ''}`} onClick={() => void togglePause()}>{snapshot?.paused ? <Play /> : <Pause />}{snapshot?.paused ? '继续' : '暂停'}</Button>
         </div>
       </header>
 
-      {error && <div className="plugin-error">{error}</div>}
+      {error && <Status tone="error" className="plugin-error">{error}</Status>}
 
-      <section className="keyboard-card">
+      <section className="dw-card keyboard-card">
         <div className="layout-picker" ref={layoutPickerRef}>
-          <button
+          <Button
             ref={layoutTriggerRef}
             type="button"
             className="layout-picker-trigger"
@@ -120,16 +121,16 @@ export default function App() {
             onClick={() => setLayoutMenuOpen(open => !open)}
           >
             <span className="layout-preview" aria-hidden="true">{layout.preview.map((row, rowIndex) => <i key={rowIndex}>{row.map((width, index) => <b key={index} style={{ flex: width }} />)}</i>)}</span>
-            <span className="layout-picker-copy"><strong>{layout.label}</strong><small>键盘尺寸</small></span>
+            <span className="layout-picker-copy"><strong>{layout.label}</strong></span>
             <ChevronDown aria-hidden="true" />
-          </button>
-          <div id="keyboard-layout-menu" className={`layout-menu ${layoutMenuOpen ? 'open' : ''}`} role="menu" aria-label="键盘尺寸选项" aria-hidden={!layoutMenuOpen}>
-            {keyboardLayouts.map(option => <button key={option.id} type="button" role="menuitemradio" aria-checked={layoutId === option.id} className={layoutId === option.id ? 'active' : ''} onClick={() => void selectLayout(option.id)}>
+          </Button>
+          <Menu id="keyboard-layout-menu" className={`layout-menu ${layoutMenuOpen ? 'open' : ''}`} role="menu" aria-label="键盘尺寸选项" aria-hidden={!layoutMenuOpen}>
+            {keyboardLayouts.map(option => <Button key={option.id} type="button" role="menuitemradio" aria-checked={layoutId === option.id} className={layoutId === option.id ? 'active' : ''} onClick={() => void selectLayout(option.id)}>
               <span className="layout-preview" aria-hidden="true">{option.preview.map((row, rowIndex) => <i key={rowIndex}>{row.map((width, index) => <b key={index} style={{ flex: width }} />)}</i>)}</span>
               <span><strong>{option.label}</strong><small>{option.id === 'full' ? '全尺寸' : option.id === 'tkl' ? 'TKL' : `${option.id}%`}</small></span>
               {layoutId === option.id && <Check aria-hidden="true" />}
-            </button>)}
-          </div>
+            </Button>)}
+          </Menu>
         </div>
         <div className="keyboard-scroll" style={{ '--board-min-width': `${layout.minWidth}px` } as React.CSSProperties}>
           <div className="board-toolbar">
@@ -148,14 +149,14 @@ export default function App() {
       </section>
 
       <section className="lower-grid">
-        <article className="ranking-card">
+        <Card className="dw-card ranking-card">
           <h2>高频键位</h2>
           <div className="ranking-list">
             {snapshot?.topTen.length
               ? snapshot.topTen.map((entry, index) => <div key={entry.key}><b>{index + 1}</b><span>{formatKeyLabel(entry.key)}</span><i><em style={{ width: `${(entry.count / (snapshot.topTen[0]?.count || 1)) * 100}%` }} /></i><strong>{entry.count.toLocaleString()}</strong></div>)
               : <p className="no-data">暂无数据</p>}
           </div>
-        </article>
+        </Card>
       </section>
     </div>
   )

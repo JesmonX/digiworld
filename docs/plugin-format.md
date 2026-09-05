@@ -1,5 +1,7 @@
 # Digiworld plugin format v1
 
+New catalog versions must declare `uiDesignVersion: 1` and require core 0.2.27 or newer. See [UI design contract](ui-design.md) for shared controls, full light/dark themes, host-provided typography and artifact-bound publication checks. Installed older versions remain usable with the host's light compatibility theme.
+
 Official plugins are ZIP-compatible `.dwpkg` archives containing:
 
 ```text

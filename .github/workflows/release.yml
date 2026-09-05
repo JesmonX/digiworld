@@ -63,6 +63,10 @@ jobs:
       - run: pnpm typecheck
       - name: Build plugin frontends
         run: pnpm --filter "@digiworld/plugin-*-ui" build
+      - run: pnpm check:ui
+      - run: pnpm exec playwright install chromium
+      - name: Validate built plugin interfaces
+        run: pnpm test:ui
       - name: Build plugin backends
         run: cargo build --release -p digiworld-keyboard-heatmap -p digiworld-agent-token-heatmap -p digiworld-mail-assistant
       - name: Package signed keyboard plugin

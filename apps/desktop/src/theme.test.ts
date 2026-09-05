@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_ACCENT_THEME_ID, DEFAULT_FONT_THEME_ID, DEFAULT_FONT_WEIGHT, FONT_THEME_STORAGE_KEY,
-  FONT_WEIGHT_STORAGE_KEY,
+  FONT_WEIGHT_STORAGE_KEY, loadTextScale, saveTextScale, TEXT_SCALE_STORAGE_KEY,
   THEME_STORAGE_KEY, getAccentTheme, getFontTheme, loadAccentThemeId,
   loadFontThemeId, loadFontWeight, loadGlassMode, pluginTheme, saveAccentThemeId, saveFontThemeId,
   saveFontWeight, saveGlassMode, GLASS_STORAGE_KEY,
@@ -9,30 +9,30 @@ import {
 
 describe('accent themes', () => {
   it('loads a stored theme and falls back for unknown values', () => {
-    expect(loadAccentThemeId({ getItem: () => 'teal' })).toBe('teal')
+    expect(loadAccentThemeId({ getItem: () => 'catppuccin-mocha' })).toBe('catppuccin-mocha')
     expect(loadAccentThemeId({ getItem: () => 'dark' })).toBe(DEFAULT_ACCENT_THEME_ID)
   })
 
   it('persists the selected theme', () => {
     const setItem = vi.fn()
-    saveAccentThemeId('orange', { setItem })
-    expect(setItem).toHaveBeenCalledWith(THEME_STORAGE_KEY, 'orange')
+    saveAccentThemeId('rose-pine-moon', { setItem })
+    expect(setItem).toHaveBeenCalledWith(THEME_STORAGE_KEY, 'rose-pine-moon')
   })
 
-  it('changes plugin accents without changing the light surfaces', () => {
-    const theme = pluginTheme(getAccentTheme('rose'), getFontTheme('wenkai'))
+  it('resolves complete palette and typography for plugins', () => {
+    const theme = pluginTheme(getAccentTheme('rose-pine-dawn'), getFontTheme('wenkai'))
     expect(theme).toMatchObject({
       'color-scheme': 'light',
-      'bg': '#f5f7fb',
-      'surface': '#ffffff',
-      'accent': '#e11d48',
-      'accent-strong': '#be123c',
-      'accent-soft': '#fff0f3',
+      'bg': '#faf4ed',
+      'surface': '#fffaf3',
+      'accent': '#79569b',
+      'accent-strong': expect.stringContaining('color-mix'),
+      'accent-soft': expect.stringContaining('color-mix'),
       'font-sans': expect.stringContaining('LXGW WenKai'),
       'font-display': expect.stringContaining('LXGW WenKai'),
       'font-brand': expect.stringContaining('Digiworld Smiley Sans'),
-      success: '#16835b',
-      warning: '#a15c00',
+      success: '#436b58',
+      warning: '#916000',
     })
   })
 })
@@ -65,7 +65,7 @@ describe('font themes', () => {
     const setItem = vi.fn()
     saveFontWeight(400, { setItem })
     expect(setItem).toHaveBeenCalledWith(FONT_WEIGHT_STORAGE_KEY, '400')
-    expect(pluginTheme(getAccentTheme('violet'), getFontTheme('plex'), 600)).toMatchObject({
+    expect(pluginTheme(getAccentTheme('catppuccin-latte'), getFontTheme('plex'), 600)).toMatchObject({
       'weight-regular': '600',
       'weight-medium': '600',
       'weight-semibold': '700',
@@ -73,16 +73,31 @@ describe('font themes', () => {
     })
   })
 
-  it('loads and saves the glass preference with an enabled fallback', () => {
+  it('loads and saves the glass preference with a disabled fallback', () => {
     const values = new Map<string, string>()
     const storage = {
       getItem: (key: string) => values.get(key) ?? null,
       setItem: (key: string, value: string) => { values.set(key, value) },
     }
-    expect(loadGlassMode(storage)).toBe('enabled')
+    expect(loadGlassMode(storage)).toBe('disabled')
     saveGlassMode('disabled', storage)
     expect(loadGlassMode(storage)).toBe('disabled')
     values.set(GLASS_STORAGE_KEY, 'unexpected')
-    expect(loadGlassMode(storage)).toBe('enabled')
+    expect(loadGlassMode(storage)).toBe('disabled')
+  })
+})
+
+describe('complete theme preferences', () => {
+  it('migrates old accent preferences once without overwriting the new selection', () => {
+    const values = new Map([['digiworld.accent-theme.v1', 'rose']])
+    const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value) } }
+    expect(loadAccentThemeId(storage)).toBe('catppuccin-latte')
+    saveAccentThemeId('catppuccin-mocha', storage)
+    expect(loadAccentThemeId(storage)).toBe('catppuccin-mocha')
+    expect(pluginTheme(getAccentTheme('catppuccin-mocha'))['color-scheme']).toBe('dark')
+    saveTextScale(125, storage)
+    expect(values.get(TEXT_SCALE_STORAGE_KEY)).toBe('125')
+    expect(loadTextScale(storage)).toBe(125)
+    expect(pluginTheme(getAccentTheme('catppuccin-latte'), getFontTheme('plex'), 400, 'disabled', 125)['text-scale']).toBe('1.25')
   })
 })

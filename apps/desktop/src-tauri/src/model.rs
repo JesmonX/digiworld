@@ -47,6 +47,8 @@ pub struct PlatformArtifact {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PluginManifest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ui_design_version: Option<u32>,
     pub schema_version: u32,
     pub protocol_version: u32,
     pub id: String,
@@ -76,6 +78,8 @@ pub struct CatalogArtifact {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CatalogPlugin {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ui_design_version: Option<u32>,
     pub id: String,
     pub version: String,
     pub name: String,
@@ -99,6 +103,8 @@ pub struct CatalogIndex {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PluginSummary {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ui_design_version: Option<u32>,
     pub id: String,
     pub version: String,
     pub name: String,

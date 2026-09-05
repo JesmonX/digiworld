@@ -1,0 +1,24 @@
+// Deterministic, synthetic presentation data. This module is only used by design.html.
+const totals = { inputTokens: 1280000, outputTokens: 240000, cacheReadTokens: 960000, cacheWriteTokens: 12000, totalTokens: 1520000, cacheRate: .75 }
+const days = Array.from({ length: 30 }, (_, index) => ({
+  ...totals, day: new Date(Date.UTC(2026, 7, 7 + index)).toISOString().slice(0, 10),
+  totalTokens: (index % 7 + 1) * 120000, cacheAvailable: true,
+  models: [{ model: 'gpt-5.6-sol', totalTokens: (index % 7 + 1) * 120000 }],
+}))
+const account = { id: 'demo', provider: 'custom', label: '工作邮箱', email: 'hello@example.com', username: 'hello@example.com', host: 'imap.example.com', port: 993, useProxy: true, hasCredential: true, syncPhase: 'idle', indexed: 30, total: 30, baselineComplete: true, lastError: null, nextSyncAt: '2026-09-05T06:00:00Z' }
+const messages = Array.from({ length: 18 }, (_, index) => ({ id: index + 1, accountId: 'demo', accountLabel: '工作邮箱', subject: index === 0 ? '设计评审 · 框架与插件一致性 / Typography & color review' : `项目进展与本周计划 ${index + 1}`, sender: 'Design Team <design@example.com>', receivedAt: '2026-09-05T04:00:00Z', snippet: '统一排版、主题和控件，让数据更容易阅读。', serverSeen: index > 2, locallyViewed: false, size: 1200, hasBody: true }))
+export function fixture(method: string, payload: unknown = {}): unknown {
+  if (new URLSearchParams(location.search).get('state') === 'error') throw new Error('演示：暂时无法加载，请重试')
+  const empty = new URLSearchParams(location.search).get('state') === 'empty'
+  if (method === 'heatmap.getLayout') return { layout: 'full' }
+  if (method === 'heatmap.setLayout') return {}
+  if (method === 'heatmap.snapshot') return { scope: 'today', paused: false, total: empty ? 0 : 12840, uniqueKeys: empty ? 0 : 42, topKey: empty ? null : 'Space', counts: empty ? {} : { Space: 4000, KeyA: 1900, KeyE: 2000, Enter: 180, ShiftLeft: 420, ControlLeft: 128 }, topTen: empty ? [] : [{ key: 'Space', count: 4000 }, { key: 'KeyE', count: 2000 }, { key: 'KeyA', count: 1900 }] }
+  if (method === 'usage.getSettings') return { localAgents: ['codex', 'claude', 'pi'], localRoots: {}, sshSources: [], codexQuota: { sourceId: 'local', shellPreset: 'auto', preCommand: '', refreshIntervalSeconds: null } }
+  if (method === 'usage.snapshot') return { startDay: '2026-08-07', endDay: '2026-09-05', totals: empty ? { ...totals, inputTokens: 0, totalTokens: 0 } : totals, days: empty ? [] : days, breakdown: [], modelBreakdown: empty ? [] : [{ ...totals, sourceId: 'local', sourceLabel: '本机', agent: 'codex', model: 'gpt-5.6-sol' }] }
+  if (method === 'usage.getCodexQuota') return { status: 'ready', sourceId: 'local', sourceLabel: '本机', fetchedAt: '2026-09-05T04:00:00Z', planType: 'Plus', windows: [{ usedPercent: 32, windowDurationMins: 300, resetsAt: null }, { usedPercent: 62, windowDurationMins: 10080, resetsAt: null }] }
+  if (method === 'mail.sync.status') return { accounts: empty ? [] : [account], syncingAccountIds: [] }
+  if (method === 'mail.settings.get') return { pollMinutes: 10 }
+  if (method === 'mail.messages.list') return { items: empty ? [] : messages }
+  if (method === 'mail.messages.get') return { ...messages.find(message => message.id === (payload as { id: number }).id), recipients: 'hello@example.com', bodyTruncated: false, body: '你好，\n\n这是可复现的界面评审数据。\n正文、表单与插件应使用同一套字体和主题。\n\nReadable typography makes a quiet interface useful.\n\n' + '长内容用于检查换行与滚动。'.repeat(30), attachments: [] }
+  throw new Error(`No design fixture for ${method}`)
+}

@@ -4,12 +4,14 @@ import path from 'node:path'
 import process from 'node:process'
 import { zipSync } from 'fflate'
 import { loadPluginSigningKey } from './plugin-signing-key.mjs'
+import { checkPlugin } from './check-ui.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
 const pluginName = process.argv[2]
 if (!pluginName || !/^[a-z0-9-]+$/.test(pluginName)) throw new Error('Usage: package-plugin.mjs <plugin-directory>')
 
 const source = JSON.parse(await readFile(path.join(root, 'plugins', pluginName, 'plugin.json'), 'utf8'))
+const designChecks = await checkPlugin(pluginName)
 const target = process.env.DIGIWORLD_TARGET ?? ({ win32: 'windows-x86_64', linux: 'linux-x86_64', darwin: 'darwin-x86_64' })[process.platform]
 if (!target) throw new Error(`Unsupported host platform: ${process.platform}`)
 
@@ -22,6 +24,10 @@ const backendPath = process.env.DIGIWORLD_PLUGIN_BACKEND
   : path.join(root, 'target', 'release', executableName)
 const uiPath = path.join(root, 'plugins', pluginName, 'ui', 'dist', 'index.html')
 const [backend, ui] = await Promise.all([readFile(backendPath), readFile(uiPath)])
+if (/@font-face|data:font|data:application\/(?:font|x-font)/i.test(ui.toString())) throw new Error('Plugin bundle contains a font payload')
+const visualReport = JSON.parse(await readFile(path.join(root, 'dist', 'ui-validation.json'), 'utf8'))
+const uiDigest = createHash('sha256').update(ui).digest('hex')
+if (visualReport.status !== 'passed' || visualReport.plugins?.[pluginName] !== uiDigest) throw new Error('Run pnpm test:ui against this exact frontend before packaging')
 const backendArchivePath = `bin/${target}/${executableName}`
 const sha256 = value => createHash('sha256').update(value).digest('hex')
 
@@ -55,6 +61,7 @@ if (process.env.DIGIWORLD_PLUGIN_SIGNING_KEY_B64) {
 const repository = process.env.GITHUB_REPOSITORY ?? 'JesmonX/digiworld'
 const tag = process.env.DIGIWORLD_RELEASE_TAG ?? `plugin-${pluginName}-v${source.version}`
 const metadata = {
+  designValidation: { ...designChecks, uiSha256: uiDigest, archiveSha256: sha256(archive), visual: visualReport.status },
   plugin: source,
   artifact: {
     target,

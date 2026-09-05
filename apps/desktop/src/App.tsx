@@ -1,3 +1,4 @@
+import { Button, Input, Card, Dialog, Switch, Status, RadioGroup } from '@digiworld/design-system/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
@@ -13,9 +14,9 @@ import {
   type ProxySettings, type UpdateProgress,
 } from './lib/api'
 import {
-  ACCENT_THEMES, FONT_THEMES, accentThemeStyle, fontThemeStyle, getAccentTheme,
+  ACCENT_THEMES, FONT_THEMES, themeStyle, loadTextScale, saveTextScale, type TextScale, getAccentTheme,
   getFontTheme, loadAccentThemeId, loadFontThemeId, loadFontWeight, pluginTheme, saveAccentThemeId,
-  saveFontThemeId, saveFontWeight, fontWeightStyle, loadGlassMode, saveGlassMode, type AccentThemeId, type FontThemeId, type FontWeight, type GlassMode,
+  saveFontThemeId, saveFontWeight, loadGlassMode, saveGlassMode, type AccentThemeId, type FontThemeId, type FontWeight, type GlassMode,
 } from './theme'
 import './styles.css'
 
@@ -101,9 +102,17 @@ function App() {
   const [fontThemeId, setFontThemeId] = useState<FontThemeId>(loadFontThemeId)
   const [fontWeight, setFontWeight] = useState<FontWeight>(loadFontWeight)
   const [glassMode, setGlassMode] = useState<GlassMode>(loadGlassMode)
+  const [textScale, setTextScale] = useState<TextScale>(loadTextScale)
+  useEffect(() => saveTextScale(textScale), [textScale])
   const accentTheme = getAccentTheme(accentThemeId)
   const fontTheme = getFontTheme(fontThemeId)
-  const activeTheme = useMemo(() => pluginTheme(accentTheme, fontTheme, fontWeight, glassMode), [accentTheme, fontTheme, fontWeight, glassMode])
+  const activeTheme = useMemo(() => pluginTheme(accentTheme, fontTheme, fontWeight, glassMode, textScale), [accentTheme, fontTheme, fontWeight, glassMode, textScale])
+
+  useEffect(() => {
+    for (const [key, value] of Object.entries(activeTheme)) if (value !== undefined) document.documentElement.style.setProperty('--dw-' + key, value)
+    document.documentElement.style.colorScheme = activeTheme['color-scheme']
+    document.documentElement.dataset.dwGlass = glassMode
+  }, [activeTheme, glassMode])
 
   useEffect(() => saveAccentThemeId(accentThemeId), [accentThemeId])
   useEffect(() => saveFontThemeId(fontThemeId), [fontThemeId])
@@ -192,7 +201,7 @@ function App() {
   const pluginOpen = typeof page !== 'string'
 
   return (
-    <div className={`app-window glass-${glassMode} ${pluginOpen ? 'plugin-open' : ''}`} style={{ ...accentThemeStyle(accentTheme), ...fontThemeStyle(fontTheme), ...fontWeightStyle(fontWeight) }}>
+    <div className={`app-window glass-${glassMode} ${pluginOpen ? 'plugin-open' : ''}`} data-dw-glass={glassMode} style={themeStyle(activeTheme)}>
       <WindowChrome />
       <div className="app-shell">
         <aside className="sidebar">
@@ -223,15 +232,15 @@ function App() {
             {selectedPlugin && (
               <div className="plugin-management">
                 <span className={`compact-status ${selectedPlugin.state}`}>{stateLabel(selectedPlugin)}</span>
-                <button className="secondary compact" disabled={busy === selectedPlugin.id} onClick={() => void manageEnabled(selectedPlugin, !selectedPlugin.enabled)}>
+                <Button className="secondary compact" disabled={busy === selectedPlugin.id} onClick={() => void manageEnabled(selectedPlugin, !selectedPlugin.enabled)}>
                   {selectedPlugin.enabled ? '停用' : '启用'}
-                </button>
-                <button className="danger-button" disabled={busy === selectedPlugin.id} onClick={() => void uninstall(selectedPlugin)}>移除</button>
+                </Button>
+                <Button className="danger-button" disabled={busy === selectedPlugin.id} onClick={() => void uninstall(selectedPlugin)}>移除</Button>
               </div>
             )}
           </header>
 
-          {error && <div className="error-banner"><CircleAlert /><span>{error}</span><button onClick={() => setError(null)}>关闭</button></div>}
+          {error && <Status tone="error" className="error-banner"><CircleAlert /><span>{error}</span><Button onClick={() => setError(null)}>关闭</Button></Status>}
 
           <section className="content">
             <AnimatePresence initial={false} mode={reduceMotion ? 'sync' : 'wait'}>
@@ -245,11 +254,11 @@ function App() {
               >
                 {page === 'home' && <Home plugins={state?.plugins ?? []} version={state?.version} onCatalog={() => setPage('catalog')} onOpen={id => setPage({ pluginId: id })} onRefresh={() => { void refreshState().catch(reason => setError(errorMessage(reason))) }} reducedMotion={Boolean(reduceMotion)} />}
                 {page === 'catalog' && <Catalog catalog={catalog} installed={installed} busy={busy} onInstall={setConfirmInstall} onRefresh={() => refreshCatalog(true)} onOpen={id => setPage({ pluginId: id })} currentTarget={state?.target} />}
-                {page === 'settings' && state && <SettingsPage state={state} progress={updateProgress} onProgressReset={() => setUpdateProgress(null)} onPluginsUpdated={refreshState} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} fontThemeId={fontThemeId} onFontThemeChange={setFontThemeId} fontWeight={fontWeight} onFontWeightChange={setFontWeight} glassMode={glassMode} onGlassModeChange={setGlassMode} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
+                {page === 'settings' && state && <SettingsPage state={state} progress={updateProgress} onProgressReset={() => setUpdateProgress(null)} onPluginsUpdated={refreshState} textScale={textScale} onTextScaleChange={setTextScale} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} fontThemeId={fontThemeId} onFontThemeChange={setFontThemeId} fontWeight={fontWeight} onFontWeightChange={setFontWeight} glassMode={glassMode} onGlassModeChange={setGlassMode} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
                 {pluginOpen && (
                   !selectedPlugin ? <Loading label="载入插件" />
                     : selectedPlugin.enabled
-                      ? (pluginHtml ? <PluginFrame pluginId={page.pluginId} html={pluginHtml} theme={{ ...activeTheme, glass: glassMode }} /> : <Loading label="载入界面" />)
+                      ? (pluginHtml ? <PluginFrame pluginId={page.pluginId} html={pluginHtml} theme={selectedPlugin?.uiDesignVersion === 1 ? activeTheme : pluginTheme(getAccentTheme('catppuccin-latte'), fontTheme, fontWeight, glassMode, textScale)} /> : <Loading label="载入界面" />)
                       : <div className="plugin-disabled"><Pause /><h2>已停用</h2></div>
                 )}
               </motion.div>
@@ -268,7 +277,7 @@ function SidebarGroup({ label, children }: { label: string; children: React.Reac
 }
 
 function NavButton({ active, icon, label, status, onClick }: { active: boolean; icon: React.ReactNode; label: string; status?: string; onClick(): void }) {
-  return <button title={label} className={`nav-item ${active ? 'active' : ''}`} onClick={onClick}><span>{icon}</span><b>{label}</b>{status && <i className={`state-dot ${status}`} />}</button>
+  return <Button title={label} className={`nav-item ${active ? 'active' : ''}`} onClick={onClick}><span>{icon}</span><b>{label}</b>{status && <i className={`state-dot ${status}`} />}</Button>
 }
 
 function Home({ plugins, version, onCatalog, onOpen, onRefresh, reducedMotion }: { plugins: PluginSummary[]; version: string | undefined; onCatalog(): void; onOpen(id: string): void; onRefresh(): void; reducedMotion: boolean }) {
@@ -277,7 +286,7 @@ function Home({ plugins, version, onCatalog, onOpen, onRefresh, reducedMotion }:
       <div className="empty-icon"><Boxes /></div>
       <h2>还没有安装功能</h2>
       <p>从功能库选择需要的工具。</p>
-      <button className="primary" onClick={onCatalog}>浏览功能库 <ChevronRight /></button>
+      <Button className="primary" onClick={onCatalog}>浏览功能库 <ChevronRight /></Button>
     </div>
   )
 
@@ -302,22 +311,22 @@ function Home({ plugins, version, onCatalog, onOpen, onRefresh, reducedMotion }:
       </div>
       <div className="section-heading installed-heading">
         <div><span className="section-kicker">你的工作台</span><h2>已安装功能</h2></div>
-        <button className="secondary" onClick={onCatalog}><Library />添加功能</button>
+        <Button className="secondary" onClick={onCatalog}><Library />添加功能</Button>
       </div>
       <div className="installed-list">
         {plugins.map((plugin, index) => (
           <motion.button key={plugin.id} className="plugin-row" onClick={() => onOpen(plugin.id)} initial={reducedMotion ? false : { opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={reducedMotion ? { duration: 0 } : { delay: index * .035, duration: .18 }}>
             <span className="row-icon"><PluginIcon plugin={plugin} /></span>
             <span className="plugin-row-copy"><span className="plugin-row-heading"><strong>{plugin.name}</strong><ChevronRight className="row-chevron" /></span><small>{plugin.description || '打开以查看功能'}</small></span>
-            <span className={`compact-status ${plugin.state}`}>{stateLabel(plugin)}</span>
+            <span className={`compact-status ${plugin.state}`}>{stateLabel(plugin)}</span>{plugin.uiDesignVersion !== 1 && <small className="legacy-design">浅色兼容 · 待适配新外观</small>}
           </motion.button>
         ))}
       </div>
       <div className="quick-actions" aria-label="快捷操作">
         <span className="section-kicker">快捷操作</span>
         <div>
-          <button className="quick-action" onClick={onCatalog}><span><Library /></span><b>浏览功能库</b><ChevronRight /></button>
-          <button className="quick-action" onClick={onRefresh}><span><RefreshCw /></span><b>刷新状态</b><ChevronRight /></button>
+          <Button className="quick-action" onClick={onCatalog}><span><Library /></span><b>浏览功能库</b><ChevronRight /></Button>
+          <Button className="quick-action" onClick={onRefresh}><span><RefreshCw /></span><b>刷新状态</b><ChevronRight /></Button>
         </div>
       </div>
     </div>
@@ -325,7 +334,7 @@ function Home({ plugins, version, onCatalog, onOpen, onRefresh, reducedMotion }:
 }
 
 function SummaryCard({ label, value, detail, icon, tone = 'accent' }: { label: string; value: string | number; detail: string; icon: React.ReactNode; tone?: 'accent' | 'success' | 'warning' | 'neutral' }) {
-  return <article className={`summary-card ${tone}`}><span className="summary-card-icon">{icon}</span><div><small>{label}</small><strong>{value}</strong><span>{detail}</span></div></article>
+  return <Card className={`summary-card ${tone}`}><span className="summary-card-icon">{icon}</span><div><small>{label}</small><strong>{value}</strong><span>{detail}</span></div></Card>
 }
 
 function Catalog({ catalog, installed, busy, onInstall, onRefresh, onOpen, currentTarget }: { catalog: CatalogIndex | null; installed: Map<string, PluginSummary>; busy: string | null; onInstall(plugin: CatalogPlugin): void; onRefresh(): void; onOpen(id: string): void; currentTarget?: string | undefined }) {
@@ -334,23 +343,23 @@ function Catalog({ catalog, installed, busy, onInstall, onRefresh, onOpen, curre
     <div>
       <div className="section-heading">
         <h2>可用功能</h2>
-        <button className="icon-button" aria-label="刷新功能库" title="刷新" onClick={onRefresh}><RefreshCw /></button>
+        <Button className="icon-button" aria-label="刷新功能库" title="刷新" onClick={onRefresh}><RefreshCw /></Button>
       </div>
       <div className="catalog-grid">
         {catalog.plugins.map(plugin => {
           const current = installed.get(plugin.id)
           const supported = Boolean(currentTarget && plugin.artifacts.some(artifact => artifact.target === currentTarget))
           return (
-            <article className="catalog-card" key={plugin.id}>
+            <Card className="catalog-card" key={plugin.id}>
               <div className="catalog-title"><span className="catalog-icon"><PluginIcon plugin={plugin} /></span><div className="catalog-version"><span className={`availability-dot ${current ? 'installed' : supported ? 'available' : 'unavailable'}`} /> <small>{current ? '已安装' : supported ? '可安装' : '暂未适配'}</small><small>v{plugin.version}</small></div></div>
               <h3>{plugin.name}</h3>
               <p>{plugin.description}</p>
               {current
-                ? <button className="secondary full" onClick={() => onOpen(plugin.id)}>打开 <ChevronRight /></button>
+                ? <Button className="secondary full" onClick={() => onOpen(plugin.id)}>打开 <ChevronRight /></Button>
                 : !supported
-                  ? <button className="secondary full" disabled title={`该插件暂未适配当前系统架构 (${currentTarget})`}>暂未适配当前系统</button>
-                  : <button className="primary full" disabled={busy === plugin.id} onClick={() => onInstall(plugin)}>{busy === plugin.id ? <LoaderCircle className="spin" /> : <Download />}安装</button>}
-            </article>
+                  ? <Button className="secondary full" disabled title={`该插件暂未适配当前系统架构 (${currentTarget})`}>暂未适配当前系统</Button>
+                  : <Button className="primary full" disabled={busy === plugin.id} onClick={() => onInstall(plugin)}>{busy === plugin.id ? <LoaderCircle className="spin" /> : <Download />}安装</Button>}
+            </Card>
           )
         })}
       </div>
@@ -362,11 +371,13 @@ type UpdateDialog =
   | { kind: 'plugins'; updates: PluginUpdateInfo[] }
   | { kind: 'core'; update: CoreUpdateInfo }
 
-function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, accentThemeId, onAccentThemeChange, fontThemeId, onFontThemeChange, fontWeight, onFontWeightChange, glassMode, onGlassModeChange, onChange }: {
+function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, textScale, onTextScaleChange, accentThemeId, onAccentThemeChange, fontThemeId, onFontThemeChange, fontWeight, onFontWeightChange, glassMode, onGlassModeChange, onChange }: {
   state: AppState
   progress: UpdateProgress | null
   onProgressReset(): void
   onPluginsUpdated(): Promise<void>
+  textScale: TextScale
+  onTextScaleChange(scale: TextScale): void
   accentThemeId: AccentThemeId
   onAccentThemeChange(id: AccentThemeId): void
   fontThemeId: FontThemeId
@@ -491,44 +502,46 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
 
   return (
     <div className="settings-stack">
-      <article className="settings-card theme-card">
+      <Card className="settings-card theme-card">
         <div className="theme-copy">
           <h3><Palette />主题颜色</h3>
-          <p>选择按钮、选中状态和图表的强调色，界面仍保持浅色</p>
+          <p>框架与插件使用同一套完整配色</p>
         </div>
-        <div className="theme-options" role="radiogroup" aria-label="主题颜色">
+        <RadioGroup className="theme-options" aria-label="主题颜色">
           {ACCENT_THEMES.map(theme => (
-            <button
+            <Button
               key={theme.id}
               type="button"
               className={accentThemeId === theme.id ? 'active' : ''}
               role="radio"
               aria-checked={accentThemeId === theme.id}
+              tabIndex={accentThemeId === theme.id ? 0 : -1}
               aria-label={theme.label}
               title={theme.label}
-              style={{ '--theme-swatch': theme.accent } as React.CSSProperties}
+              style={{ '--theme-swatch': theme.colors.accent, '--preview-bg': theme.colors.bg, '--preview-surface': theme.colors.surface, '--preview-text': theme.colors.text } as React.CSSProperties}
               onClick={() => onAccentThemeChange(theme.id)}
             >
-              <span />
+              <span className="theme-miniature" aria-hidden="true"><i /><b><em />Aa 123</b></span>
               <small>{theme.label}</small>
               {accentThemeId === theme.id && <Check />}
-            </button>
+            </Button>
           ))}
-        </div>
-      </article>
-      <article className="settings-card font-card">
+        </RadioGroup>
+      </Card>
+      <Card className="settings-card font-card">
         <div className="theme-copy">
           <h3><Type />界面字体</h3>
           <p>字体会同步应用到主界面、插件、图表数字与键盘按键</p>
         </div>
-        <div className="font-options" role="radiogroup" aria-label="界面字体">
+        <RadioGroup className="font-options" aria-label="界面字体">
           {FONT_THEMES.map(theme => (
-            <button
+            <Button
               key={theme.id}
               type="button"
               className={fontThemeId === theme.id ? 'active' : ''}
               role="radio"
               aria-checked={fontThemeId === theme.id}
+              tabIndex={fontThemeId === theme.id ? 0 : -1}
               aria-label={theme.label}
               style={{ '--font-preview': theme.fontSans, '--font-preview-display': theme.fontDisplay } as React.CSSProperties}
               onClick={() => onFontThemeChange(theme.id)}
@@ -536,45 +549,51 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
               <span className="font-option-heading"><strong>{theme.label}</strong>{fontThemeId === theme.id && <Check />}</span>
               <span className="font-sample">数字世界 Digiworld 2026</span>
               <small>{theme.description}</small>
-            </button>
+            </Button>
           ))}
+        </RadioGroup>
+      </Card>
+      <Card className="settings-card">
+        <div><h3>文字大小</h3><p>同步应用到框架、插件与图表</p></div>
+        <div className="dw-segmented" role="group" aria-label="文字大小">
+          {([100, 110, 125] as TextScale[]).map(scale => <Button key={scale} className={textScale === scale ? 'active' : ''} aria-pressed={textScale === scale} onClick={() => onTextScaleChange(scale)}>{scale}%</Button>)}
         </div>
-      </article>
-      <article className="settings-card weight-card">
+      </Card>
+      <Card className="settings-card weight-card">
         <div className="theme-copy">
           <h3><Type />字体粗细</h3>
           <p>同步调整主界面与插件正文，同时保留标题的信息层级</p>
         </div>
         <div className="weight-control">
           <div><span>标准</span><span>清晰</span><span>粗重</span></div>
-          <input aria-label="字体粗细" type="range" min="400" max="600" step="100" value={fontWeight} onChange={event => onFontWeightChange(Number(event.target.value) as FontWeight)} />
+          <Input aria-label="字体粗细" type="range" min="400" max="600" step="100" value={fontWeight} onChange={event => onFontWeightChange(Number(event.target.value) as FontWeight)} />
           <output>{fontWeight}</output>
         </div>
-      </article>
-      <article className="settings-card appearance-card"><div><h3>玻璃效果</h3><p>应用到 Digiworld 界面和已安装插件</p></div><button aria-label="切换玻璃效果" className={`switch ${glassMode === 'enabled' ? 'on' : ''}`} aria-pressed={glassMode === 'enabled'} onClick={() => onGlassModeChange(glassMode === 'enabled' ? 'disabled' : 'enabled')}><span /></button></article>
-      <article className="settings-card"><div><h3>开机启动</h3><p>在后台启动已启用的插件</p></div><button aria-label="切换开机启动" className={`switch ${state.launchAtStartup ? 'on' : ''}`} onClick={() => void onChange(!state.launchAtStartup)}><span /></button></article>
-      <article className="settings-card proxy-card">
+      </Card>
+      <Card className="settings-card appearance-card"><div><h3>玻璃效果</h3><p>应用到 Digiworld 界面和已安装插件</p></div><Switch aria-label="切换玻璃效果" checked={glassMode === 'enabled'} onCheckedChange={enabled => onGlassModeChange(enabled ? 'enabled' : 'disabled')} /></Card>
+      <Card className="settings-card"><div><h3>开机启动</h3><p>在后台启动已启用的插件</p></div><Switch aria-label="切换开机启动" checked={state.launchAtStartup} onCheckedChange={enabled => void onChange(enabled)} /></Card>
+      <Card className="settings-card proxy-card">
         <div className="proxy-copy">
           <h3><Network />网络代理</h3>
           <p>用于功能库、程序更新和声明网络权限的插件</p>
-          <div className="proxy-modes" role="group" aria-label="代理模式">
+          <div className="dw-segmented proxy-modes" role="group" aria-label="代理模式">
             {([['system', '系统代理'], ['custom', '自定义'], ['direct', '直连']] as const).map(([mode, label]) => (
-              <button key={mode} className={proxy.mode === mode ? 'active' : ''} aria-pressed={proxy.mode === mode} onClick={() => updateMode(mode)}>{label}</button>
+              <Button key={mode} className={proxy.mode === mode ? 'active' : ''} aria-pressed={proxy.mode === mode} onClick={() => updateMode(mode)}>{label}</Button>
             ))}
           </div>
-          {proxy.mode === 'custom' && <input aria-label="自定义代理地址" value={proxy.url ?? ''} onChange={event => setProxy({ mode: 'custom', url: event.target.value })} placeholder="http://127.0.0.1:7890 或 socks5h://127.0.0.1:7890" />}
+          {proxy.mode === 'custom' && <Input aria-label="自定义代理地址" value={proxy.url ?? ''} onChange={event => setProxy({ mode: 'custom', url: event.target.value })} placeholder="http://127.0.0.1:7890 或 socks5h://127.0.0.1:7890" />}
           {proxyMessage && <small className="proxy-message">{proxyMessage}</small>}
         </div>
-        <div className="proxy-actions"><button className="secondary" disabled={proxyBusy !== null} onClick={() => void runProxyAction('test')}>{proxyBusy === 'test' ? '测试中…' : '测试连接'}</button><button className="primary" disabled={proxyBusy !== null} onClick={() => void runProxyAction('save')}>{proxyBusy === 'save' ? '保存中…' : '保存'}</button></div>
-      </article>
-      <article className="settings-card update-card">
+        <div className="proxy-actions"><Button className="secondary" disabled={proxyBusy !== null} onClick={() => void runProxyAction('test')}>{proxyBusy === 'test' ? '测试中…' : '测试连接'}</Button><Button className="primary" disabled={proxyBusy !== null} onClick={() => void runProxyAction('save')}>{proxyBusy === 'save' ? '保存中…' : '保存'}</Button></div>
+      </Card>
+      <Card className="settings-card update-card">
         <div><h3>插件更新</h3><p>一次检查并更新所有已安装插件，通过上方已保存的代理连接</p>{pluginMessage && <small className="update-message">{pluginMessage}</small>}</div>
-        <button className="secondary" disabled={updateBusy !== null} onClick={() => void checkPluginUpdates()}>{updateBusy === 'plugin-check' ? <><LoaderCircle className="spin" />检查中…</> : '检查全部插件'}</button>
-      </article>
-      <article className="settings-card update-card">
+        <Button className="secondary" disabled={updateBusy !== null} onClick={() => void checkPluginUpdates()}>{updateBusy === 'plugin-check' ? <><LoaderCircle className="spin" />检查中…</> : '检查全部插件'}</Button>
+      </Card>
+      <Card className="settings-card update-card">
         <div><h3>主程序更新</h3><p>当前版本 {state.version}，检查后由你确认是否下载和安装</p>{coreMessage && <small className="update-message">{coreMessage}</small>}</div>
-        <button className="secondary" disabled={updateBusy !== null} onClick={() => void checkCoreUpdate()}>{updateBusy === 'core-check' ? <><LoaderCircle className="spin" />检查中…</> : '检查主程序'}</button>
-      </article>
+        <Button className="secondary" disabled={updateBusy !== null} onClick={() => void checkCoreUpdate()}>{updateBusy === 'core-check' ? <><LoaderCircle className="spin" />检查中…</> : '检查主程序'}</Button>
+      </Card>
       <div className="version-line"><ShieldCheck /> Digiworld {state.version}</div>
       {updateDialog && (
         <UpdateDialogView
@@ -592,17 +611,15 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
 
 function InstallDialog({ plugin, busy, progress, onCancel, onConfirm }: { plugin: CatalogPlugin; busy: boolean; progress: UpdateProgress | null; onCancel(): void; onConfirm(): void }) {
   return (
-    <div className="modal-backdrop">
-      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="install-title">
+    <Dialog open onClose={() => { if (!busy) onCancel() }} className="modal" aria-labelledby="install-title">
         <div className="modal-icon"><ShieldCheck /></div>
         <h2 id="install-title">安装 {plugin.name}</h2>
         <div className="permission-dialog">
           {plugin.permissions.map(permission => <div key={permission.id}><Check /><span><strong>{permissionLabel(permission.id)}</strong><small>{permission.reason}</small></span></div>)}
         </div>
         {busy && <ProgressView progress={progress} fallbackName={plugin.name} />}
-        <div className="modal-actions"><button className="secondary" disabled={busy} onClick={onCancel}>取消</button><button className="primary" disabled={busy} onClick={onConfirm}>{busy ? <LoaderCircle className="spin" /> : <Download />}安装</button></div>
-      </div>
-    </div>
+        <div className="modal-actions"><Button className="secondary" disabled={busy} onClick={onCancel}>取消</Button><Button className="primary" disabled={busy} onClick={onConfirm}>{busy ? <LoaderCircle className="spin" /> : <Download />}安装</Button></div>
+    </Dialog>
   )
 }
 
@@ -614,8 +631,7 @@ function UpdateDialogView({ dialog, busy, progress, error, onCancel, onConfirm }
     (!isPlugins && progress.operation === 'core-update')
   ) ? progress : null
   return (
-    <div className="modal-backdrop">
-      <div className="modal update-modal" role="dialog" aria-modal="true" aria-labelledby="update-title">
+    <Dialog open onClose={() => { if (!busy) onCancel() }} className="modal update-modal" aria-labelledby="update-title">
         <div className="modal-icon"><Download /></div>
         <h2 id="update-title">{isPlugins ? `发现 ${dialog.updates.length} 个插件更新` : `发现 Digiworld ${dialog.update.version}`}</h2>
         {isPlugins ? (
@@ -646,16 +662,15 @@ function UpdateDialogView({ dialog, busy, progress, error, onCancel, onConfirm }
         )}
         {!busy && <p className="consent-copy">检查更新不会自动安装。点击下方按钮后才会通过当前代理下载并安装。</p>}
         {busy && <ProgressView progress={matchingProgress} fallbackName={isPlugins ? '插件更新' : `Digiworld ${dialog.update.version}`} />}
-        {error && <div className="update-error"><CircleAlert />{error}</div>}
+        {error && <Status tone="error" className="update-error"><CircleAlert />{error}</Status>}
         <div className="modal-actions">
-          <button className="secondary" disabled={busy} onClick={onCancel}>取消</button>
-          <button className="primary" disabled={busy || compatibleCount === 0} onClick={onConfirm}>
+          <Button className="secondary" disabled={busy} onClick={onCancel}>取消</Button>
+          <Button className="primary" disabled={busy || compatibleCount === 0} onClick={onConfirm}>
             {busy ? <LoaderCircle className="spin" /> : <Download />}
             {busy ? '正在更新…' : isPlugins ? `同意并更新 ${compatibleCount} 项` : '同意并更新'}
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
+    </Dialog>
   )
 }
 

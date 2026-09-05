@@ -208,7 +208,7 @@ describe('explicit update consent', () => {
     const wenkai = container.querySelector<HTMLButtonElement>('button[aria-label="霞鹜文楷"]')
     await act(async () => { wenkai?.click(); await flush() })
 
-    expect(container.querySelector<HTMLElement>('.app-window')?.style.getPropertyValue('--font-sans')).toContain('LXGW WenKai')
+    expect(container.querySelector<HTMLElement>('.app-window')?.style.getPropertyValue('--dw-font-sans')).toContain('LXGW WenKai')
     expect(localStorage.getItem(FONT_THEME_STORAGE_KEY)).toBe('wenkai')
 
     const weight = container.querySelector<HTMLInputElement>('input[aria-label="字体粗细"]')!
@@ -217,7 +217,7 @@ describe('explicit update consent', () => {
       weight.dispatchEvent(new Event('input', { bubbles: true }))
       await flush()
     })
-    expect(container.querySelector<HTMLElement>('.app-window')?.style.getPropertyValue('--weight-regular')).toBe('600')
+    expect(container.querySelector<HTMLElement>('.app-window')?.style.getPropertyValue('--dw-weight-regular')).toBe('600')
     expect(localStorage.getItem(FONT_WEIGHT_STORAGE_KEY)).toBe('600')
 
     const stylesheet = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8')
@@ -232,11 +232,11 @@ describe('explicit update consent', () => {
     await act(async () => { root.render(<App />); await flush() })
     await navigate(container, '设置')
     const toggle = container.querySelector<HTMLButtonElement>('[aria-label="切换玻璃效果"]')!
-    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
     await act(async () => toggle.click())
-    expect(toggle.getAttribute('aria-pressed')).toBe('false')
-    expect(localStorage.getItem(GLASS_STORAGE_KEY)).toBe('disabled')
-    expect(container.querySelector('.app-window')?.className).toContain('glass-disabled')
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    expect(localStorage.getItem(GLASS_STORAGE_KEY)).toBe('enabled')
+    expect(container.querySelector('.app-window')?.className).toContain('glass-enabled')
     await act(async () => root.unmount())
   })
 

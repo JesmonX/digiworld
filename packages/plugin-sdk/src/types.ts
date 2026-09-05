@@ -18,6 +18,7 @@ export interface PlatformArtifact {
 }
 
 export interface PluginManifest {
+  uiDesignVersion?: number
   schemaVersion: typeof MANIFEST_SCHEMA_VERSION
   protocolVersion: typeof PROTOCOL_VERSION
   id: string
@@ -46,6 +47,7 @@ export interface CatalogArtifact {
 }
 
 export interface CatalogPlugin {
+  uiDesignVersion?: number
   id: string
   version: string
   name: string
@@ -65,6 +67,7 @@ export interface CatalogIndex {
 }
 
 export interface PluginTheme {
+  [token: string]: string | undefined
   'color-scheme': 'light' | 'dark'
   'bg': string
   'surface': string
@@ -118,6 +121,7 @@ export interface RpcFailure {
 }
 
 export interface PluginSummary {
+  uiDesignVersion?: number
   id: string
   version: string
   name: string

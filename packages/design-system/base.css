@@ -1,0 +1,29 @@
+/* Host and iframe documents load the same baseline. No font payloads here. */
+:root {
+  font-family: var(--dw-font-sans);
+  font-size: var(--dw-type-body);
+  font-weight: var(--dw-weight-regular);
+  line-height: var(--dw-leading-body);
+  color: var(--dw-text);
+  color-scheme: var(--dw-color-scheme, light);
+  font-synthesis: none;
+  accent-color: var(--dw-accent);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--dw-bg); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: default; opacity: .55; }
+:where(button, input, select, textarea, a, [tabindex]):focus-visible { outline: 2px solid var(--dw-focus, var(--dw-accent)); outline-offset: 3px; }
+::selection { color: var(--dw-accent-contrast); background: var(--dw-accent); }
+::placeholder { color: var(--dw-text-muted); opacity: 1; }
+* { scrollbar-color: var(--dw-border-strong) transparent; scrollbar-width: thin; }
+h1, h2, h3, p { overflow-wrap: anywhere; }
+h1 { font-size: var(--dw-type-page); line-height: var(--dw-leading-page); }
+h2, h3 { font-size: var(--dw-type-title); line-height: var(--dw-leading-title); }
+small { font-size: var(--dw-type-caption); line-height: var(--dw-leading-caption); }
+strong, b, h1, h2, h3 { font-weight: var(--dw-weight-semibold); }
+.dw-numeric { font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}

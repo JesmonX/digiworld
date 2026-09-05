@@ -11,6 +11,7 @@ if (files.length === 0) throw new Error('No packaged plugin metadata found')
 const metadata = await Promise.all(files.map(file => readFile(path.join(metadataDir, file), 'utf8').then(JSON.parse)))
 const grouped = new Map()
 for (const item of metadata) {
+  if (item.plugin.uiDesignVersion !== 1 || item.designValidation?.archiveSha256 !== item.artifact.sha256 || item.designValidation?.visual !== 'passed') throw new Error(`Missing artifact-bound design validation: ${item.plugin.id}`)
   const existing = grouped.get(item.plugin.id) ?? { ...item.plugin, artifacts: [] }
   existing.artifacts.push({
     target: item.artifact.target,
@@ -25,8 +26,8 @@ const output = {
   schemaVersion: 1,
   sequence: Number(process.env.DIGIWORLD_CATALOG_SEQUENCE ?? Math.floor(Date.now() / 1000)),
   generatedAt: new Date().toISOString(),
-  plugins: [...grouped.values()].map(({ id, version, name, description, author, icon, minCoreVersion, permissions, artifacts }) => ({
-    id, version, name, description, author, icon, minCoreVersion, permissions,
+  plugins: [...grouped.values()].map(({ id, version, name, description, author, icon, minCoreVersion, permissions, artifacts, uiDesignVersion }) => ({
+    id, version, name, description, author, icon, minCoreVersion, permissions, uiDesignVersion,
     artifacts: artifacts.sort((left, right) => left.target.localeCompare(right.target)),
   })).sort((left, right) => left.id.localeCompare(right.id)),
 }

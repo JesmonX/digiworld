@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react'
 import type { HostToPluginMessage, PluginTheme, PluginToHostMessage } from '@digiworld/plugin-sdk'
 import hostTypographyCss from '@digiworld/typography/fonts.css?inline'
+import designTokensCss from '@digiworld/design-system/tokens.css?inline'
+import designBaseCss from '@digiworld/design-system/base.css?inline'
 import { api } from '../lib/api'
 
 interface PluginFrameProps {
@@ -48,10 +50,23 @@ export function withHostTypography(
     : `${injection}${html}`
 }
 
+export function withInitialTheme(html: string, theme: PluginTheme): string {
+  const declarations = Object.entries(theme)
+    .filter(([key, value]) => /^[a-z][a-z0-9-]*$/.test(key) && value !== undefined)
+    .map(([key, value]) => `--dw-${key}:${String(value).replace(/[<>;{}]/g, '')}`)
+    .join(';')
+  const style = `<style data-digiworld-host-design>${designTokensCss}\n${designBaseCss}\n:root{${declarations};color-scheme:${theme['color-scheme']}}</style>`
+  // Last in head: initial host values must win over bundled fallback tokens.
+  return /<\/head>/i.test(html) ? html.replace(/<\/head>/i, `${style}</head>`) : `${style}${html}`
+}
+
 export function PluginFrame({ pluginId, html, theme }: PluginFrameProps) {
   const frame = useRef<HTMLIFrameElement>(null)
   const ready = useRef(false)
-  const source = useMemo(() => withHostTypography(html), [html])
+  // Theme changes travel over the bridge; changing srcDoc would destroy plugin state.
+  const initialTheme = useRef(theme)
+  initialTheme.current = theme
+  const source = useMemo(() => withInitialTheme(withHostTypography(html), initialTheme.current), [html, pluginId])
 
   useEffect(() => {
     ready.current = false

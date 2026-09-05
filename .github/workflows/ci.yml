@@ -23,6 +23,17 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - run: pnpm check:ui
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:ui
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ui-validation
+          path: |
+            dist/ui-report
+            dist/ui-results
+            dist/ui-validation.json
 
   rust:
     strategy:

@@ -4,6 +4,12 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./tokens.css": "./tokens.css"
-  }
+    "./tokens.css": "./tokens.css",
+    "./base.css": "./base.css",
+    "./components.css": "./components.css",
+    "./react": "./components.tsx",
+    "./themes": "./themes.ts"
+  },
+  "peerDependencies": { "react": "^19.1.0" },
+  "devDependencies": { "@types/react": "^19.1.0" }
 }

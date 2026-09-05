@@ -1,0 +1,41 @@
+.dw-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--dw-space-2);
+  min-height: max(36px, calc(var(--dw-leading-body) + 12px)); padding: 6px 12px;
+  border: 1px solid var(--dw-border-strong); border-radius: var(--dw-radius-sm);
+  font-size: var(--dw-type-body); line-height: var(--dw-leading-body); font-weight: var(--dw-weight-medium);
+  color: var(--dw-text); background: var(--dw-surface); text-align: center;
+  transition: background var(--dw-motion-fast), border-color var(--dw-motion-fast), color var(--dw-motion-fast);
+}
+.dw-button:hover:not(:disabled) { background: var(--dw-surface-subtle); }
+.dw-button:is(.active, [aria-pressed=true]) { color: var(--dw-accent-strong); background: var(--dw-accent-soft); border-color: var(--dw-accent); }
+.dw-button.primary { color: var(--dw-accent-contrast); background: var(--dw-accent); border-color: var(--dw-accent); }
+.dw-button.primary:hover:not(:disabled) { background: var(--dw-accent-strong); }
+.dw-button:is(.danger, .danger-button) { color: var(--dw-danger); background: var(--dw-danger-soft); border-color: var(--dw-danger-border); }
+.dw-button:is(.icon, .icon-button, .panel-action) { width: max(36px, calc(var(--dw-leading-body) + 12px)); padding: 6px; flex-shrink: 0; }
+.dw-button svg { width: 16px; height: 16px; flex-shrink: 0; }
+.dw-button:active:not(:disabled) { box-shadow: inset 0 0 0 1px var(--dw-accent); }
+.dw-input:not([type=checkbox]):not([type=range]), .dw-select, .dw-textarea {
+  min-height: max(36px, calc(var(--dw-leading-body) + 12px)); padding: 6px 10px;
+  border: 1px solid var(--dw-border-strong); border-radius: var(--dw-radius-sm);
+  color: var(--dw-text); background: var(--dw-surface); font: inherit; font-size: var(--dw-type-body);
+}
+.dw-input[type=checkbox] { accent-color: var(--dw-accent); }
+.dw-input[type=range] { accent-color: var(--dw-accent); }
+.dw-input:disabled { background: var(--dw-surface-subtle); }
+.dw-card { padding: var(--dw-space-4); border: 1px solid var(--dw-border); border-radius: var(--dw-radius-md); background: var(--dw-surface); box-shadow: var(--dw-shadow-xs); }
+.dw-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--dw-space-3); }
+.dw-status { display: flex; align-items: center; gap: var(--dw-space-2); padding: var(--dw-space-3); border: 1px solid var(--dw-border); border-radius: var(--dw-radius-sm); color: var(--dw-text-muted); background: var(--dw-surface-subtle); }
+.dw-status[data-tone=error] { color: var(--dw-danger); border-color: var(--dw-danger-border); background: var(--dw-danger-soft); }
+.dw-status[data-tone=success] { color: var(--dw-success); border-color: var(--dw-success-border); background: var(--dw-success-soft); }
+.dw-segmented { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: var(--dw-radius-sm); background: var(--dw-surface-subtle); }
+.dw-segmented > .dw-button { border-color: transparent; background: transparent; }
+.dw-segmented > .dw-button:is(.active, [aria-pressed=true], [aria-checked=true]) { background: var(--dw-surface); color: var(--dw-accent-strong); box-shadow: var(--dw-shadow-xs); }
+.dw-dialog { max-width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: var(--dw-space-5); border: 1px solid var(--dw-border); border-radius: var(--dw-radius-lg); background: var(--dw-surface-raised); color: var(--dw-text); box-shadow: var(--dw-shadow-lg); }
+.dw-dialog::backdrop { background: var(--dw-overlay); }
+.dw-dialog { margin: auto; }
+.dw-menu { padding: var(--dw-space-1); border: 1px solid var(--dw-border); border-radius: var(--dw-radius-sm); background: var(--dw-surface-raised); box-shadow: var(--dw-shadow-lg); }
+.dw-switch { min-width: 40px; min-height: 24px; padding: 3px; border: 1px solid var(--dw-border-strong); border-radius: 999px; background: var(--dw-surface-subtle); }
+.dw-switch > span { display: block; width: 16px; height: 16px; border-radius: 50%; background: var(--dw-text-muted); transition: transform var(--dw-motion-fast); }
+.dw-switch[aria-checked=true] { background: var(--dw-accent); border-color: var(--dw-accent); }
+.dw-switch[aria-checked=true] > span { background: var(--dw-accent-contrast); transform: translateX(16px); }
+[data-dw-glass=enabled] .dw-card { background: var(--dw-glass-surface); backdrop-filter: var(--dw-glass-filter); }

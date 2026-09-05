@@ -5,6 +5,9 @@
   "type": "module",
   "packageManager": "pnpm@11.21.0",
   "scripts": {
+    "check:ui": "node scripts/check-ui.mjs && node --test scripts/check-ui.test.mjs",
+    "test:ui": "playwright test",
+    "design:preview": "pnpm --filter @digiworld/desktop exec vite --host 127.0.0.1 --port 1420",
     "dev": "pnpm --filter @digiworld/desktop tauri dev",
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
@@ -17,8 +20,10 @@
     "catalog:build": "node scripts/build-catalog.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "1.61.1",
     "@types/node": "^24.0.0",
     "fflate": "^0.8.2",
+    "postcss": "8.5.26",
     "typescript": "^5.9.0"
   }
 }
