@@ -39,6 +39,12 @@ type Event = {
   recurring: boolean
 }
 
+type CalendarSyncResult = {
+  calendars: Cal[]
+  events: Event[]
+  warnings?: string[]
+}
+
 type Todo = {
   id: string
   title: string
@@ -125,10 +131,11 @@ export default function App() {
       const a = await bridge.request<typeof account>('calendar.account.get')
       setAccount(a)
       const data = sync && a
-        ? await bridge.request<{ calendars: Cal[]; events: Event[] }>('calendar.sync')
-        : await bridge.request<{ calendars: Cal[]; events: Event[] }>('calendar.cached')
+        ? await bridge.request<CalendarSyncResult>('calendar.sync')
+        : await bridge.request<CalendarSyncResult>('calendar.cached')
       setCals(data.calendars)
       setEvents(data.events)
+      if (data.warnings?.length) setError(data.warnings.join('；'))
       setTodos(await bridge.request<Todo[]>('todo.list'))
     } catch (e) {
       setError(String(e))

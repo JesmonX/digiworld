@@ -159,7 +159,8 @@ function buildPreset(id: ThemeId, schemeId: ColorSchemeId = DEFAULT_COLOR_SCHEME
       text, 'text-muted': muted, accent, 'accent-strong': scheme === 'light' ? mix(accent, 85, text) : accent,
       'accent-contrast': scheme === 'light' ? '#ffffff' : bg, 'accent-secondary': secondary,
       'accent-soft': mix(accent, scheme === 'light' ? 9 : 14), 'accent-border': accent, success, warning, danger,
-      'success-soft': mix(success, 10), 'warning-soft': mix(warning, 10), 'danger-soft': mix(danger, 10),
+      // Dark palettes keep success states readable without creating large green-tinted slabs.
+      'success-soft': scheme === 'dark' ? subtle : mix(success, 10), 'warning-soft': mix(warning, 10), 'danger-soft': mix(danger, 10),
       'success-border': mix(success, 45), 'warning-border': mix(warning, 45), 'danger-border': mix(danger, 45),
       focus: accent, 'overlay': 'rgba(15, 17, 26, .48)',
       'chart-grid': border,

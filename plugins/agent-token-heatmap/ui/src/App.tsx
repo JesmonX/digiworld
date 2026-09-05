@@ -278,20 +278,6 @@ export default function App() {
     }
   }, [autoRefreshInterval, refreshAll])
 
-  const changeAutoRefreshInterval = async (seconds: number) => {
-    if (!settings) return
-    const next: UsageSettings = {
-      ...settings,
-      autoRefreshIntervalSeconds: seconds <= 0 ? null : seconds,
-    }
-    setSettings(next)
-    try {
-      await bridge.request('usage.saveSettings', { settings: next })
-    } catch (e) {
-      setError(String(e))
-    }
-  }
-
   useEffect(() => {
     const seconds = settings?.codexQuota.refreshIntervalSeconds
     if (!seconds) return
@@ -350,22 +336,7 @@ export default function App() {
     <div className="usage-app">
       <header className="dw-toolbar usage-header">
         <div className="header-buttons">
-          <div className="auto-refresh-control">
-            <Clock3 size={14} />
-            <Select
-              aria-label="自动刷新间隔"
-              value={String(autoRefreshInterval)}
-              onChange={e => void changeAutoRefreshInterval(Number(e.target.value))}
-            >
-              <option value="0">自动刷新：关闭</option>
-              <option value="60">自动刷新：1 分钟</option>
-              <option value="300">自动刷新：5 分钟</option>
-              <option value="900">自动刷新：15 分钟</option>
-              <option value="1800">自动刷新：30 分钟</option>
-              <option value="3600">自动刷新：1 小时</option>
-            </Select>
-          </div>
-          <Button className="secondary" onClick={() => setSettingsOpen(true)}><Settings2 />数据源</Button>
+          <Button className="secondary" onClick={() => setSettingsOpen(true)}><Settings2 />设置</Button>
           <Button className="primary" disabled={refresh.running} onClick={() => void startRefresh()}><RefreshCw className={refresh.running ? 'spin' : ''} />{refresh.running ? `${refresh.completed}/${refresh.total} ${refresh.currentSource ?? ''}` : '手动刷新'}</Button>
         </div>
       </header>
@@ -462,8 +433,6 @@ function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
   return <Card className="dw-card weekly-card">
     <div className="panel-heading"><div><h2>Last 7 Days</h2></div><div className="chart-legend" aria-label="图例">{modelCategories.length ? modelCategories.map((category, index) => <span className="legend-item" key={category.key} title={`${category.label} · ${formatTokens(category.totalTokens)}`}><i className={`model-key model-key-${index % 8}`} /><b>{category.label}</b><small>{formatTokens(category.totalTokens)}</small></span>) : <span className="legend-item"><i className="bar-key" /><b>Token</b></span>}<span className="legend-item" title="缓存率折线"><i className="cache-key" /><b>缓存率</b></span></div></div>
     {points.length ? <svg className="weekly-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="近七天按模型堆叠的 Token 用量柱形图和缓存率折线图">
-      <text x={left} y={top - 13} className="chart-axis-title">Token</text>
-      <text x={width - right} y={top - 13} textAnchor="end" className="chart-axis-title">缓存率</text>
       {ticks.map(ratio => {
         const y = top + ratio * plotHeight
         return <g key={ratio}><line x1={left} x2={width - right} y1={y} y2={y} className="chart-grid-line" /><text x={left - 10} y={y + 4} textAnchor="end" className="chart-axis-label">{formatTokens(maximum * (1 - ratio))}</text><text x={width - right + 10} y={y + 4} className="chart-axis-label">{Math.round((cacheAxisMaximum - cacheAxisRange * ratio) * 100)}%</text></g>
@@ -644,13 +613,13 @@ function SourceDialog({ settings, refreshRunning, onClose, onSave, onScan, onQuo
   const interval = draft.codexQuota.refreshIntervalSeconds
   const intervalMode = interval == null ? 'off' : [30, 60, 300, 900].includes(interval) ? String(interval) : 'custom'
   const sourceOptions = [{ id: 'local', label: '本机' }, ...draft.sshSources]
-  return <Dialog open onClose={() => { if (!busy) onClose() }} className="source-modal" aria-label="数据源"><header><div><h2>数据源</h2><p>用量扫描按需运行，Codex 限额可独立自动刷新</p></div><Button className="close" onClick={onClose}><X /></Button></header>
+  return <Dialog open onClose={() => { if (!busy) onClose() }} className="source-modal" aria-label="设置"><header><div><h2>设置</h2><p>配置用量数据源；会话数据与 Codex 限额分别按各自周期刷新</p></div><Button className="close" onClick={onClose}><X /></Button></header>
     {dialogError && <Status tone="error" className="dialog-error">{dialogError}</Status>}
     <section className="source-block"><div className="source-heading"><div><HardDrive /><span><strong>本机</strong><small>默认 Agent 数据目录</small></span></div><div className="agent-checks">{AGENTS.map(agent => <label key={agent}><Input type="checkbox" checked={draft.localAgents.includes(agent)} onChange={() => setDraft(current => ({ ...current, localAgents: toggleRequired(current.localAgents, agent) }))} /><AgentIcon agent={agent} /><span>{agentLabel[agent]}</span></label>)}</div></div><div className="root-grid">{AGENTS.map(agent => <label key={agent}>{agentLabel[agent]}<Input value={draft.localRoots[agent] ?? ''} onChange={event => setDraft(current => ({ ...current, localRoots: { ...current.localRoots, [agent]: event.target.value } }))} placeholder={defaultRoot[agent]} /></label>)}</div></section>
     {draft.sshSources.map((source, index) => <section className="source-block" key={source.id}><div className="source-heading"><div><Server /><span><strong>{source.label || 'SSH 设备'}</strong><small>{source.host || '尚未填写 Host'}</small></span></div><Button className="icon danger" title="移除设备" onClick={() => setDraft(current => ({ ...current, sshSources: current.sshSources.filter((_, item) => item !== index), codexQuota: current.codexQuota.sourceId === source.id ? { ...current.codexQuota, sourceId: null } : current.codexQuota }))}><Trash2 /></Button></div><div className="ssh-fields"><label>名称<Input value={source.label} onChange={event => updateSource(index, { ...source, label: event.target.value })} /></label><label>SSH Config Host<Input value={source.host} onChange={event => updateSource(index, { ...source, host: event.target.value })} placeholder="gpu-server" /></label></div><div className="agent-checks">{AGENTS.map(agent => <label key={agent}><Input type="checkbox" checked={source.enabledAgents.includes(agent)} onChange={() => updateSource(index, { ...source, enabledAgents: toggleRequired(source.enabledAgents, agent) })} /><AgentIcon agent={agent} /><span>{agentLabel[agent]}</span></label>)}</div><div className="root-grid">{AGENTS.map(agent => <label key={agent}>{agentLabel[agent]}<Input value={source.roots[agent] ?? ''} onChange={event => updateSource(index, { ...source, roots: { ...source.roots, [agent]: event.target.value } })} placeholder={defaultRoot[agent]} /></label>)}</div><Button className="secondary scan-source" disabled={refreshRunning || !source.host} onClick={async () => { setScanning(source.id); setScanMessage(null); setDialogError(null); try { await onScan(source); setScanMessage(`${source.label || source.host} 扫描成功`) } catch (reason) { setDialogError(String(reason)) } finally { setScanning(null) } }}><RefreshCw className={scanning === source.id ? 'spin' : ''} />{scanning === source.id ? '扫描中…' : '测试并扫描'}</Button></section>)}
     {scanMessage && <Status tone="success" className="dialog-success">{scanMessage}</Status>}
     {adding ? <div className="add-confirm"><span>将添加一个使用 SSH config 和密钥认证的 Unix 设备。</span><Button className="primary" onClick={addSource}>继续</Button><Button className="secondary" onClick={() => setAdding(false)}>取消</Button></div> : <Button className="add-source" onClick={() => setAdding(true)}><Plus />添加 SSH 设备</Button>}
-    <section className="source-block">
+    <section className="source-block session-refresh-settings">
       <div className="source-heading">
         <div><Clock3 /><span><strong>整体用量自动刷新</strong><small>处于插件页时按设定周期自动同步 Token 用量与限额</small></span></div>
       </div>

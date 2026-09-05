@@ -175,6 +175,10 @@ label {
   display: grid;
   gap: var(--dw-space-1);
 }
+html[data-dw-scheme="dark"] .calendar-meta-card {
+  border: 1px solid var(--dw-border);
+  background: var(--dw-surface);
+}
 
 .calendar-picker {
   display: flex;

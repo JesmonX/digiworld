@@ -21,6 +21,7 @@ const settings = {
   localAgents: ['codex', 'claude', 'pi', 'zcode', 'agy'],
   localRoots: {},
   sshSources: [],
+  autoRefreshIntervalSeconds: 300,
   codexQuota: { sourceId: 'local', shellPreset: 'auto', preCommand: '', refreshIntervalSeconds: null },
 }
 
@@ -129,6 +130,7 @@ describe('token usage layout', () => {
     expect(container.querySelector('.chart-legend')?.textContent).toContain('缓存率')
     expect(filterBar.querySelectorAll('.agent-icon').length).toBe(5)
     expect(container.querySelector('.weekly-card h2')?.textContent).toBe('Last 7 Days')
+    expect(container.querySelectorAll('.weekly-chart .chart-axis-title')).toHaveLength(0)
     expect(container.querySelectorAll('.model-pie-slice')).toHaveLength(2)
     expect(container.querySelector('.model-card .model-table')).toBeNull()
     expect(container.querySelector('.model-pie-legend')?.textContent).toContain('gpt-5.6-mini1.05K')
@@ -187,6 +189,27 @@ describe('token usage layout', () => {
       sources: ['local'],
     }))
 
+    await act(async () => root.unmount())
+  })
+
+  it('keeps session refresh settings inside the settings dialog', async () => {
+    const root = createRoot(container)
+    await act(async () => {
+      root.render(<App />)
+      await flush()
+      await flush()
+    })
+
+    expect(container.querySelector('.usage-header .auto-refresh-control')).toBeNull()
+    const settingsButton = Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('设置'))
+    expect(settingsButton).not.toBeNull()
+    await act(async () => {
+      settingsButton?.click()
+      await flush()
+    })
+    const sessionRefresh = container.querySelector<HTMLSelectElement>('dialog[aria-label="设置"] .session-refresh-settings select')
+    expect(sessionRefresh).not.toBeNull()
+    expect(sessionRefresh?.value).toBe('300')
     await act(async () => root.unmount())
   })
 

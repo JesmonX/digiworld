@@ -83,11 +83,11 @@ button, input, select, textarea { font: inherit; }
 .plugin-open .sidebar-section-label { display: none; }
 
 .main { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: transparent; }
-.topbar { flex: 0 0 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; border-bottom: 1px solid color-mix(in srgb, var(--border) 78%, transparent); background: color-mix(in srgb, var(--dw-surface) 66%, transparent); backdrop-filter: var(--dw-glass-filter); }
+.topbar { position: relative; z-index: 10; flex: 0 0 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; border-bottom: 1px solid color-mix(in srgb, var(--border) 78%, transparent); background: color-mix(in srgb, var(--dw-surface) 66%, transparent); backdrop-filter: var(--dw-glass-filter); }
 .topbar h1 { margin: 0; color: var(--text); font-family: var(--font-display); font-size: var(--dw-type-page); font-weight: var(--weight-semibold); letter-spacing: 0; }
 .plugin-management { display: flex; align-items: center; gap: 8px; }
 .plugin-more { position: relative; }
-.plugin-more-menu { position: absolute; z-index: 8; top: calc(100% + 6px); right: 0; width: 136px; padding: 6px; border: 1px solid var(--dw-border); border-radius: var(--dw-radius-md); background: var(--dw-surface); box-shadow: var(--dw-shadow-md); }
+.plugin-more-menu { position: absolute; z-index: 20; top: calc(100% + 6px); right: 0; width: 136px; padding: 6px; border: 1px solid var(--dw-border); border-radius: var(--dw-radius-md); background: var(--dw-surface); box-shadow: var(--dw-shadow-md); }
 .plugin-more-menu .dw-button { width: 100%; justify-content: flex-start; }
 .content { position: relative; flex: 1; min-height: 0; padding: 26px 28px 30px; overflow: auto; background: radial-gradient(circle at 82% 0%, color-mix(in srgb, var(--accent-soft) 34%, transparent), transparent 34%); }
 .plugin-open .content { padding: 18px 22px 22px; overflow: hidden; background: var(--canvas); }

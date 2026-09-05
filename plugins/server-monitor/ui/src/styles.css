@@ -43,6 +43,11 @@ main { padding: var(--dw-space-3); display: grid; gap: var(--dw-space-3); }
   background: var(--dw-surface-subtle);
   border-radius: var(--dw-radius-sm);
 }
+html[data-dw-scheme="dark"] .metric,
+html[data-dw-scheme="dark"] .traffic {
+  background: var(--dw-surface);
+  border: 1px solid var(--dw-border);
+}
 .metric > div { display: flex; align-items: center; gap: var(--dw-space-2); }
 .metric span { display: grid; flex: 1; min-width: 0; }
 .metric small { font-size: var(--dw-type-caption); color: var(--dw-text-muted); }

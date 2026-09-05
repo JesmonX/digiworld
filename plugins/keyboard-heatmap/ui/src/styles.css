@@ -57,6 +57,7 @@ button { font: inherit; }
 .legend i.level-4 { background: color-mix(in srgb, var(--dw-accent) 77%, var(--dw-surface)); }
 .legend i.level-5 { background: var(--dw-accent-strong); }
 .keyboard-board { min-width: var(--board-min-width); padding: 14px; border: 0; border-radius: var(--dw-radius-sm); background: var(--dw-surface-subtle); }
+html[data-dw-scheme="dark"] .keyboard-board { border: 1px solid var(--dw-border); background: var(--dw-surface); }
 .function-row-layout { display: block; }
 .keyboard-gap { height: 8px; }
 .keyboard-sections { display: grid; grid-template-columns: minmax(0, 14fr) minmax(116px, 3fr) minmax(154px, 4fr); gap: 10px; }

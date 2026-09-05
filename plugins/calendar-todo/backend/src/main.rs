@@ -1,5 +1,5 @@
 use anyhow::{Context, Result, bail};
-use chrono::Utc;
+use chrono::{DateTime, Duration, Utc};
 use regex::Regex;
 use reqwest::{
     Method,
@@ -11,7 +11,7 @@ use std::{
     fs,
     io::{BufRead, Write},
     path::PathBuf,
-    time::Duration,
+    time::Duration as StdDuration,
 };
 use uuid::Uuid;
 const SERVICE: &str = "io.github.jesmonx.digiworld.calendar-todo";
@@ -76,6 +76,52 @@ struct Todo {
 struct App {
     dir: PathBuf,
     http: Client,
+}
+
+#[derive(Debug)]
+struct CalendarReportError {
+    status: u16,
+    detail: String,
+    retryable: bool,
+}
+
+fn sync_range() -> (DateTime<Utc>, DateTime<Utc>) {
+    let now = Utc::now();
+    (now - Duration::days(366), now + Duration::days(731))
+}
+
+fn calendar_query_body(start: DateTime<Utc>, end: DateTime<Utc>) -> String {
+    format!(
+        "<?xml version=\"1.0\"?><c:calendar-query xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:prop><d:getetag/><c:calendar-data/></d:prop><c:filter><c:comp-filter name=\"VCALENDAR\"><c:comp-filter name=\"VEVENT\"><c:time-range start=\"{}\" end=\"{}\"/></c:comp-filter></c:comp-filter></c:filter></c:calendar-query>",
+        start.format("%Y%m%dT%H%M%SZ"),
+        end.format("%Y%m%dT%H%M%SZ"),
+    )
+}
+
+fn dav_error_detail(body: &str) -> (String, bool) {
+    let lower = body.to_ascii_lowercase();
+    if lower.contains("number-of-matches-within-limits")
+        || lower.contains("number of matches within limits")
+        || lower.contains("max-resource-size")
+    {
+        return ("服务端限制了单次返回数量，将按时间分段重试".into(), true);
+    }
+    if lower.contains("need-privileges") || lower.contains("privilege") {
+        return ("当前账号没有读取该日历的权限".into(), false);
+    }
+    let text = Regex::new(r"(?is)<[^>]+>")
+        .map(|re| re.replace_all(body, " ").into_owned())
+        .unwrap_or_else(|_| body.to_string());
+    let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if text.is_empty() {
+        // Some iCloud edges return only `403 Forbidden` even when the
+        // unbounded query is what tripped the server-side result limit.
+        ("服务端未返回具体原因".into(), true)
+    } else {
+        // A bounded retry is cheap and lets generic 403 responses recover
+        // without masking explicit permission failures above.
+        (text.chars().take(240).collect(), true)
+    }
 }
 impl App {
     fn account(&self) -> Result<Account> {
@@ -182,46 +228,146 @@ impl App {
         }
         Ok(out)
     }
+
+    fn report_events(
+        &self,
+        cal: &Calendar,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+    ) -> std::result::Result<Vec<Event>, CalendarReportError> {
+        let body = calendar_query_body(start, end);
+        let response = self
+            .request(
+                Method::from_bytes(b"REPORT").map_err(|error| CalendarReportError {
+                    status: 0,
+                    detail: error.to_string(),
+                    retryable: false,
+                })?,
+                &cal.href,
+                "1",
+                Some(body),
+            )
+            .map_err(|error| CalendarReportError {
+                status: 0,
+                detail: format!("连接失败：{error}"),
+                retryable: false,
+            })?;
+        let status = response.status().as_u16();
+        let text = response.text().map_err(|error| CalendarReportError {
+            status,
+            detail: format!("读取响应失败：{error}"),
+            retryable: false,
+        })?;
+        if !(200..300).contains(&status) {
+            let (detail, retryable) = dav_error_detail(&text);
+            return Err(CalendarReportError {
+                status,
+                detail,
+                retryable: status == 403 && retryable,
+            });
+        }
+
+        let mut events = vec![];
+        for block in blocks(&text, "response") {
+            let href = tag(&block, "href").unwrap_or_default();
+            let etag = tag(&block, "getetag")
+                .unwrap_or_default()
+                .trim_matches('"')
+                .to_string();
+            if let Some(ics) = tag(&block, "calendar-data")
+                && let Some(mut event) = parse_event(&ics)
+            {
+                event.calendar_id = cal.id.clone();
+                event.href =
+                    resolve_url(&cal.href, &href).map_err(|error| CalendarReportError {
+                        status,
+                        detail: error.to_string(),
+                        retryable: false,
+                    })?;
+                event.etag = etag;
+                events.push(event);
+            }
+        }
+        Ok(events)
+    }
+
+    fn report_events_segmented(
+        &self,
+        cal: &Calendar,
+        start: DateTime<Utc>,
+        end: DateTime<Utc>,
+    ) -> std::result::Result<Vec<Event>, CalendarReportError> {
+        let mut cursor = start;
+        let mut events = vec![];
+        while cursor < end {
+            let next = std::cmp::min(cursor + Duration::days(31), end);
+            events.extend(self.report_events(cal, cursor, next)?);
+            cursor = next;
+        }
+        let mut unique = std::collections::BTreeMap::new();
+        for event in events {
+            unique.insert(format!("{}\u{1f}{}", event.calendar_id, event.href), event);
+        }
+        Ok(unique.into_values().collect())
+    }
+
     fn sync(&self) -> Result<Value> {
         let a = self.account()?;
-        let calendars = self.discover()?;
+        let cached_calendars: Vec<Calendar> =
+            read(&self.dir.join("calendars.json")).unwrap_or_default();
+        let cached: Vec<Event> = read(&self.dir.join("events.json")).unwrap_or_default();
+        let calendars = match self.discover() {
+            Ok(value) => value,
+            Err(error) if !cached_calendars.is_empty() => {
+                return Ok(json!({
+                    "calendars": cached_calendars,
+                    "events": cached,
+                    "warnings": [format!("日历发现失败（{error}）")],
+                    "syncedAt": Utc::now().to_rfc3339(),
+                }));
+            }
+            Err(error) => return Err(error),
+        };
         let chosen: Vec<Calendar> = calendars
             .into_iter()
             .filter(|c| a.selected_calendars.contains(&c.id))
             .collect();
-        let body = "<?xml version=\"1.0\"?><c:calendar-query xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:prop><d:getetag/><c:calendar-data/></d:prop><c:filter><c:comp-filter name=\"VCALENDAR\"><c:comp-filter name=\"VEVENT\"/></c:comp-filter></c:filter></c:calendar-query>";
+        let (start, end) = sync_range();
         let mut events = vec![];
+        let mut warnings = vec![];
         for cal in &chosen {
-            let z = self.request(
-                Method::from_bytes(b"REPORT")?,
-                &cal.href,
-                "1",
-                Some(body.into()),
-            )?;
-            let status = z.status();
-            let text = z.text()?;
-            if !status.is_success() && !status.as_u16().eq(&207) {
-                bail!("读取日历失败 {status}")
-            }
-            for b in blocks(&text, "response") {
-                let href = tag(&b, "href").unwrap_or_default();
-                let etag = tag(&b, "getetag")
-                    .unwrap_or_default()
-                    .trim_matches('"')
-                    .to_string();
-                if let Some(ics) = tag(&b, "calendar-data")
-                    && let Some(mut e) = parse_event(&ics)
-                {
-                    e.calendar_id = cal.id.clone();
-                    e.href = resolve_url(&cal.href, &href)?;
-                    e.etag = etag;
-                    events.push(e)
+            let result = self.report_events(cal, start, end);
+            let result = match result {
+                Ok(value) => Ok(value),
+                Err(error) if error.retryable => self.report_events_segmented(cal, start, end),
+                Err(error) => Err(error),
+            };
+            match result {
+                Ok(value) => events.extend(value),
+                Err(error) => {
+                    events.extend(
+                        cached
+                            .iter()
+                            .filter(|event| event.calendar_id == cal.id)
+                            .cloned(),
+                    );
+                    let status = if error.status == 0 {
+                        "".into()
+                    } else {
+                        format!(" {}", error.status)
+                    };
+                    warnings.push(format!(
+                        "{}：读取失败{}（{}）",
+                        cal.name, status, error.detail
+                    ));
                 }
             }
         }
         write(&self.dir.join("calendars.json"), &chosen)?;
         write(&self.dir.join("events.json"), &events)?;
-        Ok(json!({"calendars":chosen,"events":events,"syncedAt":Utc::now().to_rfc3339()}))
+        Ok(
+            json!({"calendars":chosen,"events":events,"warnings":warnings,"syncedAt":Utc::now().to_rfc3339()}),
+        )
     }
     fn event_save(&self, e: Event, overwrite: bool) -> Result<Event> {
         if e.recurring {
@@ -475,7 +621,7 @@ fn main() -> Result<()> {
     let a = App {
         dir,
         http: Client::builder()
-            .timeout(Duration::from_secs(15))
+            .timeout(StdDuration::from_secs(15))
             .user_agent("Digiworld-Calendar/0.1")
             .build()?,
     };
@@ -600,5 +746,36 @@ mod tests {
             resolve_url("https://p120-caldav.icloud.com:443/123/calendars/", "home/").unwrap(),
             "https://p120-caldav.icloud.com/123/calendars/home/"
         );
+    }
+
+    #[test]
+    fn calendar_queries_are_time_bounded() {
+        let start = Utc::now();
+        let body = calendar_query_body(start, start + Duration::days(1));
+        assert!(body.contains("<c:time-range start=\""));
+        assert!(body.contains("end=\""));
+        assert!(body.contains("name=\"VEVENT\""));
+    }
+
+    #[test]
+    fn classifies_caldav_match_limit_errors_for_segmented_retry() {
+        let (detail, retryable) =
+            dav_error_detail("<d:number-of-matches-within-limits xmlns:d=\"DAV:\"/>");
+        assert!(retryable);
+        assert!(detail.contains("分段"));
+    }
+
+    #[test]
+    fn classifies_caldav_privilege_errors_without_retrying() {
+        let (detail, retryable) = dav_error_detail("<d:need-privileges xmlns:d=\"DAV:\"/>");
+        assert!(!retryable);
+        assert!(detail.contains("权限"));
+    }
+
+    #[test]
+    fn treats_generic_forbidden_responses_as_bounded_retry_candidates() {
+        let (detail, retryable) = dav_error_detail("403 Forbidden");
+        assert!(retryable);
+        assert!(detail.contains("403 Forbidden"));
     }
 }

@@ -68,6 +68,22 @@ test('shared controls retain keyboard focus and modal focus containment', async 
   await expect(page.getByRole('button', { name: '打开对话框' })).toBeFocused()
 })
 
+test('disabled plugin actions menu stays above the plugin content', async ({ page }) => {
+  await gotoWithRetry(page, '/design.html?state=disabled')
+  await page.getByRole('button', { name: 'Servers', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '已停用' })).toBeVisible()
+  await page.getByRole('button', { name: '更多插件操作' }).click()
+  const menu = page.getByRole('menu')
+  await expect(menu).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: '移除插件' })).toBeVisible()
+  const menuLayer = await menu.evaluate(element => {
+    const rect = element.getBoundingClientRect()
+    const point = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+    return point?.closest('[role="menu"]') === element
+  })
+  expect(menuLayer).toBe(true)
+})
+
 test('servers plugin layout switching, GPU metrics and disk device display', async ({ page }) => {
   await gotoWithRetry(page, '/design.html')
   await page.getByRole('button', { name: 'Servers', exact: true }).click()
@@ -78,6 +94,7 @@ test('servers plugin layout switching, GPU metrics and disk device display', asy
   await expect(frame.getByText('L40', { exact: false })).toBeVisible()
   await expect(frame.getByText('RTX 4090', { exact: false })).toBeVisible()
   await expect(frame.getByText('180W', { exact: false })).toBeVisible()
+  await expect(frame.getByText('29.3 GB / 45.0 GB (65%)', { exact: false })).toBeVisible()
 
   // Disk device display
   await expect(frame.getByText('/dev/nvme0n1p2', { exact: false })).toBeVisible()
@@ -92,6 +109,16 @@ test('servers plugin layout switching, GPU metrics and disk device display', asy
     const noOverflow = await frame.locator('body').evaluate(el => el.scrollWidth <= el.clientWidth + 1)
     expect(noOverflow).toBe(true)
   }
+
+  await frame.getByRole('button', { name: '设备设置' }).click()
+  const gpuMemorySelect = frame.getByRole('combobox', { name: 'GPU 显存显示' })
+  await expect(gpuMemorySelect).toHaveValue('both')
+  for (const mode of ['percent', 'value', 'both']) {
+    await gpuMemorySelect.selectOption(mode)
+    await expect(gpuMemorySelect).toHaveValue(mode)
+  }
+  await expect(frame.getByText('GPU 显示温度', { exact: true })).toBeVisible()
+  await expect(gpuMemorySelect).toBeVisible()
 })
 
 test('calendar plugin filters past events, displays month calendar and supports date selection', async ({ page }) => {
@@ -157,7 +184,9 @@ test('agent overview auto-refresh interval selector', async ({ page }) => {
   const frame = page.frameLocator('iframe')
   await expect(frame.locator('.weekly-card')).toBeVisible()
 
-  const refreshSelect = frame.locator('.auto-refresh-control select')
+  const settingsButton = frame.getByRole('button', { name: '设置', exact: true })
+  await settingsButton.click()
+  const refreshSelect = frame.locator('.session-refresh-settings select')
   await expect(refreshSelect).toBeVisible()
   // Fixture has 300 seconds default
   await expect(refreshSelect).toHaveValue('300')

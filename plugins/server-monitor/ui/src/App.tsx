@@ -17,6 +17,8 @@ type Config = {
   showDiskDevice?: boolean
   showGpuLabels?: boolean
   showGpuPower?: boolean
+  showGpuTemperature?: boolean
+  gpuMemoryDisplay?: 'percent' | 'value' | 'both'
 }
 
 type Disk = {
@@ -182,6 +184,8 @@ export default function App() {
       showDiskDevice: c.showDiskDevice ?? true,
       showGpuLabels: c.showGpuLabels ?? false,
       showGpuPower: c.showGpuPower ?? false,
+      showGpuTemperature: c.showGpuTemperature ?? true,
+      gpuMemoryDisplay: c.gpuMemoryDisplay ?? 'both',
       ...c,
     } : {
       id: crypto.randomUUID().replaceAll('-', '').slice(0, 12),
@@ -195,6 +199,8 @@ export default function App() {
       showDiskDevice: true,
       showGpuLabels: false,
       showGpuPower: false,
+      showGpuTemperature: true,
+      gpuMemoryDisplay: 'both',
     })
   }
 
@@ -348,10 +354,17 @@ export default function App() {
                         {d.gpus && d.gpus.length > 0 ? (
                           d.gpus.map(g => {
                             const cleanName = g.name.replace(/^NVIDIA\s+/i, '').trim()
+                            const memoryPercent = pct(g.memoryUsedMiB, g.memoryTotalMiB)
+                            const memoryValue = `${size(g.memoryUsedMiB * 1024 * 1024)} / ${size(g.memoryTotalMiB * 1024 * 1024)}`
+                            const memoryDisplay = d.selection.gpuMemoryDisplay === 'percent'
+                              ? `${memoryPercent}%`
+                              : d.selection.gpuMemoryDisplay === 'value'
+                                ? memoryValue
+                                : `${memoryValue} (${memoryPercent}%)`
                             const details = [
                               d.selection.showGpuLabels ? `利用率: ${g.utilization}%` : `${g.utilization}%`,
-                              d.selection.showGpuLabels ? `显存: ${size(g.memoryUsedMiB * 1024 * 1024)} / ${size(g.memoryTotalMiB * 1024 * 1024)}` : `${g.memoryUsedMiB}/${g.memoryTotalMiB} MiB`,
-                              g.temperatureC != null ? (d.selection.showGpuLabels ? `温度: ${g.temperatureC}°C` : `${g.temperatureC}°C`) : null,
+                              d.selection.showGpuLabels ? `显存: ${memoryDisplay}` : memoryDisplay,
+                              d.selection.showGpuTemperature !== false && g.temperatureC != null ? (d.selection.showGpuLabels ? `温度: ${g.temperatureC}°C` : `${g.temperatureC}°C`) : null,
                               (d.selection.showGpuPower && g.powerDrawW != null) ? (d.selection.showGpuLabels ? `功率: ${Math.round(g.powerDrawW)}W` : `${Math.round(g.powerDrawW)}W`) : null,
                             ].filter(Boolean).join(' · ')
                             return (
@@ -461,6 +474,25 @@ export default function App() {
                 onChange={e => setDraft({ ...draft, showGpuPower: e.target.checked })}
               />
               GPU 显示功率
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={draft.showGpuTemperature !== false}
+                onChange={e => setDraft({ ...draft, showGpuTemperature: e.target.checked })}
+              />
+              GPU 显示温度
+            </label>
+            <label>
+              GPU 显存显示
+              <Select
+                value={draft.gpuMemoryDisplay ?? 'both'}
+                onChange={e => setDraft({ ...draft, gpuMemoryDisplay: e.target.value as NonNullable<Config['gpuMemoryDisplay']> })}
+              >
+                <option value="percent">占用百分比</option>
+                <option value="value">具体数值</option>
+                <option value="both">百分比 + 具体数值</option>
+              </Select>
             </label>
           </div>
           <p>选择要并列显示的挂载点和网卡；空选择表示全部显示。</p>

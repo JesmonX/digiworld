@@ -14,6 +14,18 @@ struct Req {
     #[serde(default)]
     params: Value,
 }
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+enum GpuMemoryDisplay {
+    Percent,
+    Value,
+    Both,
+}
+
+fn default_gpu_memory_display() -> GpuMemoryDisplay {
+    GpuMemoryDisplay::Both
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Device {
@@ -36,6 +48,10 @@ struct Device {
     show_gpu_labels: bool,
     #[serde(default)]
     show_gpu_power: bool,
+    #[serde(default = "yes")]
+    show_gpu_temperature: bool,
+    #[serde(default = "default_gpu_memory_display")]
+    gpu_memory_display: GpuMemoryDisplay,
 }
 #[derive(Default, Serialize, Deserialize)]
 struct Settings {
@@ -130,6 +146,8 @@ impl App {
                 "showDiskDevice": d.show_disk_device,
                 "showGpuLabels": d.show_gpu_labels,
                 "showGpuPower": d.show_gpu_power,
+                "showGpuTemperature": d.show_gpu_temperature,
+                "gpuMemoryDisplay": d.gpu_memory_display,
             });
             match ssh(&d.host, HELPER) {
                 Ok(mut v) => {
@@ -352,5 +370,17 @@ mod tests {
         assert!(host("prod-gpu-1").is_ok());
         assert!(host("-oProxyCommand=bad").is_err());
         assert!(host("name with spaces").is_err())
+    }
+
+    #[test]
+    fn gpu_display_settings_default_for_legacy_devices() {
+        let device: Device = serde_json::from_value(json!({
+            "id": "gpu1",
+            "label": "GPU",
+            "host": "gpu"
+        }))
+        .unwrap();
+        assert!(device.show_gpu_temperature);
+        assert_eq!(device.gpu_memory_display, GpuMemoryDisplay::Both);
     }
 }
