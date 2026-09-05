@@ -5,6 +5,9 @@ members = [
   "plugins/keyboard-heatmap/backend",
   "plugins/agent-token-heatmap/backend",
   "plugins/mail-assistant/backend",
+  "plugins/github-actions/backend",
+  "plugins/server-monitor/backend",
+  "plugins/calendar-todo/backend",
 ]
 
 [workspace.package]

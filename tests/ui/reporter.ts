@@ -9,7 +9,7 @@ export default class DesignReporter implements Reporter {
   }
   async onEnd(result: FullResult) {
     const plugins: Record<string, string> = {}
-    for (const name of ['keyboard-heatmap', 'agent-token-heatmap', 'mail-assistant']) plugins[name] = createHash('sha256').update(await readFile(`plugins/${name}/ui/dist/index.html`)).digest('hex')
+    for (const name of ['keyboard-heatmap', 'agent-token-heatmap', 'mail-assistant', 'github-actions', 'server-monitor', 'calendar-todo']) plugins[name] = createHash('sha256').update(await readFile(`plugins/${name}/ui/dist/index.html`)).digest('hex')
     await mkdir('dist', { recursive: true })
     await writeFile('dist/ui-validation.json', JSON.stringify({ status: result.status === 'passed' && !this.complete ? 'partial' : result.status, plugins, environment: 'Chromium with synthetic data; native WebView acceptance is separate', generatedAt: new Date().toISOString() }, null, 2))
   }

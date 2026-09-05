@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   Activity, AlertTriangle, BarChart3, Boxes, Check, ChevronRight, CircleAlert, Download, Gauge,
-  Keyboard, Library, LoaderCircle, Mail, Network, Palette, Pause, RefreshCw, Settings,
+  CalendarDays, GitBranch, Keyboard, Library, LoaderCircle, Mail, Network, Palette, Pause, RefreshCw, Server, Settings,
   ShieldCheck, Type, type LucideIcon,
 } from 'lucide-react'
 import { suppressContextMenu, type CatalogIndex, type CatalogPlugin, type PluginSummary } from '@digiworld/plugin-sdk'
@@ -50,8 +50,12 @@ function permissionLabel(id: string): string {
     'process:shell': '运行已配置的系统 Shell',
     'network:openai': '访问 OpenAI Codex 服务',
     'network:imap': '访问 IMAP 邮箱服务',
+    'network:github': '访问 GitHub 服务',
+    'network:icloud': '访问 iCloud 日历服务',
     'notifications': '显示系统通知',
     'secret:mail-credentials': '保存邮箱授权码',
+    'secret:github-token': '保存 GitHub Token',
+    'secret:icloud-app-password': '保存 iCloud App 专用密码',
   }
   return labels[id] ?? id
 }
@@ -92,6 +96,9 @@ const pluginIconMap: Record<string, PluginIconType> = {
   tokens: BarChart3,
   chatgpt: ChatGptIcon,
   mail: Mail,
+  'git-branch': GitBranch,
+  server: Server,
+  'calendar-days': CalendarDays,
   default: Boxes,
 }
 

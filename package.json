@@ -17,6 +17,9 @@
     "package:keyboard": "node scripts/package-plugin.mjs keyboard-heatmap",
     "package:agent-tokens": "node scripts/package-plugin.mjs agent-token-heatmap",
     "package:mail": "node scripts/package-plugin.mjs mail-assistant",
+    "package:github-actions": "node scripts/package-plugin.mjs github-actions",
+    "package:server-monitor": "node scripts/package-plugin.mjs server-monitor",
+    "package:calendar-todo": "node scripts/package-plugin.mjs calendar-todo",
     "catalog:build": "node scripts/build-catalog.mjs"
   },
   "devDependencies": {

@@ -1,0 +1,18 @@
+{
+  "id": "io.github.jesmonx.digiworld.github-actions",
+  "version": "0.1.0",
+  "uiDesignVersion": 1,
+  "name": "Git Actions",
+  "description": "查看所选 GitHub 仓库中由当前账号触发的 Actions 运行与 Job 进度。",
+  "icon": "git-branch",
+  "author": "JesmonX",
+  "license": "MIT",
+  "minCoreVersion": "0.2.31",
+  "ui": "ui/index.html",
+  "background": "none",
+  "permissions": [
+    { "id": "network:github", "reason": "读取当前账号、可访问仓库与 GitHub Actions 状态。" },
+    { "id": "secret:github-token", "reason": "将 GitHub Token 保存到操作系统凭据库。" },
+    { "id": "plugin-storage", "reason": "保存仓库选择与刷新设置。" }
+  ]
+}

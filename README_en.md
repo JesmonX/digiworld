@@ -68,6 +68,15 @@ Hardware physical key heatmap for developers and mechanical keyboard enthusiasts
 - **Strict Privacy**: Aggregates daily press counts by physical key code only. Never records keystroke sequence, text content, active application titles, or device IDs.
 - **Dynamic Heat Tiers**: Visual gradient reflecting press density with Today vs. All-time statistics and Top-10 keys.
 
+### 4. Git Actions (`github-actions`)
+Select multiple repositories and monitor workflow runs triggered by the connected GitHub account. Tokens stay in the OS credential store and the plugin remains read-only.
+
+### 5. Servers (`server-monitor`)
+Monitor remote Linux memory, CPU, selected filesystems, NVIDIA GPUs, and interface traffic through system OpenSSH. Optional user-confirmed vnStat setup adds daily traffic history.
+
+### 6. Calendar & Todo (`calendar-todo`)
+Synchronize ordinary iCloud Calendar events over CalDAV with ETag conflict protection and calendar selection. Recurring events are displayed read-only; Todo data stays local.
+
 ---
 
 ## Getting Started

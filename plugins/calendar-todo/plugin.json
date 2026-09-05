@@ -1,0 +1,18 @@
+{
+  "id": "io.github.jesmonx.digiworld.calendar-todo",
+  "version": "0.1.0",
+  "uiDesignVersion": 1,
+  "name": "日历与 Todo",
+  "description": "双向同步 iCloud 日历事件，并管理本地 Todo。",
+  "icon": "calendar-days",
+  "author": "JesmonX",
+  "license": "MIT",
+  "minCoreVersion": "0.2.31",
+  "ui": "ui/index.html",
+  "background": "none",
+  "permissions": [
+    { "id": "network:icloud", "reason": "通过 CalDAV 发现和同步用户选择的 iCloud 日历。" },
+    { "id": "secret:icloud-app-password", "reason": "将 Apple App 专用密码保存到操作系统凭据库。" },
+    { "id": "plugin-storage", "reason": "保存日历缓存、同步设置和本地 Todo。" }
+  ]
+}

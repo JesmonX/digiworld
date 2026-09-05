@@ -1,0 +1,17 @@
+{
+  "id": "io.github.jesmonx.digiworld.server-monitor",
+  "version": "0.1.0",
+  "uiDesignVersion": 1,
+  "name": "Servers",
+  "description": "通过 SSH 查看远程 Linux 设备的内存、磁盘、CPU、NVIDIA GPU 与网络流量。",
+  "icon": "server",
+  "author": "JesmonX",
+  "license": "MIT",
+  "minCoreVersion": "0.2.31",
+  "ui": "ui/index.html",
+  "background": "none",
+  "permissions": [
+    { "id": "process:ssh", "reason": "通过系统 OpenSSH 读取远程 Linux 状态；仅在用户点击安装后执行 vnStat 安装命令。" },
+    { "id": "plugin-storage", "reason": "保存设备、指标选择及最近采样。" }
+  ]
+}

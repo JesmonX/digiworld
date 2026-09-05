@@ -68,7 +68,7 @@ jobs:
       - name: Validate built plugin interfaces
         run: pnpm test:ui
       - name: Build plugin backends
-        run: cargo build --release -p digiworld-keyboard-heatmap -p digiworld-agent-token-heatmap -p digiworld-mail-assistant
+        run: cargo build --release -p digiworld-keyboard-heatmap -p digiworld-agent-token-heatmap -p digiworld-mail-assistant -p digiworld-github-actions -p digiworld-server-monitor -p digiworld-calendar-todo
       - name: Package signed keyboard plugin
         shell: pwsh
         env:

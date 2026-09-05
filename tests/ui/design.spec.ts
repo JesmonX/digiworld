@@ -19,7 +19,7 @@ for (const theme of THEMES) for (const scale of [100, 110, 125]) for (const [wid
     await expect(page.getByRole('button', { name: `${scale}%`, exact: true })).toHaveAttribute('aria-pressed', 'true')
     await page.screenshot({ path: info.outputPath('settings.png') })
     const hostFont = await page.locator('.dw-button.primary').first().evaluate(el => getComputedStyle(el).fontSize).catch(() => '')
-    for (const [label, selector] of [['键盘热力图', '.keyboard-card'], ['Agent Overview', '.weekly-card'], ['邮件助手', '.message-list']]) {
+    for (const [label, selector] of [['键盘热力图', '.keyboard-card'], ['Agent Overview', '.weekly-card'], ['邮件助手', '.message-list'], ['Git Actions', '.runs'], ['Servers', '.devices'], ['日历与 Todo', '.agenda']]) {
       await page.getByRole('button', { name: label, exact: true }).click()
       const frame = page.frameLocator('iframe')
       await expect(frame.locator(selector)).toBeVisible()
@@ -51,7 +51,7 @@ test('live theme and typography update preserves plugin document and UI state', 
 
 for (const state of ['empty', 'error']) test(`plugin ${state} states`, async ({ page }) => {
   await page.goto(`/design.html?state=${state}`)
-  for (const label of ['键盘热力图', 'Agent Overview', '邮件助手']) {
+  for (const label of ['键盘热力图', 'Agent Overview', '邮件助手', 'Git Actions', 'Servers', '日历与 Todo']) {
     await page.getByRole('button', { name: label, exact: true }).click()
     await expect(page.frameLocator('iframe').locator('#root')).not.toBeEmpty()
     if (state === 'error') await expect(page.frameLocator('iframe').getByText('演示：暂时无法加载，请重试', { exact: false }).first()).toBeVisible()

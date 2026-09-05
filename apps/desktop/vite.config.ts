@@ -9,7 +9,7 @@ export default defineConfig({
     configureServer(server) {
       server.middlewares.use('/__design-plugin', async (req, res, next) => {
         const name = req.url?.slice(1)
-        if (!name || !['keyboard-heatmap', 'agent-token-heatmap', 'mail-assistant'].includes(name)) return next()
+        if (!name || !['keyboard-heatmap', 'agent-token-heatmap', 'mail-assistant', 'github-actions', 'server-monitor', 'calendar-todo'].includes(name)) return next()
         try {
           res.setHeader('Content-Type', 'text/plain; charset=utf-8')
           res.end(await readFile(path.resolve(import.meta.dirname, '../../plugins', name, 'ui/dist/index.html')))
