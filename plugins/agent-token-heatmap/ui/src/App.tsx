@@ -23,6 +23,8 @@ interface UsageSettings {
   localRoots: Partial<Record<Agent, string>>
   sshSources: SshSource[]
   codexQuota: CodexQuotaSettings
+  selectedAgents?: Agent[]
+  selectedSources?: string[]
 }
 type ShellPreset = 'auto' | 'powershell' | 'zsh' | 'bash'
 interface CodexQuotaSettings {
@@ -98,6 +100,43 @@ const defaultRoot: Record<Agent, string> = {
   agy: '~/.gemini/antigravity-cli/conversations',
 }
 
+function AgentIcon({ agent, className = '' }: { agent: Agent; className?: string }) {
+  const cls = `agent-icon agent-icon-${agent} ${className}`.trim()
+  if (agent === 'codex') {
+    return (
+      <svg className={cls} viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+        <path d="M22.28 9.82a5.98 5.98 0 0 0-.51-4.91 6.05 6.05 0 0 0-6.51-2.9A6.07 6.07 0 0 0 4.98 4.18a5.98 5.98 0 0 0-4 2.9 6.05 6.05 0 0 0 .74 7.1 5.98 5.98 0 0 0 .51 4.91 6.05 6.05 0 0 0 6.52 2.9A5.98 5.98 0 0 0 13.26 24a6.06 6.06 0 0 0 5.77-4.2 5.99 5.99 0 0 0 4-2.9 6.06 6.06 0 0 0-.75-7.08zm-9.02 12.61a4.48 4.48 0 0 1-2.88-1.04l.14-.08 4.78-2.76a.8.8 0 0 0 .4-.68v-6.74l2.02 1.17a.07.07 0 0 1 .04.05v5.59a4.5 4.5 0 0 1-4.5 4.49zm-9.66-4.13a4.47 4.47 0 0 1-.54-3.01l.15.08 4.78 2.76a.77.77 0 0 0 .78 0l5.84-3.37v2.33a.08.08 0 0 1-.03.06L9.74 19.95a4.5 4.5 0 0 1-6.14-1.65zM2.34 7.9a4.48 4.48 0 0 1 2.37-1.98V11.6a.77.77 0 0 0 .38.68l5.82 3.35-2.02 1.17a.08.08 0 0 1-.07 0L4 14.01A4.5 4.5 0 0 1 2.34 7.9zm16.6 3.85L13.1 8.36 15.12 7.2a.08.08 0 0 1 .07 0l4.83 2.8a4.49 4.49 0 0 1-.67 8.1v-5.68a.8.8 0 0 0-.41-.67zm2.01-3.02l-.14-.09-4.78-2.78a.78.78 0 0 0-.78 0L9.41 9.23V6.9a.07.07 0 0 1 .03-.06l4.83-2.79a4.5 4.5 0 0 1 6.68 4.66zM8.31 12.86l-2.02-1.16a.08.08 0 0 1-.04-.06V6.07a4.5 4.5 0 0 1 7.38-3.45l-.14.08L8.7 5.46a.8.8 0 0 0-.4.68zm1.1-2.36l2.6-1.5 2.6 1.5v3l-2.6 1.5-2.6-1.5z" />
+      </svg>
+    )
+  }
+  if (agent === 'claude') {
+    return (
+      <svg className={cls} viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+        <path d="M12 2a1.25 1.25 0 0 1 1.25 1.25v2.88a1.25 1.25 0 1 1-2.5 0V3.25A1.25 1.25 0 0 1 12 2zm0 14.62a1.25 1.25 0 0 1 1.25 1.25v2.88a1.25 1.25 0 1 1-2.5 0v-2.88A1.25 1.25 0 0 1 12 16.62zm10-5.87a1.25 1.25 0 0 1-1.25 1.25h-2.88a1.25 1.25 0 1 1 0-2.5h2.88A1.25 1.25 0 0 1 22 10.75zm-14.62 0a1.25 1.25 0 0 1-1.25 1.25H3.25a1.25 1.25 0 1 1 0-2.5h2.88A1.25 1.25 0 0 1 7.38 10.75zm11.69-6.32a1.25 1.25 0 0 1 0 1.77l-2.04 2.04a1.25 1.25 0 0 1-1.77-1.77l2.04-2.04a1.25 1.25 0 0 1 1.77 0zm-10.36 10.36a1.25 1.25 0 0 1 0 1.77l-2.04 2.04a1.25 1.25 0 0 1-1.77-1.77l2.04-2.04a1.25 1.25 0 0 1 1.77 0zm10.36 1.77a1.25 1.25 0 0 1-1.77 1.77l-2.04-2.04a1.25 1.25 0 0 1 1.77-1.77l2.04 2.04zM6.94 4.43a1.25 1.25 0 0 1 1.77 1.77L6.67 8.24A1.25 1.25 0 0 1 4.9 6.47l2.04-2.04z" />
+      </svg>
+    )
+  }
+  if (agent === 'pi') {
+    return (
+      <svg className={cls} viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+        <path d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13a1.5 1.5 0 0 1 0 3H7.8l.7 9.2a2 2 0 0 0 2 1.8h.5a1.5 1.5 0 0 1 0 3h-.5a5 5 0 0 1-4.98-4.63L5 8h-.5A1.5 1.5 0 0 1 4 6.5zm11 1.5h3v8.5a2.5 2.5 0 0 0 2.5 2.5 1.5 1.5 0 0 1 0 3 5.5 5.5 0 0 1-5.5-5.5V8z" />
+      </svg>
+    )
+  }
+  if (agent === 'zcode') {
+    return (
+      <svg className={cls} viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+        <path d="M5 6.5A1.5 1.5 0 0 1 6.5 5h11a1.5 1.5 0 0 1 1.2 2.4L11.5 16H17.5a1.5 1.5 0 0 1 0 3h-11a1.5 1.5 0 0 1-1.2-2.4L12.5 8H6.5A1.5 1.5 0 0 1 5 6.5z" />
+      </svg>
+    )
+  }
+  return (
+    <svg className={cls} viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+      <path d="M12 2C12 7.52 7.52 12 2 12C7.52 12 12 16.48 12 22C12 16.48 16.48 12 22 12C16.48 12 12 7.52 12 2Z" />
+    </svg>
+  )
+}
+
 export default function App() {
   const [settings, setSettings] = useState<UsageSettings | null>(null)
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
@@ -111,13 +150,17 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
-  const loadSnapshot = useCallback(async (nextSettings?: UsageSettings) => {
+  const loadSnapshot = useCallback(async (nextSettings?: UsageSettings, currentAgents?: Agent[], currentSources?: string[]) => {
     const configured = nextSettings ?? settings
     if (!configured) return
+    const activeAgents = currentAgents ?? agents
+    const activeSources = currentSources ?? sources
     const allowedSources = ['local', ...configured.sshSources.map(source => source.id)]
-    const selectedSources = sources.filter(source => allowedSources.includes(source))
+    const selectedSources = activeSources.filter(source => allowedSources.includes(source))
     setSnapshot(await bridge.request<Snapshot>('usage.snapshot', {
-      range, agents, sources: selectedSources.length ? selectedSources : allowedSources,
+      range,
+      agents: activeAgents,
+      sources: selectedSources.length ? selectedSources : allowedSources,
     }))
   }, [agents, range, settings, sources])
 
@@ -125,8 +168,21 @@ export default function App() {
     bridge.ready()
     bridge.request<UsageSettings>('usage.getSettings').then(value => {
       setSettings(value)
-      setSources(['local', ...value.sshSources.map(source => source.id)])
-      return bridge.request<Snapshot>('usage.snapshot', { range: '365', agents: AGENTS, sources: ['local', ...value.sshSources.map(source => source.id)] })
+      const allowedSources = ['local', ...value.sshSources.map(source => source.id)]
+      const initialAgents = (value.selectedAgents && value.selectedAgents.length > 0)
+        ? value.selectedAgents.filter(a => AGENTS.includes(a))
+        : [...AGENTS]
+      const initialSources = (value.selectedSources && value.selectedSources.length > 0)
+        ? value.selectedSources.filter(s => allowedSources.includes(s))
+        : allowedSources
+      const effectiveSources = initialSources.length > 0 ? initialSources : allowedSources
+      setAgents(initialAgents)
+      setSources(effectiveSources)
+      return bridge.request<Snapshot>('usage.snapshot', {
+        range: '365',
+        agents: initialAgents,
+        sources: effectiveSources,
+      })
     }).then(setSnapshot).catch(reason => setError(String(reason)))
   }, [])
 
@@ -197,12 +253,20 @@ export default function App() {
     }
   }
 
-  const toggleAgent = (agent: Agent) => setAgents(current => current.includes(agent)
-    ? (current.length === 1 ? current : current.filter(value => value !== agent))
-    : [...current, agent])
-  const toggleSource = (source: string) => setSources(current => current.includes(source)
-    ? (current.length === 1 ? current : current.filter(value => value !== source))
-    : [...current, source])
+  const toggleAgent = (agent: Agent) => {
+    const next = agents.includes(agent)
+      ? (agents.length === 1 ? agents : agents.filter(value => value !== agent))
+      : [...agents, agent]
+    setAgents(next)
+    void bridge.request('usage.saveFilters', { agents: next, sources }).catch(() => {})
+  }
+  const toggleSource = (source: string) => {
+    const next = sources.includes(source)
+      ? (sources.length === 1 ? sources : sources.filter(value => value !== source))
+      : [...sources, source]
+    setSources(next)
+    void bridge.request('usage.saveFilters', { agents, sources: next }).catch(() => {})
+  }
 
   const cells = useMemo(() => {
     if (!snapshot) return []
@@ -235,7 +299,7 @@ export default function App() {
       {(error || refresh.errors.length > 0) && <Status tone="error" className="error-banner"><AlertTriangle /><span>{error ?? refresh.errors.join('；')}</span><Button onClick={() => { setError(null); setRefresh(current => ({ ...current, errors: [] })) }}><X /></Button></Status>}
 
       <section className="filter-bar">
-        <FilterGroup label="Agent">{AGENTS.map(agent => <FilterChip key={agent} active={agents.includes(agent)} label={agentLabel[agent]} onClick={() => toggleAgent(agent)} />)}</FilterGroup>
+        <FilterGroup label="Agent">{AGENTS.map(agent => <FilterChip key={agent} active={agents.includes(agent)} label={agentLabel[agent]} icon={<AgentIcon agent={agent} />} onClick={() => toggleAgent(agent)} />)}</FilterGroup>
         <FilterGroup label="设备">{sourceOptions.map(source => <FilterChip key={source.id} active={sources.includes(source.id)} label={source.label} onClick={() => toggleSource(source.id)} />)}</FilterGroup>
       </section>
 
@@ -264,7 +328,7 @@ export default function App() {
       </section>
 
       <section className="lower-grid">
-        <Card className="dw-card breakdown-card"><h2>来源明细</h2>{snapshot?.breakdown.length ? <div className="breakdown-table">{[...snapshot.breakdown].sort((a, b) => b.totalTokens - a.totalTokens).map(row => <div key={`${row.sourceId}-${row.agent}`}><span className={`agent-dot ${row.agent}`} /><strong>{agentLabel[row.agent]}</strong><span>{row.sourceLabel}</span><b>{formatTokens(row.totalTokens)}</b><small>{row.cacheRate == null ? `${formatTokens(row.cacheReadTokens)} cache` : `${(row.cacheRate * 100).toFixed(1)}% cache`}</small></div>)}</div> : <Empty />}</Card>
+        <Card className="dw-card breakdown-card"><h2>来源明细</h2>{snapshot?.breakdown.length ? <div className="breakdown-table">{[...snapshot.breakdown].sort((a, b) => b.totalTokens - a.totalTokens).map(row => <div key={`${row.sourceId}-${row.agent}`}><AgentIcon agent={row.agent} className={`agent-breakdown-icon ${row.agent}`} /><strong>{agentLabel[row.agent]}</strong><span>{row.sourceLabel}</span><b>{formatTokens(row.totalTokens)}</b><small>{row.cacheRate == null ? `${formatTokens(row.cacheReadTokens)} cache` : `${(row.cacheRate * 100).toFixed(1)}% cache`}</small></div>)}</div> : <Empty />}</Card>
         <Card className="dw-card daily-ranking-card"><h2>每日用量排行</h2>{dailyRanking.length ? <div className="daily-ranking">{dailyRanking.map((day, index) => <div key={day.day}><b>{index + 1}</b><span>{day.day}</span><i><em style={{ width: `${(day.totalTokens / dailyMax) * 100}%` }} /></i><strong>{formatTokens(day.totalTokens)}</strong></div>)}</div> : <Empty />}</Card>
       </section>
 
@@ -274,11 +338,20 @@ export default function App() {
       </Card>
 
       {settingsOpen && settings && <SourceDialog settings={settings} refreshRunning={refresh.running} onClose={() => setSettingsOpen(false)} onSave={async value => {
-        const saved = await bridge.request<UsageSettings>('usage.saveSettings', { settings: value })
+        const nextSources = sources.filter(id => id === 'local' || value.sshSources.some(source => source.id === id))
+        const saved = await bridge.request<UsageSettings>('usage.saveSettings', {
+          settings: {
+            ...value,
+            selectedAgents: agents,
+            selectedSources: nextSources,
+          },
+        })
         setSettings(saved)
-        setSources(current => current.filter(id => id === 'local' || saved.sshSources.some(source => source.id === id)).concat(saved.sshSources.filter(source => !current.includes(source.id)).map(source => source.id)))
+        const allowedSources = ['local', ...saved.sshSources.map(source => source.id)]
+        const effectiveSources = nextSources.length ? nextSources : allowedSources
+        setSources(effectiveSources)
         setSettingsOpen(false)
-        await loadSnapshot(saved)
+        await loadSnapshot(saved, agents, effectiveSources)
       }} onScan={testSource} onQuotaTest={async value => bridge.request<CodexQuotaSnapshot>('usage.testCodexQuota', { settings: value })} />}
     </div>
   )
@@ -313,7 +386,7 @@ function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
   const yForRate = (rate: number) => top + (cacheAxisMaximum - Math.max(cacheAxisMinimum, Math.min(cacheAxisMaximum, rate))) / cacheAxisRange * plotHeight
 
   return <Card className="dw-card weekly-card">
-    <div className="panel-heading"><div><h2>Last 7 Days</h2></div><div className="chart-legend" aria-label="图例">{modelCategories.length ? modelCategories.map((category, index) => <span className="legend-item" key={category.key} title={`${category.label} · ${formatTokens(category.totalTokens)}`}><i className={`model-key model-key-${index % 8}`} /><b>{category.label}</b><small>{formatTokens(category.totalTokens)}</small></span>) : <span className="legend-item"><i className="bar-key" /><b>Token</b></span>}</div></div>
+    <div className="panel-heading"><div><h2>Last 7 Days</h2></div><div className="chart-legend" aria-label="图例">{modelCategories.length ? modelCategories.map((category, index) => <span className="legend-item" key={category.key} title={`${category.label} · ${formatTokens(category.totalTokens)}`}><i className={`model-key model-key-${index % 8}`} /><b>{category.label}</b><small>{formatTokens(category.totalTokens)}</small></span>) : <span className="legend-item"><i className="bar-key" /><b>Token</b></span>}<span className="legend-item" title="缓存率折线"><i className="cache-key" /><b>缓存率</b></span></div></div>
     {points.length ? <svg className="weekly-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="近七天按模型堆叠的 Token 用量柱形图和缓存率折线图">
       <text x={left} y={top - 13} className="chart-axis-title">Token</text>
       <text x={width - right} y={top - 13} textAnchor="end" className="chart-axis-title">缓存率</text>
@@ -477,7 +550,7 @@ function formatFetchedAt(value: string | null): string {
 }
 
 function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) { return <div className="filter-group"><span>{label}</span>{children}</div> }
-function FilterChip({ active, label, onClick }: { active: boolean; label: string; onClick(): void }) { return <Button className={`filter-chip ${active ? 'active' : ''}`} aria-pressed={active} onClick={onClick}>{active && <Check />}{label}</Button> }
+function FilterChip({ active, label, icon, onClick }: { active: boolean; label: string; icon?: React.ReactNode; onClick(): void }) { return <Button className={`filter-chip ${active ? 'active' : ''}`} aria-pressed={active} onClick={onClick}>{active && <Check className="chip-check" />}{icon}<span>{label}</span></Button> }
 function Summary({ label, value, text }: { label: string; value?: number | undefined; text?: string }) { return <div className="summary-item"><small>{label}</small><strong>{text ?? formatTokens(value ?? 0)}</strong></div> }
 function Empty() { return <div className="empty"><Database /><span>暂无数据，点击“手动刷新”开始扫描</span></div> }
 
@@ -499,8 +572,8 @@ function SourceDialog({ settings, refreshRunning, onClose, onSave, onScan, onQuo
   const sourceOptions = [{ id: 'local', label: '本机' }, ...draft.sshSources]
   return <Dialog open onClose={() => { if (!busy) onClose() }} className="source-modal" aria-label="数据源"><header><div><h2>数据源</h2><p>用量扫描按需运行，Codex 限额可独立自动刷新</p></div><Button className="close" onClick={onClose}><X /></Button></header>
     {dialogError && <Status tone="error" className="dialog-error">{dialogError}</Status>}
-    <section className="source-block"><div className="source-heading"><div><HardDrive /><span><strong>本机</strong><small>默认 Agent 数据目录</small></span></div><div className="agent-checks">{AGENTS.map(agent => <label key={agent}><Input type="checkbox" checked={draft.localAgents.includes(agent)} onChange={() => setDraft(current => ({ ...current, localAgents: toggleRequired(current.localAgents, agent) }))} />{agentLabel[agent]}</label>)}</div></div><div className="root-grid">{AGENTS.map(agent => <label key={agent}>{agentLabel[agent]}<Input value={draft.localRoots[agent] ?? ''} onChange={event => setDraft(current => ({ ...current, localRoots: { ...current.localRoots, [agent]: event.target.value } }))} placeholder={defaultRoot[agent]} /></label>)}</div></section>
-    {draft.sshSources.map((source, index) => <section className="source-block" key={source.id}><div className="source-heading"><div><Server /><span><strong>{source.label || 'SSH 设备'}</strong><small>{source.host || '尚未填写 Host'}</small></span></div><Button className="icon danger" title="移除设备" onClick={() => setDraft(current => ({ ...current, sshSources: current.sshSources.filter((_, item) => item !== index), codexQuota: current.codexQuota.sourceId === source.id ? { ...current.codexQuota, sourceId: null } : current.codexQuota }))}><Trash2 /></Button></div><div className="ssh-fields"><label>名称<Input value={source.label} onChange={event => updateSource(index, { ...source, label: event.target.value })} /></label><label>SSH Config Host<Input value={source.host} onChange={event => updateSource(index, { ...source, host: event.target.value })} placeholder="gpu-server" /></label></div><div className="agent-checks">{AGENTS.map(agent => <label key={agent}><Input type="checkbox" checked={source.enabledAgents.includes(agent)} onChange={() => updateSource(index, { ...source, enabledAgents: toggleRequired(source.enabledAgents, agent) })} />{agentLabel[agent]}</label>)}</div><div className="root-grid">{AGENTS.map(agent => <label key={agent}>{agentLabel[agent]}<Input value={source.roots[agent] ?? ''} onChange={event => updateSource(index, { ...source, roots: { ...source.roots, [agent]: event.target.value } })} placeholder={defaultRoot[agent]} /></label>)}</div><Button className="secondary scan-source" disabled={refreshRunning || !source.host} onClick={async () => { setScanning(source.id); setScanMessage(null); setDialogError(null); try { await onScan(source); setScanMessage(`${source.label || source.host} 扫描成功`) } catch (reason) { setDialogError(String(reason)) } finally { setScanning(null) } }}><RefreshCw className={scanning === source.id ? 'spin' : ''} />{scanning === source.id ? '扫描中…' : '测试并扫描'}</Button></section>)}
+    <section className="source-block"><div className="source-heading"><div><HardDrive /><span><strong>本机</strong><small>默认 Agent 数据目录</small></span></div><div className="agent-checks">{AGENTS.map(agent => <label key={agent}><Input type="checkbox" checked={draft.localAgents.includes(agent)} onChange={() => setDraft(current => ({ ...current, localAgents: toggleRequired(current.localAgents, agent) }))} /><AgentIcon agent={agent} /><span>{agentLabel[agent]}</span></label>)}</div></div><div className="root-grid">{AGENTS.map(agent => <label key={agent}>{agentLabel[agent]}<Input value={draft.localRoots[agent] ?? ''} onChange={event => setDraft(current => ({ ...current, localRoots: { ...current.localRoots, [agent]: event.target.value } }))} placeholder={defaultRoot[agent]} /></label>)}</div></section>
+    {draft.sshSources.map((source, index) => <section className="source-block" key={source.id}><div className="source-heading"><div><Server /><span><strong>{source.label || 'SSH 设备'}</strong><small>{source.host || '尚未填写 Host'}</small></span></div><Button className="icon danger" title="移除设备" onClick={() => setDraft(current => ({ ...current, sshSources: current.sshSources.filter((_, item) => item !== index), codexQuota: current.codexQuota.sourceId === source.id ? { ...current.codexQuota, sourceId: null } : current.codexQuota }))}><Trash2 /></Button></div><div className="ssh-fields"><label>名称<Input value={source.label} onChange={event => updateSource(index, { ...source, label: event.target.value })} /></label><label>SSH Config Host<Input value={source.host} onChange={event => updateSource(index, { ...source, host: event.target.value })} placeholder="gpu-server" /></label></div><div className="agent-checks">{AGENTS.map(agent => <label key={agent}><Input type="checkbox" checked={source.enabledAgents.includes(agent)} onChange={() => updateSource(index, { ...source, enabledAgents: toggleRequired(source.enabledAgents, agent) })} /><AgentIcon agent={agent} /><span>{agentLabel[agent]}</span></label>)}</div><div className="root-grid">{AGENTS.map(agent => <label key={agent}>{agentLabel[agent]}<Input value={source.roots[agent] ?? ''} onChange={event => updateSource(index, { ...source, roots: { ...source.roots, [agent]: event.target.value } })} placeholder={defaultRoot[agent]} /></label>)}</div><Button className="secondary scan-source" disabled={refreshRunning || !source.host} onClick={async () => { setScanning(source.id); setScanMessage(null); setDialogError(null); try { await onScan(source); setScanMessage(`${source.label || source.host} 扫描成功`) } catch (reason) { setDialogError(String(reason)) } finally { setScanning(null) } }}><RefreshCw className={scanning === source.id ? 'spin' : ''} />{scanning === source.id ? '扫描中…' : '测试并扫描'}</Button></section>)}
     {scanMessage && <Status tone="success" className="dialog-success">{scanMessage}</Status>}
     {adding ? <div className="add-confirm"><span>将添加一个使用 SSH config 和密钥认证的 Unix 设备。</span><Button className="primary" onClick={addSource}>继续</Button><Button className="secondary" onClick={() => setAdding(false)}>取消</Button></div> : <Button className="add-source" onClick={() => setAdding(true)}><Plus />添加 SSH 设备</Button>}
     <section className="source-block quota-settings"><div className="source-heading"><div><Gauge /><span><strong>Codex 限额查询</strong><small>仅显示所选设备登录的一个 Codex 账号</small></span></div></div>

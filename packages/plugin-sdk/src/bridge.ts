@@ -15,7 +15,10 @@ export function applyPluginTheme(theme: Partial<PluginTheme>, root: HTMLElement 
     if (value === undefined) continue
     root.style.setProperty(`--dw-${key}`, String(value))
   }
-  if (theme['color-scheme']) root.style.colorScheme = theme['color-scheme']
+  if (theme['color-scheme']) {
+    root.style.colorScheme = theme['color-scheme']
+    root.dataset.dwScheme = theme['color-scheme']
+  }
   if (theme.glass) root.dataset.dwGlass = theme.glass
 }
 

@@ -34,7 +34,7 @@ Native official backends run with the current user's operating-system rights.
 The permission screen is consent and transparency, not an OS sandbox.
 
 The optional manifest `icon` is a stable host icon token. Official plugins use
-the tokens `keyboard`, `tokens`, and `mail`; the desktop host falls back to a
+the tokens `keyboard`, `tokens`, `chatgpt`, and `mail`; the desktop host falls back to a
 generic icon for unknown tokens.
 
 Backends declaring a `network:*` permission receive `DIGIWORLD_PROXY_MODE`.

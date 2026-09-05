@@ -90,8 +90,8 @@ button { font: inherit; }
 .key.strong-heat { color: var(--dw-accent-contrast); text-shadow: none; }
 .key span { position: relative; z-index: 1; max-width: calc(100% - 4px); overflow: hidden; font-size: var(--type-body-sm); font-weight: var(--weight-semibold); line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
 .key.has-count span { transform: translateY(-8px); }
-.key small { position: absolute; z-index: 1; right: 4px; bottom: 3px; min-width: 17px; padding: 1px 3px; border-radius: var(--dw-radius-sm); color: var(--dw-text); font-size: var(--type-caption); font-weight: var(--weight-semibold); line-height: 1.2; text-align: center; background: color-mix(in srgb, var(--dw-surface) 74%, transparent); font-variant-numeric: tabular-nums; }
-.key.strong-heat small, .key.level-3 small, .key.level-4 small, .key.level-5 small { color: var(--dw-accent-contrast); background: var(--dw-overlay); text-shadow: none; }
+.key small { position: absolute; z-index: 1; right: 4px; bottom: 3px; min-width: 17px; padding: 1px 3px; border-radius: var(--dw-radius-sm); color: var(--dw-heat-count-text); font-size: var(--type-caption); font-weight: var(--weight-semibold); line-height: 1.2; text-align: center; background: color-mix(in srgb, var(--dw-surface) 74%, transparent); font-variant-numeric: tabular-nums; }
+.key.strong-heat small, .key.level-3 small, .key.level-4 small, .key.level-5 small { color: var(--dw-heat-count-strong); background: var(--dw-overlay); text-shadow: none; }
 .nav-section .key-row:nth-child(3) { height: 42px; }
 .numpad-section { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(5, 42px); gap: 4px; }
 .numpad-section .key { width: 100%; height: 100%; margin: 0; }

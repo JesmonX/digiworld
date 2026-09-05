@@ -57,7 +57,13 @@ export function withInitialTheme(html: string, theme: PluginTheme): string {
     .join(';')
   const style = `<style data-digiworld-host-design>${designTokensCss}\n${designBaseCss}\n:root{${declarations};color-scheme:${theme['color-scheme']}}</style>`
   // Last in head: initial host values must win over bundled fallback tokens.
-  return /<\/head>/i.test(html) ? html.replace(/<\/head>/i, `${style}</head>`) : `${style}${html}`
+  const themed = /<\/head>/i.test(html) ? html.replace(/<\/head>/i, `${style}</head>`) : `${style}${html}`
+  return /<html(?:\s[^>]*)?>/i.test(themed)
+    ? themed.replace(/<html(\s[^>]*)?>/i, (match, attrs) => {
+        if (attrs && attrs.includes('data-dw-scheme')) return match
+        return `<html${attrs ?? ''} data-dw-scheme="${theme['color-scheme']}">`
+      })
+    : themed
 }
 
 export function PluginFrame({ pluginId, html, theme }: PluginFrameProps) {

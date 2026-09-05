@@ -92,10 +92,11 @@ describe('token usage layout', () => {
     document.body.append(container)
     mocks.ready.mockReset()
     mocks.request.mockReset()
-    mocks.request.mockImplementation(async (method: string) => {
+    mocks.request.mockImplementation(async (method: string, params?: any) => {
       if (method === 'usage.getSettings') return settings
       if (method === 'usage.snapshot') return snapshot
       if (method === 'usage.getCodexQuota') return quota
+      if (method === 'usage.saveFilters') return { ...settings, ...params }
       throw new Error(`unexpected method: ${method}`)
     })
   })
@@ -125,7 +126,8 @@ describe('token usage layout', () => {
     expect(container.querySelector('.chart-legend')?.textContent).toContain('gpt-5.6-sol1.2K')
     expect(container.querySelector('.chart-legend')?.textContent).toContain('gpt-5.6-mini1K')
     expect(container.querySelector('.chart-legend')?.textContent).not.toContain('模型')
-    expect(container.querySelector('.chart-legend')?.textContent).not.toContain('缓存率')
+    expect(container.querySelector('.chart-legend')?.textContent).toContain('缓存率')
+    expect(filterBar.querySelectorAll('.agent-icon').length).toBe(5)
     expect(container.querySelector('.weekly-card h2')?.textContent).toBe('Last 7 Days')
     expect(container.querySelectorAll('.model-pie-slice')).toHaveLength(2)
     expect(container.querySelector('.model-card .model-table')).toBeNull()
@@ -172,6 +174,47 @@ describe('token usage layout', () => {
       await flush()
     })
     expect(mocks.request).toHaveBeenCalledWith('usage.getCodexQuota', { force: true })
+
+    // Test filter persistence on chip toggle
+    mocks.request.mockClear()
+    const codexChip = Array.from(filterBar.querySelectorAll<HTMLButtonElement>('.filter-chip')).find(b => b.textContent?.includes('Codex'))!
+    await act(async () => {
+      codexChip.click()
+      await flush()
+    })
+    expect(mocks.request).toHaveBeenCalledWith('usage.saveFilters', expect.objectContaining({
+      agents: ['claude', 'pi', 'zcode', 'agy'],
+      sources: ['local'],
+    }))
+
+    await act(async () => root.unmount())
+  })
+
+  it('restores persisted agent and source filter selections from settings', async () => {
+    const customSettings = {
+      ...settings,
+      selectedAgents: ['claude'],
+      selectedSources: ['local'],
+    }
+    mocks.request.mockImplementation(async (method: string, params?: any) => {
+      if (method === 'usage.getSettings') return customSettings
+      if (method === 'usage.snapshot') return snapshot
+      if (method === 'usage.getCodexQuota') return quota
+      if (method === 'usage.saveFilters') return { ...customSettings, ...params }
+      throw new Error(`unexpected method: ${method}`)
+    })
+
+    const root = createRoot(container)
+    await act(async () => {
+      root.render(<App />)
+      await flush()
+      await flush()
+    })
+
+    const filterBar = container.querySelector('.filter-bar')!
+    const activeChips = Array.from(filterBar.querySelectorAll('.filter-chip.active')).map(c => c.textContent?.trim())
+    expect(activeChips).toContain('Claude Code')
+    expect(activeChips).not.toContain('Codex')
 
     await act(async () => root.unmount())
   })

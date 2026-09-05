@@ -71,6 +71,15 @@ fn handle(engine: &UsageEngine, method: &str, params: Value) -> Result<Value> {
                     .context("invalid usage settings")?;
             Ok(serde_json::to_value(engine.save_settings(settings)?)?)
         }
+        "usage.saveFilters" => {
+            let agents: Option<Vec<model::AgentKind>> = params
+                .get("agents")
+                .and_then(|v| serde_json::from_value(v.clone()).ok());
+            let sources: Option<Vec<String>> = params
+                .get("sources")
+                .and_then(|v| serde_json::from_value(v.clone()).ok());
+            Ok(serde_json::to_value(engine.save_filters(agents, sources)?)?)
+        }
         "usage.startRefresh" => {
             let source = params.get("sourceId").and_then(Value::as_str);
             Ok(serde_json::to_value(engine.start_refresh(source)?)?)

@@ -73,12 +73,15 @@
   --dw-chart-6: #d25400;
   --dw-chart-7: #347a1b;
   --dw-chart-8: #1e66f5;
+  --dw-chart-cache-rate: #df8e1d;
   --dw-heat-empty: #f0f3f8;
   --dw-heat-low: #e6ddf9;
   --dw-heat-mid: #c5a8ef;
   --dw-heat-high: #8839ef;
   --dw-heat-text: #4c4f69;
   --dw-heat-text-high: #ffffff;
+  --dw-heat-count-text: #4c4f69;
+  --dw-heat-count-strong: #ffffff;
   --dw-glass-surface: color-mix(in srgb, var(--dw-surface) 92%, transparent);
   --dw-glass-filter: blur(14px) saturate(115%);
 

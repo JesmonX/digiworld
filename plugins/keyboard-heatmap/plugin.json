@@ -1,6 +1,6 @@
 {
   "id": "io.github.jesmonx.digiworld.keyboard-heatmap",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "uiDesignVersion": 1,
   "name": "键盘热力图",
   "description": "在 104、87、84、68 和 61 键主流配列中查看实体键位热力图，只保存每日聚合次数。",

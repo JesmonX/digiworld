@@ -10,7 +10,7 @@ import { fixture } from './design-fixtures'
 import { getAccentTheme, pluginTheme } from './theme'
 
 const names = ['keyboard-heatmap', 'agent-token-heatmap', 'mail-assistant']
-const labels = ['键盘热力图', 'Agent Token', '邮件助手']
+const labels = ['键盘热力图', 'Agent Overview', '邮件助手']
 const plugins = names.map((name, index) => ({ id: `io.github.jesmonx.digiworld.${name}`, version: '1.0.0', name: labels[index]!, description: '界面验证数据', enabled: true, state: 'running' as const, permissions: [], uiDesignVersion: 1 }))
 api.appState = async () => ({ version: 'Design preview', platform: 'windows', target: 'windows-x86_64', plugins, catalogSequence: 1, launchAtStartup: false })
 api.catalog = async () => ({ schemaVersion: 1, sequence: 1, generatedAt: '2026-09-05', plugins: plugins.map(plugin => ({ ...plugin, author: 'Digiworld', minCoreVersion: '0.2.27', artifacts: [] })) })

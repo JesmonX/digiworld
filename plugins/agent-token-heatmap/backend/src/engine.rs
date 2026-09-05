@@ -63,6 +63,36 @@ impl UsageEngine {
         Ok(settings)
     }
 
+    pub fn save_filters(
+        &self,
+        agents: Option<Vec<crate::model::AgentKind>>,
+        sources: Option<Vec<String>>,
+    ) -> Result<UsageSettings> {
+        let mut settings = self.settings()?;
+        if let Some(mut agents) = agents {
+            let mut unique = BTreeSet::new();
+            agents.retain(|a| unique.insert(*a));
+            if !agents.is_empty() {
+                settings.selected_agents = Some(agents);
+            }
+        }
+        if let Some(mut sources) = sources {
+            let mut unique = BTreeSet::new();
+            let valid_sources: BTreeSet<String> = std::iter::once("local".to_string())
+                .chain(settings.ssh_sources.iter().map(|s| s.id.clone()))
+                .collect();
+            sources.retain(|s| valid_sources.contains(s) && unique.insert(s.clone()));
+            if !sources.is_empty() {
+                settings.selected_sources = Some(sources);
+            }
+        }
+        self.database
+            .lock()
+            .expect("database lock poisoned")
+            .save_settings(&settings)?;
+        Ok(settings)
+    }
+
     pub fn snapshot(&self, request: SnapshotRequest) -> Result<UsageSnapshot> {
         let database = self.database.lock().expect("database lock poisoned");
         let settings = database.settings()?;
@@ -308,6 +338,20 @@ fn normalize_settings(settings: &mut UsageSettings) -> Result<()> {
     {
         settings.codex_quota.source_id = None;
     }
+    if let Some(ref mut agents) = settings.selected_agents {
+        let mut unique = BTreeSet::new();
+        agents.retain(|a| unique.insert(*a));
+        if agents.is_empty() {
+            settings.selected_agents = None;
+        }
+    }
+    if let Some(ref mut sources) = settings.selected_sources {
+        let mut unique = BTreeSet::new();
+        sources.retain(|s| ids.contains(s) && unique.insert(s.clone()));
+        if sources.is_empty() {
+            settings.selected_sources = None;
+        }
+    }
     Ok(())
 }
 
@@ -420,6 +464,58 @@ mod tests {
                 .expect("quota cache lock poisoned")
                 .is_none()
         );
+        drop(engine);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn save_filters_persists_selection_without_invalidating_quota_cache() {
+        let path = std::env::temp_dir().join(format!(
+            "digiworld-agent-token-filter-cache-{}-{}.db",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let engine = UsageEngine::open(&path).unwrap();
+        *engine
+            .quota_cache
+            .lock()
+            .expect("quota cache lock poisoned") = Some(CachedCodexQuota {
+            snapshot: CodexQuotaSnapshot::unconfigured(),
+            cached_at: Instant::now(),
+        });
+
+        let updated = engine
+            .save_filters(
+                Some(vec![AgentKind::Codex, AgentKind::Claude]),
+                Some(vec!["local".to_string()]),
+            )
+            .unwrap();
+
+        assert_eq!(
+            updated.selected_agents,
+            Some(vec![AgentKind::Codex, AgentKind::Claude])
+        );
+        assert_eq!(updated.selected_sources, Some(vec!["local".to_string()]));
+
+        // Quota cache should NOT be invalidated by filter changes
+        assert!(
+            engine
+                .quota_cache
+                .lock()
+                .expect("quota cache lock poisoned")
+                .is_some()
+        );
+
+        let reloaded = engine.settings().unwrap();
+        assert_eq!(
+            reloaded.selected_agents,
+            Some(vec![AgentKind::Codex, AgentKind::Claude])
+        );
+        assert_eq!(reloaded.selected_sources, Some(vec!["local".to_string()]));
+
         drop(engine);
         let _ = std::fs::remove_file(path);
     }
