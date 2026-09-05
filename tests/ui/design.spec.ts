@@ -12,7 +12,7 @@ for (const theme of THEMES) for (const scale of [100, 110, 125]) for (const [wid
       localStorage.setItem('digiworld.text-scale.v1', String(scale))
     }, { id: theme.id, scale })
     await page.goto('/design.html')
-    await expect(page.locator('.app-window')).toBeVisible()
+    await expect(page.locator('.home-dashboard')).toBeVisible()
     await page.evaluate(() => document.fonts.ready)
     await page.screenshot({ path: info.outputPath('home.png') })
     await page.getByRole('button', { name: '设置', exact: true }).click()

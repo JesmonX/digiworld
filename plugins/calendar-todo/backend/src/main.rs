@@ -141,14 +141,19 @@ impl App {
         let clean_home_url = home.trim_end_matches('/');
         let mut out = vec![];
         for block in blocks(&text, "response") {
-            let rt = blocks(&block, "resourcetype").into_iter().next().unwrap_or_default();
+            let rt = blocks(&block, "resourcetype")
+                .into_iter()
+                .next()
+                .unwrap_or_default();
             if !rt.contains("calendar") {
                 continue;
             }
-            if let Some(comps) = blocks(&block, "supported-calendar-component-set").into_iter().next() {
-                if !comps.contains("VEVENT") {
-                    continue;
-                }
+            if let Some(comps) = blocks(&block, "supported-calendar-component-set")
+                .into_iter()
+                .next()
+                && !comps.contains("VEVENT")
+            {
+                continue;
             }
             let href = tag(&block, "href").unwrap_or_default();
             if href.is_empty() {
@@ -397,8 +402,8 @@ fn resolve_url(base: &str, href: &str) -> Result<String> {
     } else {
         format!("{base}/")
     };
-    let base_url = reqwest::Url::parse(&base_with_slash)
-        .with_context(|| format!("无效的基础 URL: {base}"))?;
+    let base_url =
+        reqwest::Url::parse(&base_with_slash).with_context(|| format!("无效的基础 URL: {base}"))?;
     let resolved = base_url
         .join(href)
         .with_context(|| format!("无法解析相对路径: {href}"))?;
@@ -541,7 +546,11 @@ mod tests {
     #[test]
     fn resolves_partitioned_dav_paths() {
         assert_eq!(
-            resolve_url("https://p120-caldav.icloud.com:443/123/calendars/", "/123/calendars/home/").unwrap(),
+            resolve_url(
+                "https://p120-caldav.icloud.com:443/123/calendars/",
+                "/123/calendars/home/"
+            )
+            .unwrap(),
             "https://p120-caldav.icloud.com/123/calendars/home/"
         );
     }
