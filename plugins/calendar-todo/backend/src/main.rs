@@ -183,13 +183,13 @@ impl App {
                     .unwrap_or_default()
                     .trim_matches('"')
                     .to_string();
-                if let Some(ics) = tag(&b, "calendar-data") {
-                    if let Some(mut e) = parse_event(&ics) {
-                        e.calendar_id = cal.id.clone();
-                        e.href = absolute(&cal.href, &href);
-                        e.etag = etag;
-                        events.push(e)
-                    }
+                if let Some(ics) = tag(&b, "calendar-data")
+                    && let Some(mut e) = parse_event(&ics)
+                {
+                    e.calendar_id = cal.id.clone();
+                    e.href = absolute(&cal.href, &href);
+                    e.etag = etag;
+                    events.push(e)
                 }
             }
         }

@@ -169,7 +169,7 @@ fn ssh(h: &str, script: &str) -> Result<Value> {
     if out.stdout.len() > 4 * 1024 * 1024 {
         bail!("远端数据超过 4 MiB")
     }
-    Ok(serde_json::from_slice(&out.stdout).context("远端未返回有效 JSON")?)
+    serde_json::from_slice(&out.stdout).context("远端未返回有效 JSON")
 }
 fn setup(h: &str, install: bool) -> Result<Value> {
     host(h)?;
