@@ -1,6 +1,6 @@
 {
   "id": "io.github.jesmonx.digiworld.server-monitor",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "uiDesignVersion": 1,
   "name": "Servers",
   "description": "通过 SSH 查看远程 Linux 设备的内存、磁盘、CPU、GPU 与网络流量。",

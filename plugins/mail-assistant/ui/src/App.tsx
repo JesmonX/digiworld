@@ -1,7 +1,7 @@
 import { Button, Input, Select, Card, Dialog, Status } from '@digiworld/design-system/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  AlertCircle, ChevronDown, Inbox, LoaderCircle, Mail, MailCheck, Paperclip, Plus, RefreshCw,
+  AlertCircle, ArrowLeft, ChevronDown, Inbox, LoaderCircle, Mail, MailCheck, Paperclip, Plus, RefreshCw,
   Search, Settings, Trash2, X,
 } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
@@ -55,7 +55,10 @@ export default function App() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [actionNotice, setActionNotice] = useState('')
+  const [listBusy, setListBusy] = useState(false)
+  const [detailBusy, setDetailBusy] = useState<number | null>(null)
   const messageRequest = useRef(0)
+  const detailRequest = useRef(0)
 
   const refreshStatus = useCallback(async () => {
     const status = await bridge.request<SyncStatus>('mail.sync.status')
@@ -65,12 +68,17 @@ export default function App() {
 
   const loadMessages = useCallback(async (append = false, cursor = 0) => {
     const request = ++messageRequest.current
-    const page = await bridge.request<MailPage>('mail.messages.list', {
-      accountId: accountId || undefined, query: query.trim(), cursor,
-    })
-    if (request !== messageRequest.current) return
-    setMessages(current => append ? [...current, ...page.items] : page.items)
-    setNextCursor(page.nextCursor)
+    setListBusy(true)
+    try {
+      const page = await bridge.request<MailPage>('mail.messages.list', {
+        accountId: accountId || undefined, query: query.trim(), cursor,
+      })
+      if (request !== messageRequest.current) return
+      setMessages(current => append ? [...current, ...page.items] : page.items)
+      setNextCursor(page.nextCursor)
+    } finally {
+      if (request === messageRequest.current) setListBusy(false)
+    }
   }, [accountId, query])
 
   useEffect(() => {
@@ -93,7 +101,11 @@ export default function App() {
     return () => window.clearTimeout(timer)
   }, [loadMessages])
 
-  useEffect(() => setSelected(null), [accountId, query])
+  useEffect(() => {
+    detailRequest.current += 1
+    setDetailBusy(null)
+    setSelected(null)
+  }, [accountId, query])
 
   const currentAccount = useMemo(() => accounts.find(account => account.id === accountId), [accountId, accounts])
 
@@ -106,12 +118,19 @@ export default function App() {
   }
 
   const openMessage = async (message: MailSummary) => {
+    const request = ++detailRequest.current
+    setDetailBusy(message.id)
     setError('')
     try {
       const detail = await bridge.request<MailDetail>('mail.messages.get', { id: message.id })
+      if (request !== detailRequest.current) return
       setSelected(detail)
       setMessages(items => items.map(item => item.id === message.id ? { ...item, locallyViewed: true } : item))
-    } catch (reason) { setError(errorText(reason)) }
+    } catch (reason) {
+      if (request === detailRequest.current) setError(errorText(reason))
+    } finally {
+      if (request === detailRequest.current) setDetailBusy(null)
+    }
   }
 
   const markAllRead = async () => {
@@ -188,7 +207,7 @@ export default function App() {
 
     {error && <Status tone="error" className="error"><AlertCircle size={16} /><span>{error}</span><Button onClick={() => setError('')}><X size={15} /></Button></Status>}
     {actionNotice && <div className="notice" role="status">{actionNotice}</div>}
-    <section className="workspace">
+    <section className={`workspace ${selected ? 'reading' : ''}`}>
       <aside className="dw-card accounts">
         <Button className={!accountId ? 'active' : ''} onClick={() => setAccountId('')}><Inbox size={17} /><span>全部收件箱</span></Button>
         {accounts.map(account => <Button key={account.id} className={accountId === account.id ? 'active' : ''} onClick={() => { setAccountId(account.id); setActionNotice('') }} onDoubleClick={() => editAccount(account)}>
@@ -198,9 +217,9 @@ export default function App() {
         {currentAccount && <Button className="manage" onClick={() => editAccount(currentAccount)}><Settings size={15} />账号设置</Button>}
       </aside>
 
-      <section className="dw-card message-list" aria-label="邮件列表">
-        {accounts.length === 0 ? <Empty icon={<Mail />} title="添加邮箱账号" text="支持 Gmail、QQ、163 和自定义 IMAP。" action={() => editAccount()} /> : messages.length === 0 ? <Empty icon={<Inbox />} title={syncing.length ? '正在同步收件箱' : '没有找到邮件'} text={syncing.length ? '首次完整同步可在后台继续。' : '尝试刷新或更换搜索条件。'} /> : <>
-          {messages.map(message => <Button key={message.id} className={`mail-row ${selected?.id === message.id ? 'selected' : ''} ${(!message.serverSeen && !message.locallyViewed) ? 'new' : ''}`} onClick={() => void openMessage(message)}>
+      <section className="dw-card message-list" aria-label="邮件列表" aria-busy={listBusy}>
+        {listBusy && messages.length === 0 ? <Empty icon={<LoaderCircle className="spin" />} title="正在载入邮件" text="正在读取本地缓存。" /> : accounts.length === 0 ? <Empty icon={<Mail />} title="添加邮箱账号" text="支持 Gmail、QQ、163 和自定义 IMAP。" action={() => editAccount()} /> : messages.length === 0 ? <Empty icon={<Inbox />} title={syncing.length ? '正在同步收件箱' : '没有找到邮件'} text={syncing.length ? '首次完整同步可在后台继续。' : '尝试刷新或更换搜索条件。'} /> : <>
+          {messages.map(message => <Button key={message.id} className={`mail-row ${selected?.id === message.id ? 'selected' : ''} ${(!message.serverSeen && !message.locallyViewed) ? 'new' : ''}`} aria-busy={detailBusy === message.id} onClick={() => void openMessage(message)}>
             <span className="row-top"><strong>{message.sender || '未知发件人'}</strong><time>{fmtDate(message.receivedAt)}</time></span>
             <span className="subject">{message.subject || '（无主题）'}</span>
             <span className="snippet">{message.hasBody ? message.snippet : '正文正在后台同步…'}</span>
@@ -212,6 +231,7 @@ export default function App() {
 
       <Card className="dw-card detail">
         {!selected ? <Empty icon={<Mail />} title="选择一封邮件" text="正文以纯文本显示，不加载远程图片。" /> : <>
+          <Button className="back-to-list" onClick={() => setSelected(null)}><ArrowLeft size={15} />返回邮件列表</Button>
           <div className="detail-head">
             <h2>{selected.subject || '（无主题）'}</h2>
             <div><strong>{selected.sender || '未知发件人'}</strong><time>{fmtDate(selected.receivedAt)}</time></div>

@@ -112,17 +112,43 @@ test('calendar plugin filters past events, displays month calendar and supports 
   await expect(frame.locator('.event-dot').first()).toBeVisible()
 
   // Date selection interaction
-  const day7Btn = frame.getByRole('button', { name: /2026-09-07/ })
-  await expect(day7Btn).toBeVisible()
-  await day7Btn.click()
-  await expect(frame.getByText('周一同步')).toBeVisible()
+  const futureKey = await frame.locator('body').evaluate(() => {
+    const date = new Date(); date.setDate(date.getDate() + 2)
+    return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-')
+  })
+  const futureDay = frame.getByRole('button', { name: new RegExp(futureKey) })
+  await expect(futureDay).toBeVisible()
+  await futureDay.click()
+  await expect(frame.getByText('后续同步')).toBeVisible()
 
   // Event creation editor
   await frame.getByRole('button', { name: '新建日程' }).first().click()
   await expect(frame.locator('.editor')).toBeVisible()
   await expect(frame.getByRole('heading', { name: '新建事件' })).toBeVisible()
+  await expect(frame.locator('input[type="datetime-local"]')).toHaveCount(2)
   await frame.getByRole('button', { name: '取消' }).click()
   await expect(frame.locator('.editor')).not.toBeVisible()
+})
+
+test('mail narrow layout gives the reader the full content pane and a return path', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 600 })
+  await gotoWithRetry(page, '/design.html')
+  await page.getByRole('button', { name: '邮件助手', exact: true }).click()
+  const frame = page.frameLocator('iframe')
+  await frame.locator('.mail-row').first().click()
+  await expect(frame.locator('.detail')).toBeVisible()
+  await expect(frame.locator('.message-list')).toBeHidden()
+  await expect(frame.getByRole('button', { name: '返回邮件列表' })).toBeVisible()
+  await frame.getByRole('button', { name: '返回邮件列表' }).click()
+  await expect(frame.locator('.message-list')).toBeVisible()
+})
+
+test('actions shows running state as localized status', async ({ page }) => {
+  await gotoWithRetry(page, '/design.html')
+  await page.getByRole('button', { name: 'Git Actions', exact: true }).click()
+  const frame = page.frameLocator('iframe')
+  await expect(frame.locator('.run-status')).toHaveText('运行中')
+  await expect(frame.getByText('开始于', { exact: false })).toBeVisible()
 })
 
 test('agent overview auto-refresh interval selector', async ({ page }) => {
@@ -140,4 +166,3 @@ test('agent overview auto-refresh interval selector', async ({ page }) => {
   await refreshSelect.selectOption('60')
   await expect(refreshSelect).toHaveValue('60')
 })
-

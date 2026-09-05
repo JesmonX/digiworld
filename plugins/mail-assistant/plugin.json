@@ -1,6 +1,6 @@
 {
   "id": "io.github.jesmonx.digiworld.mail-assistant",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "uiDesignVersion": 1,
   "name": "邮件助手",
   "description": "通过 IMAP 汇总多个邮箱的收件箱，在本机缓存、阅读和搜索，并可将选定邮箱全部标为已读。",

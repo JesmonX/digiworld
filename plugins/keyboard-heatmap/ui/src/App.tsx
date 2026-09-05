@@ -26,6 +26,7 @@ export default function App() {
   const [layoutId, setLayoutId] = useState<KeyboardLayoutId>('full')
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pauseBusy, setPauseBusy] = useState(false)
   const layoutPickerRef = useRef<HTMLDivElement>(null)
   const layoutTriggerRef = useRef<HTMLButtonElement>(null)
 
@@ -89,9 +90,16 @@ export default function App() {
   }
 
   const togglePause = async () => {
-    if (!snapshot) return
-    await bridge.request('heatmap.setPaused', { paused: !snapshot.paused })
-    await refresh()
+    if (!snapshot || pauseBusy) return
+    setPauseBusy(true)
+    try {
+      await bridge.request('heatmap.setPaused', { paused: !snapshot.paused })
+      await refresh()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    } finally {
+      setPauseBusy(false)
+    }
   }
 
   return (
@@ -103,7 +111,7 @@ export default function App() {
         </div>
         <div className="header-actions">
           <div className="dw-segmented scope-toggle" role="group" aria-label="统计时间范围"><Button aria-pressed={scope === 'today'} className={scope === 'today' ? 'active' : ''} onClick={() => setScope('today')}>今天</Button><Button aria-pressed={scope === 'all'} className={scope === 'all' ? 'active' : ''} onClick={() => setScope('all')}>全部</Button></div>
-          <Button className={`pause-button ${snapshot?.paused ? 'paused' : ''}`} onClick={() => void togglePause()}>{snapshot?.paused ? <Play /> : <Pause />}{snapshot?.paused ? '继续' : '暂停'}</Button>
+          <Button className={`pause-button ${snapshot?.paused ? 'paused' : ''}`} disabled={pauseBusy || !snapshot} onClick={() => void togglePause()}>{snapshot?.paused ? <Play /> : <Pause />}{pauseBusy ? '处理中…' : snapshot?.paused ? '继续' : '暂停'}</Button>
         </div>
       </header>
 
@@ -132,7 +140,7 @@ export default function App() {
             </Button>)}
           </Menu>
         </div>
-        <div className="keyboard-scroll" style={{ '--board-min-width': `${layout.minWidth}px` } as React.CSSProperties}>
+        <div className="keyboard-scroll" tabIndex={0} aria-label="键盘热力图，可横向滚动" style={{ '--board-min-width': `${layout.minWidth}px` } as React.CSSProperties}>
           <div className="board-toolbar">
             <div><h2><Keyboard />按键分布</h2></div>
             <div className="legend"><span>低</span>{[1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>高</span></div>
@@ -172,7 +180,7 @@ function Keycap({ definition, count, max, grid = false }: { definition: KeyDefin
     ? { gridRow: `${definition.row} / span ${definition.rowSpan ?? 1}`, gridColumn: `${definition.column} / span ${definition.columnSpan ?? 1}` }
     : { '--width': definition.width ?? 1, '--spacer': definition.spacer ?? 0 }
   return (
-    <div className={`key level-${level} ${count > 0 ? 'has-count' : ''} ${level >= 3 ? 'strong-heat' : ''}`} title={`${definition.id}: ${count.toLocaleString()} 次`} aria-label={`${definition.label || definition.id}，${count.toLocaleString()} 次`} style={style as React.CSSProperties}>
+    <div tabIndex={0} className={`key level-${level} ${count > 0 ? 'has-count' : ''} ${level >= 3 ? 'strong-heat' : ''}`} title={`${definition.id}: ${count.toLocaleString()} 次`} aria-label={`${definition.label || definition.id}，${count.toLocaleString()} 次`} style={style as React.CSSProperties}>
       <span>{definition.label}</span>
       {count > 0 && <small>{count > 999 ? `${(count / 1000).toFixed(1)}k` : count}</small>}
     </div>

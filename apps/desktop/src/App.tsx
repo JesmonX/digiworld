@@ -2,7 +2,7 @@ import { Button, Input, Card, Dialog, Switch, Status, RadioGroup } from '@digiwo
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
-  Activity, AlertTriangle, BarChart3, Boxes, Check, ChevronRight, CircleAlert, Download, Gauge,
+  Activity, AlertTriangle, BarChart3, Boxes, Check, ChevronRight, CircleAlert, Download, Gauge, MoreHorizontal,
   CalendarDays, GitBranch, Keyboard, Library, LoaderCircle, Mail, Network, Palette, Pause, RefreshCw, Server, Settings,
   ShieldCheck, Type, type LucideIcon,
 } from 'lucide-react'
@@ -136,6 +136,7 @@ function App() {
   const [fontWeight, setFontWeight] = useState<FontWeight>(loadFontWeight)
   const [glassMode, setGlassMode] = useState<GlassMode>(loadGlassMode)
   const [textScale, setTextScale] = useState<TextScale>(loadTextScale)
+  const [pluginMenuOpen, setPluginMenuOpen] = useState(false)
   useEffect(() => saveTextScale(textScale), [textScale])
   const accentTheme = getAccentTheme(accentThemeId, colorSchemeId)
   const fontTheme = getFontTheme(fontThemeId)
@@ -252,6 +253,8 @@ function App() {
     : selectedPlugin?.name ?? '插件'
   const pluginOpen = typeof page !== 'string'
 
+  useEffect(() => setPluginMenuOpen(false), [page])
+
   return (
     <div className={`app-window glass-${glassMode} ${pluginOpen ? 'plugin-open' : ''}`} data-dw-glass={glassMode} style={themeStyle(activeTheme)}>
       <WindowChrome />
@@ -287,7 +290,12 @@ function App() {
                 <Button className="secondary compact" disabled={busy === selectedPlugin.id} onClick={() => void manageEnabled(selectedPlugin, !selectedPlugin.enabled)}>
                   {selectedPlugin.enabled ? '停用' : '启用'}
                 </Button>
-                <Button className="danger-button" disabled={busy === selectedPlugin.id} onClick={() => void uninstall(selectedPlugin)}>移除</Button>
+                <div className="plugin-more">
+                  <Button className="secondary compact icon-button" aria-label="更多插件操作" aria-expanded={pluginMenuOpen} onClick={() => setPluginMenuOpen(open => !open)}><MoreHorizontal /></Button>
+                  {pluginMenuOpen && <div className="plugin-more-menu" role="menu">
+                    <Button role="menuitem" className="danger-button" disabled={busy === selectedPlugin.id} onClick={() => { setPluginMenuOpen(false); void uninstall(selectedPlugin) }}>移除插件</Button>
+                  </div>}
+                </div>
               </div>
             )}
           </header>
@@ -368,7 +376,7 @@ function Home({ plugins, version, onCatalog, onOpen, onRefresh, reducedMotion }:
   )
 
   const running = plugins.filter(plugin => plugin.state === 'running').length
-  const attention = plugins.filter(plugin => !plugin.enabled || plugin.state === 'failed').length
+  const attention = plugins.filter(plugin => plugin.enabled && plugin.state === 'failed').length
   const healthy = attention === 0
   return (
     <div className="home-dashboard">

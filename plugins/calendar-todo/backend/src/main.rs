@@ -53,6 +53,10 @@ struct Event {
     title: String,
     start: String,
     end: String,
+    #[serde(default)]
+    start_timezone: Option<String>,
+    #[serde(default)]
+    end_timezone: Option<String>,
     all_day: bool,
     location: String,
     notes: String,
@@ -320,10 +324,19 @@ impl App {
 }
 fn parse_event(s: &str) -> Option<Event> {
     let s = unfold(s);
-    let field = |n: &str| {
+    let line = |n: &str| {
         s.lines()
             .find(|l| l.starts_with(&format!("{n}:")) || l.starts_with(&format!("{n};")))
-            .and_then(|l| l.split_once(':').map(|x| unescape_ics(x.1)))
+    };
+    let field = |n: &str| line(n).and_then(|l| l.split_once(':').map(|x| unescape_ics(x.1)));
+    let timezone = |n: &str| {
+        line(n)
+            .and_then(|l| l.split_once(':'))
+            .and_then(|(head, _)| {
+                head.split(';')
+                    .skip(1)
+                    .find_map(|part| part.strip_prefix("TZID=").map(str::to_string))
+            })
     };
     let start = field("DTSTART")?;
     let end = field("DTEND").unwrap_or_else(|| start.clone());
@@ -336,6 +349,8 @@ fn parse_event(s: &str) -> Option<Event> {
         all_day: start.len() == 8,
         start,
         end,
+        start_timezone: timezone("DTSTART"),
+        end_timezone: timezone("DTEND"),
         location: field("LOCATION").unwrap_or_default(),
         notes: field("DESCRIPTION").unwrap_or_default(),
         recurring: s
@@ -345,6 +360,26 @@ fn parse_event(s: &str) -> Option<Event> {
 }
 fn to_ics(e: &Event) -> String {
     let dt = Utc::now().format("%Y%m%dT%H%M%SZ");
+    let safe_start_timezone = e
+        .start_timezone
+        .as_deref()
+        .filter(|value| valid_timezone(value));
+    let (start_key, end_key) = if e.all_day {
+        (
+            "DTSTART;VALUE=DATE".to_string(),
+            "DTEND;VALUE=DATE".to_string(),
+        )
+    } else if let Some(timezone) = safe_start_timezone {
+        (
+            format!("DTSTART;TZID={timezone}"),
+            format!(
+                "DTEND;TZID={}",
+                e.end_timezone.as_deref().unwrap_or(timezone)
+            ),
+        )
+    } else {
+        ("DTSTART".to_string(), "DTEND".to_string())
+    };
     format!(
         "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Digiworld//Calendar Todo//CN\r\nBEGIN:VEVENT\r\nUID:{}\r\nDTSTAMP:{}\r\n{}:{}\r\n{}:{}\r\nSUMMARY:{}\r\nLOCATION:{}\r\nDESCRIPTION:{}\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
         if e.id.is_empty() {
@@ -353,22 +388,21 @@ fn to_ics(e: &Event) -> String {
             e.id.clone()
         },
         dt,
-        if e.all_day {
-            "DTSTART;VALUE=DATE"
-        } else {
-            "DTSTART"
-        },
+        start_key,
         e.start,
-        if e.all_day {
-            "DTEND;VALUE=DATE"
-        } else {
-            "DTEND"
-        },
+        end_key,
         e.end,
         escape_ics(&e.title),
         escape_ics(&e.location),
         escape_ics(&e.notes)
     )
+}
+fn valid_timezone(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 100
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"/_+-".contains(&byte))
 }
 fn blocks(s: &str, name: &str) -> Vec<String> {
     Regex::new(&format!(
@@ -533,6 +567,12 @@ mod tests {
         let normal=parse_event("BEGIN:VEVENT\r\nUID:1\r\nDTSTART:20260905T090000Z\r\nDTEND:20260905T100000Z\r\nSUMMARY:Review\\, weekly\r\nEND:VEVENT").unwrap();
         assert_eq!(normal.title, "Review, weekly");
         assert!(!normal.recurring);
+        assert_eq!(normal.start_timezone, None);
+        let zoned=parse_event("BEGIN:VEVENT\r\nUID:3\r\nDTSTART;TZID=Asia/Shanghai:20260905T090000\r\nDTEND;TZID=Asia/Shanghai:20260905T100000\r\nEND:VEVENT").unwrap();
+        assert_eq!(zoned.start_timezone.as_deref(), Some("Asia/Shanghai"));
+        assert!(to_ics(&zoned).contains("DTSTART;TZID=Asia/Shanghai:20260905T090000"));
+        assert!(valid_timezone("America/Los_Angeles"));
+        assert!(!valid_timezone("Asia/Shanghai\r\nSUMMARY:Injected"));
         let recurring=parse_event("BEGIN:VEVENT\r\nUID:2\r\nDTSTART;VALUE=DATE:20260905\r\nRRULE:FREQ=DAILY\r\nEND:VEVENT").unwrap();
         assert!(recurring.all_day && recurring.recurring)
     }

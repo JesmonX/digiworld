@@ -7,6 +7,13 @@ const days = Array.from({ length: 30 }, (_, index) => ({
 }))
 const account = { id: 'demo', provider: 'custom', label: '工作邮箱', email: 'hello@example.com', username: 'hello@example.com', host: 'imap.example.com', port: 993, useProxy: true, hasCredential: true, syncPhase: 'idle', indexed: 30, total: 30, baselineComplete: true, lastError: null, nextSyncAt: '2026-09-05T06:00:00Z' }
 const messages = Array.from({ length: 18 }, (_, index) => ({ id: index + 1, accountId: 'demo', accountLabel: '工作邮箱', subject: index === 0 ? '设计评审 · 框架与插件一致性 / Typography & color review' : `项目进展与本周计划 ${index + 1}`, sender: 'Design Team <design@example.com>', receivedAt: '2026-09-05T04:00:00Z', snippet: '统一排版、主题和控件，让数据更容易阅读。', serverSeen: index > 2, locallyViewed: false, size: 1200, hasBody: true }))
+const calendarDate = (offset: number, time: string) => {
+  const date = new Date()
+  date.setHours(12, 0, 0, 0)
+  date.setDate(date.getDate() + offset)
+  const ymd = [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('')
+  return `${ymd}T${time}00`
+}
 export function fixture(method: string, payload: unknown = {}): unknown {
   if (new URLSearchParams(location.search).get('state') === 'error') throw new Error('演示：暂时无法加载，请重试')
   const empty = new URLSearchParams(location.search).get('state') === 'empty'
@@ -33,11 +40,11 @@ export function fixture(method: string, payload: unknown = {}): unknown {
   if (method === 'calendar.cached' || method === 'calendar.sync') return {
     calendars: [{ id: '/demo/calendar/', name: '个人', href: 'https://caldav.icloud.com/demo/calendar/', readOnly: false }],
     events: empty ? [] : [
-      { id: 'event-0', calendarId: '/demo/calendar/', href: 'https://caldav.icloud.com/demo/calendar/event-0.ics', etag: '0', title: '昨日总结', start: '20260904T100000Z', end: '20260904T110000Z', allDay: false, location: '办公室', notes: '', recurring: false },
-      { id: 'event-1', calendarId: '/demo/calendar/', href: 'https://caldav.icloud.com/demo/calendar/event-1.ics', etag: '1', title: '产品评审', start: '20260905T090000Z', end: '20260905T100000Z', allDay: false, location: '线上', notes: '', recurring: false },
-      { id: 'event-2', calendarId: '/demo/calendar/', href: 'https://caldav.icloud.com/demo/calendar/event-2.ics', etag: '2', title: '架构讨论', start: '20260905T140000Z', end: '20260905T153000Z', allDay: false, location: '会议室 A', notes: '', recurring: false },
-      { id: 'event-3', calendarId: '/demo/calendar/', href: 'https://caldav.icloud.com/demo/calendar/event-3.ics', etag: '3', title: '周一同步', start: '20260907T093000Z', end: '20260907T103000Z', allDay: false, location: '线上', notes: '', recurring: false },
-      { id: 'event-4', calendarId: '/demo/calendar/', href: 'https://caldav.icloud.com/demo/calendar/event-4.ics', etag: '4', title: '十月计划', start: '20261002T100000Z', end: '20261002T110000Z', allDay: false, location: '线上', notes: '', recurring: false },
+      { id: 'event-0', calendarId: '/demo/calendar/', href: 'https://caldav.icloud.com/demo/calendar/event-0.ics', etag: '0', title: '昨日总结', start: calendarDate(-1, '1000'), end: calendarDate(-1, '1100'), allDay: false, location: '办公室', notes: '', recurring: false },
+      { id: 'event-1', calendarId: '/demo/calendar/', href: 'https://caldav.icloud.com/demo/calendar/event-1.ics', etag: '1', title: '产品评审', start: calendarDate(0, '0900'), end: calendarDate(0, '1000'), allDay: false, location: '线上', notes: '', recurring: false },
+      { id: 'event-2', calendarId: '/demo/calendar/', href: 'https://caldav.icloud.com/demo/calendar/event-2.ics', etag: '2', title: '架构讨论', start: calendarDate(0, '1400'), end: calendarDate(0, '1530'), allDay: false, location: '会议室 A', notes: '', recurring: false },
+      { id: 'event-3', calendarId: '/demo/calendar/', href: 'https://caldav.icloud.com/demo/calendar/event-3.ics', etag: '3', title: '后续同步', start: calendarDate(2, '0930'), end: calendarDate(2, '1030'), allDay: false, location: '线上', notes: '', recurring: false },
+      { id: 'event-4', calendarId: '/demo/calendar/', href: 'https://caldav.icloud.com/demo/calendar/event-4.ics', etag: '4', title: '月度计划', start: calendarDate(14, '1000'), end: calendarDate(14, '1100'), allDay: false, location: '线上', notes: '', recurring: false },
     ],
   }
   if (method === 'calendar.event.save') return payload

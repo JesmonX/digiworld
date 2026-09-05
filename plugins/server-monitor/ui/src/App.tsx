@@ -41,6 +41,10 @@ type Device = {
   error?: string
   hostname?: string
   timestamp?: number
+  gpuStatus?: 'ready' | 'unavailable' | 'error'
+  gpuError?: string | null
+  vnstatStatus?: 'ready' | 'unavailable' | 'error'
+  vnstatError?: string | null
   uptimeSeconds?: number
   memory?: { total: number; used: number }
   cpu?: { logicalCores: number; load1: number; load5: number }
@@ -290,7 +294,7 @@ export default function App() {
                     <span>
                       <strong>{d.label}</strong>
                       <small>
-                        {d.hostname ? `${d.hostname} · 运行 ${Math.floor((d.uptimeSeconds ?? 0) / 86400)} 天` : d.error ? '连接异常' : '载入中…'}
+                        {d.hostname ? `${d.hostname} · 运行 ${Math.floor((d.uptimeSeconds ?? 0) / 86400)} 天 · ${new Date((d.timestamp ?? 0) * 1000).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : d.error ? '连接异常' : '载入中…'}
                       </small>
                     </span>
                   </div>
@@ -317,7 +321,7 @@ export default function App() {
                         {d.selection.showCpu && d.cpu && (
                           <Metric
                             icon={<Cpu size={15} />}
-                            title="CPU Load"
+                            title="CPU 负载"
                             value={`${d.cpu.load1.toFixed(2)} / ${d.cpu.logicalCores} 核`}
                             percent={Math.min(100, (d.cpu.load1 / d.cpu.logicalCores) * 100)}
                           />
@@ -361,7 +365,7 @@ export default function App() {
                             )
                           })
                         ) : (
-                          <small className="gpu-unavailable">GPU 不可用</small>
+                          <small className={`gpu-unavailable ${d.gpuStatus === 'error' ? 'error' : ''}`} title={d.gpuError ?? undefined}>{d.gpuStatus === 'error' ? 'GPU 信息采集失败' : d.gpuStatus === 'unavailable' ? '未安装 nvidia-smi' : '未检测到 GPU'}</small>
                         )}
                       </div>
                     )}
@@ -370,7 +374,7 @@ export default function App() {
                       <div className="traffic">
                         <div className="traffic-head">
                           <Network size={15} />
-                          <small>{d.vnstat ? 'vnStat 每日记录已连接' : '未检测到 vnStat，仅显示网卡累计'}</small>
+                          <small title={d.vnstatError ?? undefined}>{d.vnstat ? 'vnStat 每日记录已连接' : d.vnstatStatus === 'error' ? 'vnStat 采集失败，仅显示网卡累计' : '未检测到 vnStat，仅显示网卡累计'}</small>
                         </div>
                         {visibleInterfaces.length > 0 && (
                           <div className="traffic-rates">

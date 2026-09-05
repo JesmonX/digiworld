@@ -8,7 +8,7 @@ main { padding: var(--dw-space-3); display: grid; gap: var(--dw-space-3); }
   align-items: start;
 }
 .devices.layout-auto {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
 }
 .devices.layout-compact {
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
@@ -35,6 +35,9 @@ main { padding: var(--dw-space-3); display: grid; gap: var(--dw-space-3); }
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: var(--dw-space-2);
 }
+.devices.layout-auto > .dw-card:only-child .metrics,
+.devices.layout-auto > .dw-card:only-child .disk-grid,
+.devices.layout-auto > .dw-card:only-child .gpu-grid { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 .metric {
   padding: var(--dw-space-2);
   background: var(--dw-surface-subtle);
@@ -128,5 +131,6 @@ main { padding: var(--dw-space-3); display: grid; gap: var(--dw-space-3); }
 }
 .selectors label { display: flex; align-items: center; gap: var(--dw-space-1); }
 .device-error { font-size: var(--dw-type-caption); }
+.gpu-unavailable.error { color: var(--dw-danger); }
 .spin { animation: spin .9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

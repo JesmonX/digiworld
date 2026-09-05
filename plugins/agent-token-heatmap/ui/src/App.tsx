@@ -398,7 +398,7 @@ export default function App() {
           <Summary label="缓存写入" value={snapshot?.totals.cacheWriteTokens} />
           <Summary label="缓存率" text={snapshot?.totals.cacheRate == null ? '—' : `${(snapshot.totals.cacheRate * 100).toFixed(1)}%`} />
         </div>
-        {snapshot && cells.length ? <div className="calendar-wrap"><div className="weekday-labels"><span>一</span><span>三</span><span>五</span><span>日</span></div><div className="calendar-grid">{cells.map((cell, index) => <i key={cell.day ?? `blank-${index}`} className={`level-${heatLevel(cell.value, max)} ${cell.day ? '' : 'blank'}`} title={cell.day ? `${cell.day} · ${formatTokens(cell.value)}` : undefined} />)}</div><div className="legend"><span>低</span>{[0, 1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>高</span></div></div> : <Empty />}
+        {snapshot && cells.length ? <div className="calendar-wrap"><div className="weekday-labels"><span>一</span><span>三</span><span>五</span><span>日</span></div><div className="calendar-grid">{cells.map((cell, index) => <i key={cell.day ?? `blank-${index}`} tabIndex={cell.day ? 0 : undefined} aria-label={cell.day ? `${cell.day}，${formatTokens(cell.value)}` : undefined} className={`level-${heatLevel(cell.value, max)} ${cell.day ? '' : 'blank'}`} title={cell.day ? `${cell.day} · ${formatTokens(cell.value)}` : undefined} />)}</div><div className="legend"><span>低</span>{[0, 1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>高</span></div></div> : <Empty />}
       </section>
 
       <section className="lower-grid">

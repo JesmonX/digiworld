@@ -4,6 +4,10 @@ export function dateKey(value: string | Date): DateKey {
   if (typeof value === 'string') {
     if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10)
     if (/^\d{8}/.test(value)) {
+      if (/^\d{8}T\d{6}Z$/.test(value)) {
+        const utc = new Date(Date.UTC(Number(value.slice(0, 4)), Number(value.slice(4, 6)) - 1, Number(value.slice(6, 8)), Number(value.slice(9, 11)), Number(value.slice(11, 13)), Number(value.slice(13, 15))))
+        return dateKey(utc)
+      }
       return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`
     }
   }

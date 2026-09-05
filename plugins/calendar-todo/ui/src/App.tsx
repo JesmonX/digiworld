@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Input, Card, Status, Textarea, Select } from '@digiworld/design-system/react'
+import { Button, Input, Card, Status, Textarea, Select, Dialog } from '@digiworld/design-system/react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import { CalendarDays, CheckSquare, Plus, RefreshCw, Settings, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
@@ -31,6 +31,8 @@ type Event = {
   title: string
   start: string
   end: string
+  startTimezone?: string | null
+  endTimezone?: string | null
   allDay: boolean
   location: string
   notes: string
@@ -56,6 +58,8 @@ const blank = (cal = '', dk?: DateKey): Event => {
     title: '',
     start: toIcalDateTime(targetDay, 9, 0),
     end: toIcalDateTime(targetDay, 10, 0),
+    startTimezone: null,
+    endTimezone: null,
     allDay: false,
     location: '',
     notes: '',
@@ -77,6 +81,8 @@ export default function App() {
   const [todoDue, setTodoDue] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [initialized, setInitialized] = useState(false)
+  const [previousAccount, setPreviousAccount] = useState<typeof account>(null)
 
   const [viewYear, setViewYear] = useState(() => Number(today.slice(0, 4)))
   const [viewMonth, setViewMonth] = useState(() => Number(today.slice(5, 7)))
@@ -128,6 +134,7 @@ export default function App() {
       setError(String(e))
     } finally {
       setBusy(false)
+      setInitialized(true)
     }
   }
 
@@ -186,12 +193,15 @@ export default function App() {
 
   const saveEvent = async () => {
     if (!edit) return
+    setBusy(true); setError('')
     try {
       await bridge.request('calendar.event.save', { event: edit, overwrite: false })
       setEdit(null)
       await load(true)
     } catch (e) {
       setError(String(e))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -216,10 +226,9 @@ export default function App() {
 
   const saveTodo = async () => {
     if (!todoText.trim()) return
-    await bridge.request('todo.save', { todo: { id: '', title: todoText, done: false, due: todoDue || null, createdAt: '', updatedAt: '' } })
-    setTodoText('')
-    setTodoDue('')
-    await load()
+    setBusy(true); setError('')
+    try { await bridge.request('todo.save', { todo: { id: '', title: todoText, done: false, due: todoDue || null, createdAt: '', updatedAt: '' } }); setTodoText(''); setTodoDue(''); await load() }
+    catch (reason) { setError(String(reason)) } finally { setBusy(false) }
   }
 
   const toggle = async (t: Todo) => {
@@ -232,6 +241,7 @@ export default function App() {
     await load()
   }
 
+  if (!initialized) return <main className="connect"><Status>正在载入日历…</Status></main>
   if (!account) {
     return (
       <main className="connect">
@@ -248,8 +258,9 @@ export default function App() {
             <Input type="password" value={secret} onChange={e => setSecret(e.target.value)} />
           </label>
           <Button variant="primary" onClick={() => void connect()} disabled={busy || !secret}>
-            连接并发现日历
+            {busy ? '连接中…' : '连接并发现日历'}
           </Button>
+          {previousAccount && <Button onClick={() => { setAccount(previousAccount); setPreviousAccount(null); setError('') }}>取消</Button>}
           {error && <Status tone="error">{error}</Status>}
         </Card>
       </main>
@@ -270,7 +281,7 @@ export default function App() {
         <Button onClick={() => void load(true)} disabled={busy}>
           <RefreshCw size={15} />同步
         </Button>
-        <Button onClick={() => { setAccountDraft(account); setAccount(null) }}>
+        <Button onClick={() => { setPreviousAccount(account); setAccountDraft(account); setAccount(null) }}>
           <Settings size={15} />账号
         </Button>
       </header>
@@ -422,12 +433,13 @@ export default function App() {
       )}
 
       {edit && (
-        <Card className="editor">
+        <Dialog open onClose={() => !busy && setEdit(null)} className="editor" aria-label={edit.href ? '编辑事件' : '新建事件'}>
           <header>
             <h2>{edit.href ? '编辑事件' : '新建事件'}</h2>
             <Button onClick={() => setEdit(null)}><X size={16} /></Button>
           </header>
           {edit.recurring && <Status>重复事件在这里仅供查看，请在 Apple 日历中编辑。</Status>}
+          {cals.find(calendar => calendar.id === edit.calendarId)?.readOnly && <Status>此日历为只读，事件仅供查看。</Status>}
           <label>
             标题
             <Input disabled={edit.recurring} value={edit.title} onChange={e => setEdit({ ...edit, title: e.target.value })} />
@@ -467,11 +479,13 @@ export default function App() {
           </label>
           <label>
             开始
-            <Input disabled={edit.recurring} value={edit.start} onChange={e => setEdit({ ...edit, start: e.target.value })} placeholder={edit.allDay ? '20260905' : '20260905T090000'} />
+            <Input type={edit.allDay ? 'date' : 'datetime-local'} disabled={edit.recurring} value={fromIcalInput(edit.start, edit.allDay)} onChange={e => setEdit({ ...edit, start: toIcalInput(e.target.value, edit.allDay, edit.start.endsWith('Z')) })} />
+            {!edit.allDay && edit.startTimezone && <small>时区：{edit.startTimezone}</small>}
           </label>
           <label>
             结束
-            <Input disabled={edit.recurring} value={edit.end} onChange={e => setEdit({ ...edit, end: e.target.value })} placeholder={edit.allDay ? '20260906' : '20260905T100000'} />
+            <Input type={edit.allDay ? 'date' : 'datetime-local'} disabled={edit.recurring} value={fromIcalInput(edit.end, edit.allDay)} onChange={e => setEdit({ ...edit, end: toIcalInput(e.target.value, edit.allDay, edit.end.endsWith('Z')) })} />
+            {!edit.allDay && edit.endTimezone && edit.endTimezone !== edit.startTimezone && <small>时区：{edit.endTimezone}</small>}
           </label>
           <label>
             地点
@@ -483,23 +497,50 @@ export default function App() {
           </label>
           <footer>
             {edit.href && !edit.recurring ? (
-              <Button variant="danger" onClick={() => void delEvent()}>删除</Button>
+              <Button variant="danger" disabled={busy || cals.find(calendar => calendar.id === edit.calendarId)?.readOnly} onClick={() => void delEvent()}>删除</Button>
             ) : <span />}
             <div>
               <Button onClick={() => setEdit(null)}>取消</Button>
-              <Button variant="primary" disabled={edit.recurring || !edit.title || !edit.start || !edit.end} onClick={() => void saveEvent()}>
-                保存
+              <Button variant="primary" disabled={busy || edit.recurring || cals.find(calendar => calendar.id === edit.calendarId)?.readOnly || !edit.title || !edit.start || !edit.end} onClick={() => void saveEvent()}>
+                {busy ? '保存中…' : '保存'}
               </Button>
             </div>
           </footer>
-        </Card>
+        </Dialog>
       )}
     </main>
   )
 }
 
 function formatTime(v: string) {
-  if (/^\d{8}T\d{6}Z?$/.test(v)) return `${v.slice(9, 11)}:${v.slice(11, 13)}`
+  if (/^\d{8}T\d{6}Z$/.test(v)) {
+    const date = icalUtcDate(v)
+    return new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(date)
+  }
+  if (/^\d{8}T\d{6}$/.test(v)) return `${v.slice(9, 11)}:${v.slice(11, 13)}`
   const d = new Date(v)
   return Number.isNaN(+d) ? v : new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(d)
+}
+function fromIcalInput(value: string, allDay: boolean) {
+  if (!allDay && /^\d{8}T\d{6}Z$/.test(value)) {
+    const date = icalUtcDate(value)
+    const parts = [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')]
+    return `${parts.join('-')}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  }
+  const date = dateKey(value)
+  if (allDay) return date
+  const time = /^\d{8}T\d{6}/.test(value) ? `${value.slice(9, 11)}:${value.slice(11, 13)}` : '09:00'
+  return `${date}T${time}`
+}
+function toIcalInput(value: string, allDay: boolean, utc = false) {
+  if (!value) return ''
+  if (allDay) return value.replaceAll('-', '')
+  if (utc) {
+    const date = new Date(value)
+    return `${date.getUTCFullYear()}${String(date.getUTCMonth() + 1).padStart(2, '0')}${String(date.getUTCDate()).padStart(2, '0')}T${String(date.getUTCHours()).padStart(2, '0')}${String(date.getUTCMinutes()).padStart(2, '0')}00Z`
+  }
+  return `${value.slice(0, 10).replaceAll('-', '')}T${value.slice(11, 16).replace(':', '')}00`
+}
+function icalUtcDate(value: string) {
+  return new Date(Date.UTC(Number(value.slice(0, 4)), Number(value.slice(4, 6)) - 1, Number(value.slice(6, 8)), Number(value.slice(9, 11)), Number(value.slice(11, 13)), Number(value.slice(13, 15))))
 }

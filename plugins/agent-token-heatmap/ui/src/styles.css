@@ -206,6 +206,7 @@ button.icon.danger { color: var(--dw-danger); }
 .heatmap-card, .breakdown-card, .daily-ranking-card, .model-card, .weekly-card, .quota-card { border-radius: var(--dw-radius-md); box-shadow: var(--dw-shadow-xs); transition: transform var(--dw-motion-normal) var(--dw-ease-out), border-color var(--dw-motion-normal) var(--dw-ease-out), box-shadow var(--dw-motion-normal) var(--dw-ease-out); }
 .calendar-grid i { transition: transform var(--dw-motion-fast) var(--dw-ease-out), border-color var(--dw-motion-fast) var(--dw-ease-out); }
 .calendar-grid i:not(.blank):hover { transform: scale(1.18); border-color: var(--dw-accent); position: relative; z-index: 2; }
+.calendar-grid i:not(.blank):focus-visible { outline: 2px solid var(--dw-focus); outline-offset: 2px; transform: scale(1.18); position: relative; z-index: 2; }
 .lower-grid { gap: 12px; margin-top: 12px; }
 .model-card { margin-top: 12px; }
 html[data-dw-glass="enabled"] .summary-item { background: color-mix(in srgb, var(--dw-surface) 88%, transparent); backdrop-filter: var(--dw-glass-filter); }

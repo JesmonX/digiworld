@@ -1,6 +1,6 @@
 {
   "id": "io.github.jesmonx.digiworld.github-actions",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "uiDesignVersion": 1,
   "name": "Git Actions",
   "description": "查看所选 GitHub 仓库中由当前账号触发的 Actions 运行与 Job 进度。",

@@ -54,6 +54,12 @@ def read(p):
 def cmd(a):
  try:return subprocess.run(a,text=True,capture_output=True,timeout=5).stdout.strip()
  except:return ''
+def probe(a,timeout=5):
+ try:
+  r=subprocess.run(a,text=True,capture_output=True,timeout=timeout)
+  return r.stdout.strip(),('ready' if r.returncode==0 else 'error'),r.stderr.strip()
+ except FileNotFoundError:return '','unavailable','command not found'
+ except Exception as e:return '','error',str(e)
 def num(v):
  try:return float(v)
  except:return None
@@ -67,7 +73,7 @@ for line in raw.splitlines()[1:]:
  p=line.split()
  if len(p)>=6: disks.append({'device':p[0],'total':int(p[1]),'used':int(p[2]),'available':int(p[3]),'percent':float(p[4][:-1]),'mount':' '.join(p[5:])})
 gpu=[]
-raw=cmd(['nvidia-smi','--query-gpu=index,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw','--format=csv,noheader,nounits'])
+raw,gpuStatus,gpuError=probe(['nvidia-smi','--query-gpu=index,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw','--format=csv,noheader,nounits'])
 for line in raw.splitlines():
  p=[x.strip() for x in line.split(',')]
  if len(p)>=6:
@@ -88,11 +94,11 @@ for line in read('/proc/net/dev').splitlines()[2:]:
  name,data=line.split(':',1); p=data.split()
  if len(p)>=16 and name.strip()!='lo':net.append({'name':name.strip(),'receivedBytes':int(p[0]),'sentBytes':int(p[8])})
 vn=None
-try:
- r=subprocess.run(['vnstat','--json','d'],text=True,capture_output=True,timeout=8)
- if r.returncode==0:vn=json.loads(r.stdout)
-except:pass
-print(json.dumps({'hostname':read('/etc/hostname') or os.uname().nodename,'timestamp':int(time.time()),'uptimeSeconds':float(read('/proc/uptime').split()[0]),'memory':{'total':mem.get('MemTotal',0),'available':mem.get('MemAvailable',0),'used':mem.get('MemTotal',0)-mem.get('MemAvailable',0)},'cpu':{'logicalCores':os.cpu_count() or 0,'load1':float(load[0]) if load else 0,'load5':float(load[1]) if len(load)>1 else 0,'load15':float(load[2]) if len(load)>2 else 0},'disks':disks,'gpus':gpu,'network':net,'vnstat':vn}))"#;
+vnRaw,vnstatStatus,vnstatError=probe(['vnstat','--json','d'],8)
+if vnstatStatus=='ready':
+ try:vn=json.loads(vnRaw)
+ except Exception as e:vnstatStatus,vnstatError='error',str(e)
+print(json.dumps({'hostname':read('/etc/hostname') or os.uname().nodename,'timestamp':int(time.time()),'uptimeSeconds':float(read('/proc/uptime').split()[0]),'memory':{'total':mem.get('MemTotal',0),'available':mem.get('MemAvailable',0),'used':mem.get('MemTotal',0)-mem.get('MemAvailable',0)},'cpu':{'logicalCores':os.cpu_count() or 0,'load1':float(load[0]) if load else 0,'load5':float(load[1]) if len(load)>1 else 0,'load15':float(load[2]) if len(load)>2 else 0},'disks':disks,'gpus':gpu,'gpuStatus':gpuStatus,'gpuError':gpuError or None,'network':net,'vnstat':vn,'vnstatStatus':vnstatStatus,'vnstatError':vnstatError or None}))"#;
 impl App {
     fn settings(&self) -> Result<Settings> {
         let p = self.dir.join("settings.json");

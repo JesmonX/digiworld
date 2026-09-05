@@ -43,7 +43,8 @@ button { font: inherit; }
 .layout-menu > button.active { border-color: color-mix(in srgb, var(--dw-accent) 42%, var(--dw-border)); background: var(--dw-accent-soft); }
 .layout-menu > button > span:nth-child(2) { min-width: 0; }
 .layout-menu > button > svg { width: 13px; margin-left: auto; color: var(--dw-accent-strong); stroke-width: 2.6; }
-.keyboard-scroll { overflow-x: auto; }
+.keyboard-scroll { overflow-x: auto; scrollbar-gutter: stable; }
+.keyboard-scroll:focus-visible, .key:focus-visible { outline: 2px solid var(--dw-focus); outline-offset: 2px; }
 .board-toolbar { min-width: var(--board-min-width); display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .board-toolbar h2, .ranking-card h2 { margin: 0; color: var(--dw-text); font-size: var(--dw-type-title); font-weight: var(--weight-semibold); }
 .board-toolbar h2 { display: flex; align-items: center; gap: 7px; }

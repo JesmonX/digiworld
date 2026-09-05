@@ -70,6 +70,8 @@ label {
   align-items: center;
   gap: var(--dw-space-2);
 }
+.month-header h3 { white-space: nowrap; }
+.month-nav .dw-button { white-space: nowrap; }
 
 .month-header h3 {
   margin: 0;
@@ -315,4 +317,16 @@ label {
 
 .editor textarea {
   min-height: 80px;
+}
+@media (max-width: 840px) {
+  .month-header { align-items: stretch; flex-direction: column; }
+  .month-nav { display: grid; grid-template-columns: auto 1fr auto auto; }
+  .month-nav .dw-button { min-width: 0; }
+}
+@media (max-width: 620px) {
+  main { padding: var(--dw-space-2); }
+  .dw-toolbar { flex-wrap: wrap; }
+  .agenda-day-card { grid-template-columns: 1fr; }
+  .todo-add { flex-wrap: wrap; }
+  .todo-add .dw-input:first-child { flex-basis: 100%; }
 }
