@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Button, Input, Card, Dialog, Switch, Status, RadioGroup } from '@digiworld/design-system/react'
-import { Check, CircleAlert, Download, LoaderCircle, Network, Palette, ShieldCheck, Type } from 'lucide-react'
+import { Button, Input, Panel, Dialog, Switch, Status, RadioGroup } from '@digiworld/design-system/react'
+import { Check, CircleAlert, Download, LoaderCircle, Network, Palette, ShieldCheck, Sparkles, Type } from 'lucide-react'
 import { ThemeDropdown } from '../components/ThemeDropdown'
 import {
   api, type AppState, type CoreUpdateInfo, type PluginUpdateInfo, type ProxyMode,
@@ -103,8 +103,8 @@ export function UpdateDialogView({ dialog, busy, progress, error, onCancel, onCo
       {busy && <ProgressView progress={matchingProgress} fallbackName={isPlugins ? '插件更新' : `Digiworld ${dialog.update.version}`} />}
       {error && <Status tone="error" className="update-error"><CircleAlert />{error}</Status>}
       <div className="modal-actions">
-        <Button className="secondary" disabled={busy} onClick={onCancel}>取消</Button>
-        <Button className="primary" disabled={busy || compatibleCount === 0} onClick={onConfirm}>
+        <Button className="secondary compact" disabled={busy} onClick={onCancel}>取消</Button>
+        <Button className="primary compact" disabled={busy || compatibleCount === 0} onClick={onConfirm}>
           {busy ? <LoaderCircle className="spin" /> : <Download />}
           {busy ? '正在更新…' : isPlugins ? `同意并更新 ${compatibleCount} 项` : '同意并更新'}
         </Button>
@@ -263,134 +263,209 @@ export function SettingsPage({
 
   return (
     <div className="settings-stack">
-      <Card className={`settings-card theme-card ${themeDropdownOpen ? 'dropdown-open' : ''}`}>
-        <div className="theme-header-row">
-          <div className="theme-copy">
-            <h3><Palette />主题颜色</h3>
-          </div>
-          <ThemeDropdown
-            value={accentThemeId}
-            onChange={onAccentThemeChange}
-            themes={ACCENT_THEMES}
-            onOpenChange={setThemeDropdownOpen}
-          />
-        </div>
-        <div
-          className="theme-active-preview"
-          style={{
-            '--theme-swatch': currentTheme.colors.accent,
-            '--preview-bg': currentTheme.colors.bg,
-            '--preview-surface': currentTheme.colors.surface,
-            '--preview-text': currentTheme.colors.text,
-            '--preview-border': currentTheme.colors.border,
-          } as React.CSSProperties}
-        >
-          <span className="theme-miniature" aria-hidden="true"><i /><b><em />Aa 123</b></span>
-          <div className="theme-preview-details">
-            <div className="theme-preview-meta">
-              <strong>{currentTheme.label}</strong>
-              <span className="theme-preview-pill">{currentTheme.scheme === 'light' ? '浅色模式' : '深色模式'}</span>
+      {/* Section 1: Appearance */}
+      <section className="settings-group">
+        <h2 className="settings-group-title"><Sparkles />外观与视觉</h2>
+        <Panel className="settings-section-panel" padding="lg">
+          {/* Theme Color */}
+          <div className={`setting-row ${themeDropdownOpen ? 'dropdown-open' : ''}`}>
+            <div className="setting-label">
+              <h3><Palette />主题颜色</h3>
             </div>
-            <div className="theme-preview-swatches" aria-label="主题核心色彩" title="主题核心色彩">
-              <span style={{ background: currentTheme.colors.bg }} title={`背景色: ${currentTheme.colors.bg}`} />
-              <span style={{ background: currentTheme.colors.surface }} title={`表面色: ${currentTheme.colors.surface}`} />
-              <span style={{ background: currentTheme.colors['surface-raised'] }} title={`浮层色: ${currentTheme.colors['surface-raised']}`} />
-              <span style={{ background: currentTheme.colors.accent }} title={`主强调色: ${currentTheme.colors.accent}`} />
-              <span style={{ background: currentTheme.colors['accent-secondary'] }} title={`次强调色: ${currentTheme.colors['accent-secondary']}`} />
-              <span style={{ background: currentTheme.colors.text }} title={`文字色: ${currentTheme.colors.text}`} />
+            <div className="setting-control">
+              <ThemeDropdown
+                value={accentThemeId}
+                onChange={onAccentThemeChange}
+                themes={ACCENT_THEMES}
+                onOpenChange={setThemeDropdownOpen}
+              />
             </div>
           </div>
-        </div>
-      </Card>
-      <Card className="settings-card scheme-card">
-        <div className="theme-copy">
-          <h3><Palette />主题配色</h3>
-        </div>
-        <RadioGroup className="scheme-options" aria-label="主题配色">
-          {COLOR_SCHEMES.map(scheme => (
-            <Button
-              key={scheme.id}
-              type="button"
-              className={colorSchemeId === scheme.id ? 'active' : ''}
-              role="radio"
-              aria-checked={colorSchemeId === scheme.id}
-              tabIndex={colorSchemeId === scheme.id ? 0 : -1}
-              aria-label={scheme.label}
-              title={scheme.label}
-              onClick={() => onColorSchemeChange(scheme.id)}
-            >
-              <span className="scheme-swatch" style={{ background: getColorSchemePreview(accentThemeId, scheme.id) }} aria-hidden="true" />
-              <div className="scheme-label-wrap">
-                <strong>{scheme.label}</strong>
+          <div
+            className="theme-active-preview"
+            style={{
+              '--theme-swatch': currentTheme.colors.accent,
+              '--preview-bg': currentTheme.colors.bg,
+              '--preview-surface': currentTheme.colors.surface,
+              '--preview-text': currentTheme.colors.text,
+              '--preview-border': currentTheme.colors.border,
+            } as React.CSSProperties}
+          >
+            <span className="theme-miniature" aria-hidden="true"><i /><b><em />Aa 123</b></span>
+            <div className="theme-preview-details">
+              <div className="theme-preview-meta">
+                <strong>{currentTheme.label}</strong>
+                <span className="theme-preview-pill">{currentTheme.scheme === 'light' ? '浅色模式' : '深色模式'}</span>
               </div>
-              {colorSchemeId === scheme.id && <Check />}
-            </Button>
-          ))}
-        </RadioGroup>
-      </Card>
-      <Card className="settings-card font-card">
-        <div className="theme-copy">
-          <h3><Type />界面字体</h3>
-        </div>
-        <RadioGroup className="font-options" aria-label="界面字体">
-          {FONT_THEMES.map(theme => (
-            <Button
-              key={theme.id}
-              type="button"
-              className={fontThemeId === theme.id ? 'active' : ''}
-              role="radio"
-              aria-checked={fontThemeId === theme.id}
-              tabIndex={fontThemeId === theme.id ? 0 : -1}
-              aria-label={theme.label}
-              style={{ '--font-preview': theme.fontSans, '--font-preview-display': theme.fontDisplay } as React.CSSProperties}
-              onClick={() => onFontThemeChange(theme.id)}
-            >
-              <span className="font-option-heading"><strong>{theme.label}</strong>{fontThemeId === theme.id && <Check />}</span>
-              <span className="font-sample">数字世界 Digiworld 2026</span>
-            </Button>
-          ))}
-        </RadioGroup>
-      </Card>
-      <Card className="settings-card weight-card">
-        <div className="theme-copy">
-          <h3><Type />字体粗细</h3>
-        </div>
-        <div className="weight-control">
-          <div><span>标准</span><span>清晰</span><span>粗重</span></div>
-          <Input aria-label="字体粗细" type="range" min="400" max="600" step="100" value={fontWeight} onChange={event => onFontWeightChange(Number(event.target.value) as FontWeight)} />
-          <output>{fontWeight}</output>
-        </div>
-      </Card>
-      <Card className="settings-card appearance-card">
-        <h3>玻璃效果</h3>
-        <Switch aria-label="切换玻璃效果" checked={glassMode === 'enabled'} onCheckedChange={enabled => onGlassModeChange(enabled ? 'enabled' : 'disabled')} />
-      </Card>
-      <Card className="settings-card">
-        <h3>开机启动</h3>
-        <Switch aria-label="切换开机启动" checked={state.launchAtStartup} onCheckedChange={enabled => void onChange(enabled)} />
-      </Card>
-      <Card className="settings-card proxy-card">
-        <div className="proxy-copy">
-          <h3><Network />网络代理</h3>
-          <div className="dw-segmented proxy-modes" role="group" aria-label="代理模式">
-            {([['system', '系统代理'], ['custom', '自定义'], ['direct', '直连']] as const).map(([mode, label]) => (
-              <Button key={mode} className={proxy.mode === mode ? 'active' : ''} aria-pressed={proxy.mode === mode} onClick={() => updateMode(mode)}>{label}</Button>
-            ))}
+              <div className="theme-preview-swatches" aria-label="主题核心色彩" title="主题核心色彩">
+                <span style={{ background: currentTheme.colors.bg }} title={`背景色: ${currentTheme.colors.bg}`} />
+                <span style={{ background: currentTheme.colors.surface }} title={`表面色: ${currentTheme.colors.surface}`} />
+                <span style={{ background: currentTheme.colors['surface-raised'] }} title={`浮层色: ${currentTheme.colors['surface-raised']}`} />
+                <span style={{ background: currentTheme.colors.accent }} title={`主强调色: ${currentTheme.colors.accent}`} />
+                <span style={{ background: currentTheme.colors['accent-secondary'] }} title={`次强调色: ${currentTheme.colors['accent-secondary']}`} />
+                <span style={{ background: currentTheme.colors.text }} title={`文字色: ${currentTheme.colors.text}`} />
+              </div>
+            </div>
           </div>
-          {proxy.mode === 'custom' && <Input aria-label="自定义代理地址" value={proxy.url ?? ''} onChange={event => setProxy({ mode: 'custom', url: event.target.value })} placeholder="http://127.0.0.1:7890 或 socks5h://127.0.0.1:7890" />}
-          {proxyMessage && <small className="proxy-message">{proxyMessage}</small>}
-        </div>
-        <div className="proxy-actions"><Button className="secondary" disabled={proxyBusy !== null} onClick={() => void runProxyAction('test')}>{proxyBusy === 'test' ? '测试中…' : '测试连接'}</Button><Button className="primary" disabled={proxyBusy !== null} onClick={() => void runProxyAction('save')}>{proxyBusy === 'save' ? '保存中…' : '保存'}</Button></div>
-      </Card>
-      <Card className="settings-card update-card">
-        <div><h3>插件更新</h3>{pluginMessage && <small className="update-message">{pluginMessage}</small>}</div>
-        <Button className="secondary" disabled={updateBusy !== null} onClick={() => void checkPluginUpdates()}>{updateBusy === 'plugin-check' ? <><LoaderCircle className="spin" />检查中…</> : '检查全部插件'}</Button>
-      </Card>
-      <Card className="settings-card update-card">
-        <div><h3>主程序更新</h3>{coreMessage && <small className="update-message">{coreMessage}</small>}</div>
-        <Button className="secondary" disabled={updateBusy !== null} onClick={() => void checkCoreUpdate()}>{updateBusy === 'core-check' ? <><LoaderCircle className="spin" />检查中…</> : '检查主程序'}</Button>
-      </Card>
-      <div className="version-line"><ShieldCheck /> Digiworld {state.version}</div>
+
+          <div className="setting-row-divider" />
+
+          {/* Color Scheme */}
+          <div className="setting-row vertical">
+            <div className="setting-label">
+              <h3><Palette />主题配色</h3>
+            </div>
+            <RadioGroup className="scheme-options" aria-label="主题配色">
+              {COLOR_SCHEMES.map(scheme => (
+                <Button
+                  key={scheme.id}
+                  type="button"
+                  className={colorSchemeId === scheme.id ? 'active' : ''}
+                  role="radio"
+                  aria-checked={colorSchemeId === scheme.id}
+                  tabIndex={colorSchemeId === scheme.id ? 0 : -1}
+                  aria-label={scheme.label}
+                  title={scheme.label}
+                  onClick={() => onColorSchemeChange(scheme.id)}
+                >
+                  <span className="scheme-swatch" style={{ background: getColorSchemePreview(accentThemeId, scheme.id) }} aria-hidden="true" />
+                  <div className="scheme-label-wrap">
+                    <strong>{scheme.label}</strong>
+                  </div>
+                  {colorSchemeId === scheme.id && <Check />}
+                </Button>
+              ))}
+            </RadioGroup>
+          </div>
+
+          <div className="setting-row-divider" />
+
+          {/* Font Theme */}
+          <div className="setting-row vertical">
+            <div className="setting-label">
+              <h3><Type />界面字体</h3>
+            </div>
+            <RadioGroup className="font-options" aria-label="界面字体">
+              {FONT_THEMES.map(theme => (
+                <Button
+                  key={theme.id}
+                  type="button"
+                  className={fontThemeId === theme.id ? 'active' : ''}
+                  role="radio"
+                  aria-checked={fontThemeId === theme.id}
+                  tabIndex={fontThemeId === theme.id ? 0 : -1}
+                  aria-label={theme.label}
+                  style={{ '--font-preview': theme.fontSans, '--font-preview-display': theme.fontDisplay } as React.CSSProperties}
+                  onClick={() => onFontThemeChange(theme.id)}
+                >
+                  <span className="font-option-heading"><strong>{theme.label}</strong>{fontThemeId === theme.id && <Check />}</span>
+                  <span className="font-sample">数字世界 Digiworld 2026</span>
+                </Button>
+              ))}
+            </RadioGroup>
+          </div>
+
+          <div className="setting-row-divider" />
+
+          {/* Font Weight */}
+          <div className="setting-row">
+            <div className="setting-label">
+              <h3><Type />字体粗细</h3>
+            </div>
+            <div className="weight-control">
+              <div><span>标准</span><span>清晰</span><span>粗重</span></div>
+              <Input aria-label="字体粗细" type="range" min="400" max="600" step="100" value={fontWeight} onChange={event => onFontWeightChange(Number(event.target.value) as FontWeight)} />
+              <output>{fontWeight}</output>
+            </div>
+          </div>
+
+          <div className="setting-row-divider" />
+
+          {/* Glass Mode */}
+          <div className="setting-row">
+            <div className="setting-label">
+              <h3>玻璃效果</h3>
+            </div>
+            <Switch aria-label="切换玻璃效果" checked={glassMode === 'enabled'} onCheckedChange={enabled => onGlassModeChange(enabled ? 'enabled' : 'disabled')} />
+          </div>
+        </Panel>
+      </section>
+
+      {/* Section 2: Network */}
+      <section className="settings-group">
+        <h2 className="settings-group-title"><Network />网络与代理</h2>
+        <Panel className="settings-section-panel" padding="lg">
+          <div className="setting-row vertical">
+            <div className="setting-label">
+              <h3><Network />网络代理</h3>
+            </div>
+            <div className="dw-segmented proxy-modes" role="group" aria-label="代理模式">
+              {([['system', '系统代理'], ['custom', '自定义'], ['direct', '直连']] as const).map(([mode, label]) => (
+                <Button key={mode} className={proxy.mode === mode ? 'active' : ''} aria-pressed={proxy.mode === mode} onClick={() => updateMode(mode)}>{label}</Button>
+              ))}
+            </div>
+            {proxy.mode === 'custom' && (
+              <Input
+                aria-label="自定义代理地址"
+                value={proxy.url ?? ''}
+                onChange={event => setProxy({ mode: 'custom', url: event.target.value })}
+                placeholder="http://127.0.0.1:7890 或 socks5h://127.0.0.1:7890"
+              />
+            )}
+            {proxyMessage && <small className="proxy-message">{proxyMessage}</small>}
+            <div className="proxy-actions">
+              <Button className="secondary compact" disabled={proxyBusy !== null} onClick={() => void runProxyAction('test')}>
+                {proxyBusy === 'test' ? '测试中…' : '测试连接'}
+              </Button>
+              <Button className="primary compact" disabled={proxyBusy !== null} onClick={() => void runProxyAction('save')}>
+                {proxyBusy === 'save' ? '保存中…' : '保存'}
+              </Button>
+            </div>
+          </div>
+        </Panel>
+      </section>
+
+      {/* Section 3: Application */}
+      <section className="settings-group">
+        <h2 className="settings-group-title"><ShieldCheck />系统与更新</h2>
+        <Panel className="settings-section-panel" padding="lg">
+          <div className="setting-row">
+            <div className="setting-label">
+              <h3>开机启动</h3>
+            </div>
+            <Switch aria-label="切换开机启动" checked={state.launchAtStartup} onCheckedChange={enabled => void onChange(enabled)} />
+          </div>
+
+          <div className="setting-row-divider" />
+
+          <div className="setting-row">
+            <div className="setting-label">
+              <h3>插件更新</h3>
+              {pluginMessage && <small className="update-message">{pluginMessage}</small>}
+            </div>
+            <Button className="secondary compact" disabled={updateBusy !== null} onClick={() => void checkPluginUpdates()}>
+              {updateBusy === 'plugin-check' ? <><LoaderCircle className="spin" />检查中…</> : '检查全部插件'}
+            </Button>
+          </div>
+
+          <div className="setting-row-divider" />
+
+          <div className="setting-row">
+            <div className="setting-label">
+              <h3>主程序更新</h3>
+              {coreMessage && <small className="update-message">{coreMessage}</small>}
+            </div>
+            <Button className="secondary compact" disabled={updateBusy !== null} onClick={() => void checkCoreUpdate()}>
+              {updateBusy === 'core-check' ? <><LoaderCircle className="spin" />检查中…</> : '检查主程序'}
+            </Button>
+          </div>
+
+          <div className="setting-row-divider" />
+
+          <div className="version-line"><ShieldCheck /> Digiworld {state.version}</div>
+        </Panel>
+      </section>
+
       {updateDialog && (
         <UpdateDialogView
           dialog={updateDialog}

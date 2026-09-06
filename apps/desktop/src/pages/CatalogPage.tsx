@@ -65,10 +65,15 @@ export function CatalogPage({
 }) {
   if (!catalog) return <Loading label="载入功能库" />
   return (
-    <div>
+    <div className="catalog-page">
       <div className="section-heading">
-        <h2>可用功能</h2>
-        <Button className="icon-button" aria-label="刷新功能库" title="刷新" onClick={onRefresh}><RefreshCw /></Button>
+        <div>
+          <span className="section-kicker">插件中心</span>
+          <h2>可用功能</h2>
+        </div>
+        <Button className="secondary compact icon-button" aria-label="刷新功能库" title="刷新" onClick={onRefresh}>
+          <RefreshCw />
+        </Button>
       </div>
       <div className="catalog-grid">
         {catalog.plugins.map(plugin => {
@@ -76,14 +81,23 @@ export function CatalogPage({
           const supported = Boolean(currentTarget && plugin.artifacts.some(artifact => artifact.target === currentTarget))
           return (
             <Card className="catalog-card" key={plugin.id}>
-              <div className="catalog-title"><span className="catalog-icon"><PluginIcon plugin={plugin} /></span><div className="catalog-version"><span className={`availability-dot ${current ? 'installed' : supported ? 'available' : 'unavailable'}`} /> <small>{current ? '已安装' : supported ? '可安装' : '暂未适配'}</small><small>v{plugin.version}</small></div></div>
+              <div className="catalog-card-header">
+                <span className="catalog-icon"><PluginIcon plugin={plugin} /></span>
+                <div className="catalog-card-status">
+                  <span className={`availability-dot ${current ? 'installed' : supported ? 'available' : 'unavailable'}`} />
+                  <span className="catalog-status-text">{current ? '已安装' : supported ? '可安装' : '暂未适配'}</span>
+                  <span className="catalog-version-tag">v{plugin.version}</span>
+                </div>
+              </div>
               <h3>{plugin.name}</h3>
               <p>{plugin.description}</p>
-              {current
-                ? <Button className="secondary full" onClick={() => onOpen(plugin.id)}>打开 <ChevronRight /></Button>
-                : !supported
-                  ? <Button className="secondary full" disabled title={`该插件暂未适配当前系统架构 (${currentTarget})`}>暂未适配当前系统</Button>
-                  : <Button className="primary full" disabled={busy === plugin.id} onClick={() => onInstall(plugin)}>{busy === plugin.id ? <LoaderCircle className="spin" /> : <Download />}安装</Button>}
+              <div className="catalog-card-action">
+                {current
+                  ? <Button className="secondary full compact" onClick={() => onOpen(plugin.id)}>打开 <ChevronRight /></Button>
+                  : !supported
+                    ? <Button className="secondary full compact" disabled title={`该插件暂未适配当前系统架构 (${currentTarget})`}>暂未适配当前系统</Button>
+                    : <Button className="primary full compact" disabled={busy === plugin.id} onClick={() => onInstall(plugin)}>{busy === plugin.id ? <LoaderCircle className="spin" /> : <Download />}安装</Button>}
+              </div>
             </Card>
           )
         })}
