@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Input, Card, Status, Textarea, Select, Dialog } from '@digiworld/design-system/react'
+import { Button, Input, Card, Status, Textarea, Select, Dialog, Panel } from '@digiworld/design-system/react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import { CalendarDays, CheckSquare, Plus, RefreshCw, Settings, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
@@ -286,7 +286,7 @@ export default function App() {
           </Button>
         </div>
         <Button onClick={() => void load(true)} disabled={busy}>
-          <RefreshCw size={15} />同步
+          <RefreshCw size={15} className={busy ? 'spin' : ''} />同步
         </Button>
         <Button onClick={() => { setPreviousAccount(account); setAccountDraft(account); setAccount(null) }}>
           <Settings size={15} />账号
@@ -296,147 +296,199 @@ export default function App() {
       {error && <Status tone="error">{error}</Status>}
 
       {tab === 'calendar' ? (
-        <div className="calendar-view">
-          <div className="calendar-sidebar">
-            <Card className="month-card">
-              <header className="month-header">
-                <h3>{formatDisplayMonth(viewYear, viewMonth)}</h3>
-                <div className="month-nav">
-                  <Button aria-label="上一月" onClick={prevMonth}><ChevronLeft size={15} /></Button>
-                  <Button onClick={jumpToToday}>今天</Button>
-                  <Button aria-label="下一月" onClick={nextMonth}><ChevronRight size={15} /></Button>
+        <div className="calendar-dashboard">
+          <div className="calendar-view">
+            <div className="calendar-agenda-pane">
+              <header className="agenda-header">
+                <div>
+                  <strong>{selectedDate ? `${formatDisplayDate(selectedDate)}${selectedDate === today ? ' (今天)' : ''}` : '当前及之后日程'}</strong>
+                  <small>{displayDays.reduce((acc, [, list]) => acc + list.length, 0)} 个日程</small>
+                </div>
+                <div className="agenda-actions">
+                  {selectedDate && (
+                    <Button onClick={() => setSelectedDate(null)}>
+                      查看全部后续
+                    </Button>
+                  )}
                   <Button
                     variant="primary"
-                    aria-label="新建日程"
-                    title="在选定日期新建日程"
-                    disabled={!cals.length}
                     onClick={() => createEventForDate(selectedDate || today)}
+                    disabled={!cals.length}
                   >
-                    <Plus size={15} />
+                    <Plus size={15} />新建日程
                   </Button>
                 </div>
               </header>
 
-              <div className="calendar-weekdays" aria-hidden="true">
-                {['一', '二', '三', '四', '五', '六', '日'].map(w => (
-                  <span key={w}>{w}</span>
-                ))}
-              </div>
-
-              <div className="calendar-grid" role="grid" aria-label="月份日历">
-                {monthDays(viewYear, viewMonth).map(cell => {
-                  const dayEvents = eventMap.get(cell.key) || []
-                  const dotCount = Math.min(3, dayEvents.length)
-                  const isSelected = selectedDate === cell.key
-                  return (
-                    <button
-                      type="button"
-                      key={cell.key}
-                      className={`calendar-cell ${cell.inMonth ? '' : 'other-month'} ${cell.isToday ? 'is-today' : ''} ${isSelected ? 'is-selected' : ''}`}
-                      onClick={() => setSelectedDate(cell.key)}
-                      onDoubleClick={() => createEventForDate(cell.key)}
-                      aria-label={`${cell.key}${dayEvents.length ? `，有 ${dayEvents.length} 个日程` : ''}`}
-                      aria-selected={isSelected}
-                    >
-                      <span className="cell-day">{cell.dayNum}</span>
-                      <span className="cell-dots">
-                        {Array.from({ length: dotCount }).map((_, i) => (
-                          <span key={i} className="event-dot" />
+              <section className="agenda">
+                {displayDays.length ? (
+                  displayDays.map(([day, list]) => (
+                    <Panel key={day} variant="inset" className="agenda-day-card">
+                      <time>{formatDisplayDate(day)}</time>
+                      <div className="agenda-day-events">
+                        {list.map(e => (
+                          <button
+                            type="button"
+                            key={`${e.href}-${e.id}`}
+                            className="event"
+                            onClick={() => setEdit(e)}
+                          >
+                            <span className="event-indicator" />
+                            <span className="event-content">
+                              <strong>{e.title || '无标题'}</strong>
+                              <small>{e.allDay ? '全天' : formatTime(e.start)}{e.location ? ` · ${e.location}` : ''}</small>
+                            </span>
+                            {e.recurring && <small className="event-recurring">重复</small>}
+                          </button>
                         ))}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </Card>
+                      </div>
+                    </Panel>
+                  ))
+                ) : (
+                  <Status>
+                    {selectedDate ? `${formatDisplayDate(selectedDate)} 暂无日程` : '当前及之后暂无日程安排'}
+                  </Status>
+                )}
+              </section>
+            </div>
 
-            <div className="calendar-meta-card">
-              <div className="meta-head">
-                <small>{events.length} 个日程 · {cals.length} 个日历</small>
-              </div>
-              <div className="calendar-picker">
-                {cals.map(c => (
-                  <label key={c.id}>
-                    <input
-                      type="checkbox"
-                      checked={account.selectedCalendars.includes(c.id)}
-                      onChange={e => void selectCalendar(c.id, e.target.checked)}
-                    />
-                    {c.name}
-                  </label>
-                ))}
-              </div>
+            <div className="calendar-sidebar">
+              <Panel variant="raised" className="month-card">
+                <header className="month-header">
+                  <h3>{formatDisplayMonth(viewYear, viewMonth)}</h3>
+                  <div className="month-nav">
+                    <Button aria-label="上一月" onClick={prevMonth}><ChevronLeft size={15} /></Button>
+                    <Button onClick={jumpToToday}>今天</Button>
+                    <Button aria-label="下一月" onClick={nextMonth}><ChevronRight size={15} /></Button>
+                    <Button
+                      variant="primary"
+                      aria-label="新建日程"
+                      title="在选定日期新建日程"
+                      disabled={!cals.length}
+                      onClick={() => createEventForDate(selectedDate || today)}
+                    >
+                      <Plus size={15} />
+                    </Button>
+                  </div>
+                </header>
+
+                <div className="calendar-weekdays" aria-hidden="true">
+                  {['一', '二', '三', '四', '五', '六', '日'].map(w => (
+                    <span key={w}>{w}</span>
+                  ))}
+                </div>
+
+                <div className="calendar-grid" role="grid" aria-label="月份日历">
+                  {monthDays(viewYear, viewMonth).map(cell => {
+                    const dayEvents = eventMap.get(cell.key) || []
+                    const dotCount = Math.min(3, dayEvents.length)
+                    const isSelected = selectedDate === cell.key
+                    return (
+                      <button
+                        type="button"
+                        key={cell.key}
+                        className={`calendar-cell ${cell.inMonth ? '' : 'other-month'} ${cell.isToday ? 'is-today' : ''} ${isSelected ? 'is-selected' : ''}`}
+                        onClick={() => setSelectedDate(cell.key)}
+                        onDoubleClick={() => createEventForDate(cell.key)}
+                        aria-label={`${cell.key}${dayEvents.length ? `，有 ${dayEvents.length} 个日程` : ''}`}
+                        aria-selected={isSelected}
+                      >
+                        <span className="cell-day">{cell.dayNum}</span>
+                        <span className="cell-dots">
+                          {Array.from({ length: dotCount }).map((_, i) => (
+                            <span key={i} className="event-dot" />
+                          ))}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </Panel>
+
+              <Panel variant="inset" className="calendar-meta-card">
+                <div className="meta-head">
+                  <small>{events.length} 个日程 · {cals.length} 个日历</small>
+                </div>
+                <div className="calendar-picker">
+                  {cals.map(c => (
+                    <label key={c.id}>
+                      <input
+                        type="checkbox"
+                        checked={account.selectedCalendars.includes(c.id)}
+                        onChange={e => void selectCalendar(c.id, e.target.checked)}
+                      />
+                      {c.name}
+                    </label>
+                  ))}
+                </div>
+              </Panel>
             </div>
           </div>
 
-          <div className="calendar-agenda-pane">
-            <header className="agenda-header">
-              <div>
-                <strong>{selectedDate ? `${formatDisplayDate(selectedDate)}${selectedDate === today ? ' (今天)' : ''}` : '当前及之后日程'}</strong>
-                <small>{displayDays.reduce((acc, [, list]) => acc + list.length, 0)} 个日程</small>
-              </div>
-              <div className="agenda-actions">
-                {selectedDate && (
-                  <Button onClick={() => setSelectedDate(null)}>
-                    查看全部后续
-                  </Button>
-                )}
-                <Button
-                  variant="primary"
-                  onClick={() => createEventForDate(selectedDate || today)}
-                  disabled={!cals.length}
-                >
-                  <Plus size={15} />新建日程
-                </Button>
+          <Panel variant="default" className="todo-section">
+            <header className="todo-panel-header">
+              <div className="todo-panel-title">
+                <CheckSquare size={16} />
+                <strong>待办清单</strong>
+                <small>{todos.filter(t => !t.done).length} 项未完成</small>
               </div>
             </header>
-
-            <section className="agenda">
-              {displayDays.length ? (
-                displayDays.map(([day, list]) => (
-                  <Card key={day} className="agenda-day-card">
-                    <time>{formatDisplayDate(day)}</time>
-                    <div className="agenda-day-events">
-                      {list.map(e => (
-                        <Button key={`${e.href}-${e.id}`} className="event" onClick={() => setEdit(e)}>
-                          <span>
-                            <strong>{e.title || '无标题'}</strong>
-                            <small>{e.allDay ? '全天' : formatTime(e.start)}{e.location ? ` · ${e.location}` : ''}</small>
-                          </span>
-                          {e.recurring && <small>重复</small>}
-                        </Button>
-                      ))}
-                    </div>
-                  </Card>
-                ))
-              ) : (
-                <Status>
-                  {selectedDate ? `${formatDisplayDate(selectedDate)} 暂无日程` : '当前及之后暂无日程安排'}
-                </Status>
+            <div className="todo-add">
+              <Input
+                value={todoText}
+                onChange={e => setTodoText(e.target.value)}
+                placeholder="添加待办事项…"
+                onKeyDown={e => { if (e.key === 'Enter') void saveTodo() }}
+              />
+              <Input type="date" aria-label="截止日期" value={todoDue} onChange={e => setTodoDue(e.target.value)} />
+              <Button variant="primary" onClick={() => void saveTodo()}><Plus size={15} />添加</Button>
+            </div>
+            <div className="todo-list">
+              {todos.map(t => (
+                <div key={t.id} className={`todo-item ${t.done ? 'done' : ''}`}>
+                  <input type="checkbox" checked={t.done} onChange={() => void toggle(t)} />
+                  <span className="todo-title">{t.title}{t.due && <small className="todo-due">截止 {t.due}</small>}</span>
+                  <Button onClick={() => void removeTodo(t.id)} aria-label="删除待办"><Trash2 size={14} /></Button>
+                </div>
+              ))}
+              {todos.length === 0 && (
+                <div className="todo-empty"><small>暂无待办事项</small></div>
               )}
-            </section>
-          </div>
+            </div>
+          </Panel>
         </div>
       ) : (
-        <section className="todo">
-          <Card className="todo-add">
+        <Panel variant="default" className="todo todo-section">
+          <header className="todo-panel-header">
+            <div className="todo-panel-title">
+              <CheckSquare size={16} />
+              <strong>待办清单</strong>
+              <small>{todos.filter(t => !t.done).length} 项未完成</small>
+            </div>
+          </header>
+          <div className="todo-add">
             <Input
               value={todoText}
               onChange={e => setTodoText(e.target.value)}
-              placeholder="添加 Todo"
+              placeholder="添加待办事项…"
               onKeyDown={e => { if (e.key === 'Enter') void saveTodo() }}
             />
             <Input type="date" aria-label="截止日期" value={todoDue} onChange={e => setTodoDue(e.target.value)} />
-            <Button variant="primary" onClick={() => void saveTodo()}><Plus size={15} /></Button>
-          </Card>
-          {todos.map(t => (
-            <Card key={t.id} className={t.done ? 'done' : ''}>
-              <input type="checkbox" checked={t.done} onChange={() => void toggle(t)} />
-              <span>{t.title}{t.due && <small>截止 {t.due}</small>}</span>
-              <Button onClick={() => void removeTodo(t.id)}><Trash2 size={15} /></Button>
-            </Card>
-          ))}
-        </section>
+            <Button variant="primary" onClick={() => void saveTodo()}><Plus size={15} />添加</Button>
+          </div>
+          <div className="todo-list">
+            {todos.map(t => (
+              <div key={t.id} className={`todo-item ${t.done ? 'done' : ''}`}>
+                <input type="checkbox" checked={t.done} onChange={() => void toggle(t)} />
+                <span className="todo-title">{t.title}{t.due && <small className="todo-due">截止 {t.due}</small>}</span>
+                <Button onClick={() => void removeTodo(t.id)} aria-label="删除待办"><Trash2 size={14} /></Button>
+              </div>
+            ))}
+            {todos.length === 0 && (
+              <div className="todo-empty"><small>暂无待办事项</small></div>
+            )}
+          </div>
+        </Panel>
       )}
 
       {edit && (
