@@ -13,6 +13,7 @@ export interface UsageDay {
   cacheWriteTokens: number
   totalTokens: number
   cacheAvailable?: boolean
+  cacheInputTokens?: number
   models?: ModelTokens[]
 }
 
@@ -91,8 +92,8 @@ export function weeklyUsage(endDay: string, days: UsageDay[]): WeeklyUsagePoint[
     result.push({
       ...usage,
       models: modelTokensForDay(usage),
-      cacheRate: usage.cacheAvailable && usage.inputTokens > 0
-        ? usage.cacheReadTokens / usage.inputTokens
+      cacheRate: usage.cacheAvailable && (usage.cacheInputTokens ?? usage.inputTokens) > 0
+        ? usage.cacheReadTokens / (usage.cacheInputTokens ?? usage.inputTokens)
         : undefined,
     })
   }

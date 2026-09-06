@@ -1,7 +1,7 @@
-import { Button, Card, Menu, Status } from '@digiworld/design-system/react'
+import { Button, Card, Menu, Status, Input, Select } from '@digiworld/design-system/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronDown, Flame, Keyboard, Pause, Play } from 'lucide-react'
-import { createPluginBridge } from '@digiworld/plugin-sdk'
+import { exportJson, createPluginBridge } from '@digiworld/plugin-sdk'
 import {
   formatKeyLabel, getKeyboardLayout, heatLevel, keyboardLayouts, layoutKeys, type KeyboardLayoutId, type KeyDefinition,
 } from './keyboard'
@@ -21,7 +21,11 @@ interface Snapshot {
   topTen: RankingEntry[]
 }
 export default function App() {
-  const [scope, setScope] = useState<'today' | 'all'>('today')
+  const [scope, setScope] = useState<string>('today')
+  const [from, setFrom] = useState('')
+  const [until, setUntil] = useState('')
+  const generation = useRef(0)
+  const refreshing = useRef(false)
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const [layoutId, setLayoutId] = useState<KeyboardLayoutId>('full')
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false)
@@ -31,20 +35,28 @@ export default function App() {
   const layoutTriggerRef = useRef<HTMLButtonElement>(null)
 
   const refresh = useCallback(async () => {
+    if (refreshing.current) return
+    refreshing.current = true
+    const request = ++generation.current
     try {
-      setSnapshot(await bridge.request<Snapshot>('heatmap.snapshot', { scope }))
+      const result = await bridge.request<Snapshot>('heatmap.snapshot', { scope })
+      if (request === generation.current) setSnapshot(result)
       setError(null)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
-    }
+    } finally { refreshing.current = false }
   }, [scope])
 
   useEffect(() => {
     bridge.ready()
     void refresh()
-    const interval = window.setInterval(refresh, 2000)
-    return () => window.clearInterval(interval)
+    const interval = window.setInterval(() => { if (bridge.isActive()) void refresh() }, 2000)
+    return () => { generation.current += 1; window.clearInterval(interval) }
   }, [refresh])
+
+  useEffect(() => bridge.on<{active:boolean}>('host.visibility', ({active}) => {
+    if (active) void refresh().catch(reason => setError(String(reason)))
+  }), [refresh])
 
   useEffect(() => {
     bridge.request<{ layout: KeyboardLayoutId }>('heatmap.getLayout')
@@ -110,7 +122,9 @@ export default function App() {
           <div><Flame /><span>最高频</span><strong>{snapshot?.topKey ?? '—'}</strong></div>
         </div>
         <div className="header-actions">
-          <div className="dw-segmented scope-toggle" role="group" aria-label="统计时间范围"><Button aria-pressed={scope === 'today'} className={scope === 'today' ? 'active' : ''} onClick={() => setScope('today')}>今天</Button><Button aria-pressed={scope === 'all'} className={scope === 'all' ? 'active' : ''} onClick={() => setScope('all')}>全部</Button></div>
+          <Select aria-label="统计时间范围" value={scope.includes(':')?'custom':scope} onChange={e => { if(e.target.value!=='custom') setScope(e.target.value); else if(from&&until) setScope(`${from}:${until}`) }}><option value="today">今天</option><option value="7">近 7 天</option><option value="30">近 30 天</option><option value="all">全部</option><option value="custom">自选日期</option></Select>
+          <Input type="date" aria-label="开始日期" value={from} onChange={e => setFrom(e.target.value)} /><Input type="date" aria-label="结束日期" value={until} onChange={e => setUntil(e.target.value)} />
+          <Button disabled={!from || !until || from>until} onClick={() => setScope(`${from}:${until}`)}>应用日期</Button><Button disabled={!snapshot} onClick={() => exportJson('keyboard-counts.json', {scope,snapshot})}>导出</Button>
           <Button className={`pause-button ${snapshot?.paused ? 'paused' : ''}`} disabled={pauseBusy || !snapshot} onClick={() => void togglePause()}>{snapshot?.paused ? <Play /> : <Pause />}{pauseBusy ? '处理中…' : snapshot?.paused ? '继续' : '暂停'}</Button>
         </div>
       </header>

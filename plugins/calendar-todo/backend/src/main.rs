@@ -7,21 +7,9 @@ use reqwest::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{
-    fs,
-    io::{BufRead, Write},
-    path::PathBuf,
-    time::Duration as StdDuration,
-};
+use std::{fs, path::PathBuf, time::Duration as StdDuration};
 use uuid::Uuid;
 const SERVICE: &str = "io.github.jesmonx.digiworld.calendar-todo";
-#[derive(Deserialize)]
-struct Req {
-    id: Value,
-    method: String,
-    #[serde(default)]
-    params: Value,
-}
 #[derive(Default, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct Account {
@@ -62,6 +50,8 @@ struct Event {
     notes: String,
     #[serde(default)]
     recurring: bool,
+    #[serde(default)]
+    recurrence_id: Option<String>,
 }
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -76,6 +66,7 @@ struct Todo {
 struct App {
     dir: PathBuf,
     http: Client,
+    candidate: Option<(Account, String)>,
 }
 
 #[derive(Debug)]
@@ -92,7 +83,7 @@ fn sync_range() -> (DateTime<Utc>, DateTime<Utc>) {
 
 fn calendar_query_body(start: DateTime<Utc>, end: DateTime<Utc>) -> String {
     format!(
-        "<?xml version=\"1.0\"?><c:calendar-query xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:prop><d:getetag/><c:calendar-data/></d:prop><c:filter><c:comp-filter name=\"VCALENDAR\"><c:comp-filter name=\"VEVENT\"><c:time-range start=\"{}\" end=\"{}\"/></c:comp-filter></c:comp-filter></c:filter></c:calendar-query>",
+        "<?xml version=\"1.0\"?><c:calendar-query xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:prop><d:getetag/><c:calendar-data><c:expand start=\"{0}\" end=\"{1}\"/></c:calendar-data></d:prop><c:filter><c:comp-filter name=\"VCALENDAR\"><c:comp-filter name=\"VEVENT\"><c:time-range start=\"{0}\" end=\"{1}\"/></c:comp-filter></c:comp-filter></c:filter></c:calendar-query>",
         start.format("%Y%m%dT%H%M%SZ"),
         end.format("%Y%m%dT%H%M%SZ"),
     )
@@ -125,9 +116,15 @@ fn dav_error_detail(body: &str) -> (String, bool) {
 }
 impl App {
     fn account(&self) -> Result<Account> {
+        if let Some((account, _)) = &self.candidate {
+            return Ok(account.clone());
+        }
         read(&self.dir.join("account.json")).context("尚未配置 iCloud 账号")
     }
     fn pass(&self) -> Result<String> {
+        if let Some((_, secret)) = &self.candidate {
+            return Ok(secret.clone());
+        }
         keyring::Entry::new(SERVICE, "icloud-app-password")?
             .get_password()
             .context("App 专用密码不存在")
@@ -139,6 +136,7 @@ impl App {
         depth: &str,
         body: Option<String>,
     ) -> Result<Response> {
+        validate_url(url)?;
         let a = self.account()?;
         let mut r = self
             .http
@@ -274,18 +272,23 @@ impl App {
                 .unwrap_or_default()
                 .trim_matches('"')
                 .to_string();
-            if let Some(ics) = tag(&block, "calendar-data")
-                && let Some(mut event) = parse_event(&ics)
-            {
-                event.calendar_id = cal.id.clone();
-                event.href =
-                    resolve_url(&cal.href, &href).map_err(|error| CalendarReportError {
-                        status,
-                        detail: error.to_string(),
-                        retryable: false,
-                    })?;
-                event.etag = etag;
-                events.push(event);
+            if let Some(ics) = tag(&block, "calendar-data") {
+                for component in ics.split("BEGIN:VEVENT").skip(1) {
+                    let Some(body) = component.split("END:VEVENT").next() else {
+                        continue;
+                    };
+                    if let Some(mut event) = parse_event(body) {
+                        event.calendar_id = cal.id.clone();
+                        event.href =
+                            resolve_url(&cal.href, &href).map_err(|error| CalendarReportError {
+                                status,
+                                detail: error.to_string(),
+                                retryable: false,
+                            })?;
+                        event.etag = etag.clone();
+                        events.push(event);
+                    }
+                }
             }
         }
         Ok(events)
@@ -306,7 +309,16 @@ impl App {
         }
         let mut unique = std::collections::BTreeMap::new();
         for event in events {
-            unique.insert(format!("{}\u{1f}{}", event.calendar_id, event.href), event);
+            unique.insert(
+                format!(
+                    "{}\u{1f}{}\u{1f}{}\u{1f}{}",
+                    event.calendar_id,
+                    event.href,
+                    event.id,
+                    event.recurrence_id.as_deref().unwrap_or(&event.start)
+                ),
+                event,
+            );
         }
         Ok(unique.into_values().collect())
     }
@@ -329,7 +341,8 @@ impl App {
             Err(error) => return Err(error),
         };
         let chosen: Vec<Calendar> = calendars
-            .into_iter()
+            .iter()
+            .cloned()
             .filter(|c| a.selected_calendars.contains(&c.id))
             .collect();
         let (start, end) = sync_range();
@@ -363,13 +376,13 @@ impl App {
                 }
             }
         }
-        write(&self.dir.join("calendars.json"), &chosen)?;
+        write(&self.dir.join("calendars.json"), &calendars)?;
         write(&self.dir.join("events.json"), &events)?;
         Ok(
-            json!({"calendars":chosen,"events":events,"warnings":warnings,"syncedAt":Utc::now().to_rfc3339()}),
+            json!({"calendars":calendars,"events":events,"warnings":warnings,"syncedAt":Utc::now().to_rfc3339()}),
         )
     }
-    fn event_save(&self, e: Event, overwrite: bool) -> Result<Event> {
+    fn event_save(&self, mut e: Event, overwrite: bool) -> Result<Event> {
         if e.recurring {
             bail!("重复事件请在 Apple 日历中编辑")
         }
@@ -381,7 +394,11 @@ impl App {
         if cal.read_only {
             bail!("此日历只读")
         }
+        validate_event(&e)?;
         let new = e.href.is_empty();
+        if new && e.id.is_empty() {
+            e.id = Uuid::new_v4().to_string();
+        }
         let href = if new {
             format!(
                 "{}{}.ics",
@@ -391,6 +408,34 @@ impl App {
         } else {
             e.href.clone()
         };
+        validate_resource(cal, &href)?;
+        let body = if new {
+            to_ics(&e)
+        } else {
+            let response = self
+                .http
+                .get(&href)
+                .basic_auth(self.account()?.username, Some(self.pass()?))
+                .send()?;
+            if !response.status().is_success() {
+                bail!("无法读取原始日程，未保存任何修改")
+            }
+            let current_etag = response
+                .headers()
+                .get("etag")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("")
+                .trim_matches('"')
+                .to_string();
+            if current_etag.is_empty() {
+                bail!("服务器缺少版本标识，无法安全编辑")
+            }
+            if !overwrite && e.etag != current_etag {
+                bail!("conflict: 事件已在其他设备修改，请读取服务器版本后重试")
+            }
+            e.etag = current_etag;
+            patch_ics(&response.text()?, &e)?
+        };
         let mut r = self
             .http
             .put(&href)
@@ -398,10 +443,10 @@ impl App {
             .header("Content-Type", "text/calendar; charset=utf-8");
         if new {
             r = r.header("If-None-Match", "*")
-        } else if !overwrite {
+        } else {
             r = r.header("If-Match", format!("\"{}\"", e.etag))
         }
-        let z = r.body(to_ics(&e)).send()?;
+        let z = r.body(body).send()?;
         if z.status().as_u16() == 412 {
             bail!("事件已在其他设备修改，请刷新后重试或选择覆盖")
         }
@@ -422,6 +467,18 @@ impl App {
     fn event_delete(&self, e: &Event, overwrite: bool) -> Result<()> {
         if e.recurring {
             bail!("重复事件请在 Apple 日历中删除")
+        }
+        let calendars: Vec<Calendar> = read(&self.dir.join("calendars.json"))?;
+        let calendar = calendars
+            .iter()
+            .find(|c| c.id == e.calendar_id)
+            .context("日历不存在")?;
+        if calendar.read_only {
+            bail!("此日历只读")
+        }
+        validate_resource(calendar, &e.href)?;
+        if e.etag.is_empty() {
+            bail!("缺少事件版本，请先同步")
         }
         let mut r = self
             .http
@@ -499,10 +556,129 @@ fn parse_event(s: &str) -> Option<Event> {
         end_timezone: timezone("DTEND"),
         location: field("LOCATION").unwrap_or_default(),
         notes: field("DESCRIPTION").unwrap_or_default(),
+        recurrence_id: field("RECURRENCE-ID"),
         recurring: s
             .lines()
             .any(|l| l.starts_with("RRULE:") || l.starts_with("RECURRENCE-ID")),
     })
+}
+fn validate_url(raw: &str) -> Result<()> {
+    let url = reqwest::Url::parse(raw)?;
+    let host = url.host_str().unwrap_or("");
+    if url.scheme() != "https"
+        || !(host == "icloud.com" || host.ends_with(".icloud.com"))
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        bail!("仅支持 iCloud HTTPS 日历地址")
+    }
+    Ok(())
+}
+fn validate_resource(calendar: &Calendar, raw: &str) -> Result<()> {
+    validate_url(raw)?;
+    let base = reqwest::Url::parse(&calendar.href)?;
+    let url = reqwest::Url::parse(raw)?;
+    if base.origin() != url.origin()
+        || !url
+            .path()
+            .starts_with(&(base.path().trim_end_matches('/').to_string() + "/"))
+    {
+        bail!("事件不属于所选日历")
+    }
+    Ok(())
+}
+fn validate_event(e: &Event) -> Result<()> {
+    if e.title.trim().is_empty() {
+        bail!("标题不能为空")
+    }
+    for zone in [&e.start_timezone, &e.end_timezone].into_iter().flatten() {
+        if !valid_timezone(zone) {
+            bail!("无效时区")
+        }
+    }
+    let format = if e.all_day {
+        "%Y%m%d"
+    } else if e.start.ends_with('Z') {
+        "%Y%m%dT%H%M%SZ"
+    } else {
+        "%Y%m%dT%H%M%S"
+    };
+    if e.all_day {
+        let start = chrono::NaiveDate::parse_from_str(&e.start, format)?;
+        let end = chrono::NaiveDate::parse_from_str(&e.end, format)?;
+        if end <= start {
+            bail!("结束日期必须晚于开始日期")
+        }
+    } else {
+        let start = chrono::NaiveDateTime::parse_from_str(&e.start, format)?;
+        let end = chrono::NaiveDateTime::parse_from_str(&e.end, format)?;
+        if e.start_timezone != e.end_timezone {
+            bail!("起止时区须一致，请在 Apple 日历中编辑跨时区日程")
+        }
+        if end <= start {
+            bail!("结束时间必须晚于开始时间")
+        }
+    }
+    if e.id.contains(['\r', '\n']) {
+        bail!("无效事件标识")
+    }
+    Ok(())
+}
+fn patch_ics(original: &str, event: &Event) -> Result<String> {
+    let original = unfold(original);
+    if original.lines().filter(|l| *l == "BEGIN:VEVENT").count() != 1
+        || original.lines().any(|l| {
+            l.starts_with("ATTENDEE")
+                || l.starts_with("ORGANIZER")
+                || l.starts_with("RRULE")
+                || l.starts_with("RECURRENCE-ID")
+        })
+    {
+        bail!("重复日程或邀请请在 Apple 日历中编辑")
+    }
+    if parse_event(&original).is_none_or(|e| e.id != event.id) {
+        bail!("事件标识不一致，未保存修改")
+    }
+    let generated = to_ics(event);
+    let fields = [
+        "DTSTART",
+        "DTEND",
+        "DURATION",
+        "SUMMARY",
+        "LOCATION",
+        "DESCRIPTION",
+        "DTSTAMP",
+    ];
+    let replacements: Vec<_> = generated
+        .lines()
+        .filter(|line| fields.contains(&line.split([';', ':']).next().unwrap_or("")))
+        .collect();
+    let mut output = Vec::new();
+    let mut depth = 0;
+    for line in original.lines() {
+        if line == "BEGIN:VEVENT" {
+            depth = 1;
+            output.push(line);
+            continue;
+        }
+        if depth > 0 && line.starts_with("BEGIN:") {
+            depth += 1;
+        }
+        if depth == 1 && line == "END:VEVENT" {
+            output.extend(replacements.iter().copied());
+            depth = 0;
+            output.push(line);
+            continue;
+        }
+        if depth == 1 && fields.contains(&line.split([';', ':']).next().unwrap_or("")) {
+            continue;
+        }
+        output.push(line);
+        if depth > 1 && line.starts_with("END:") {
+            depth -= 1;
+        }
+    }
+    Ok(output.join("\r\n") + "\r\n")
 }
 fn to_ics(e: &Event) -> String {
     let dt = Utc::now().format("%Y%m%dT%H%M%SZ");
@@ -608,7 +784,7 @@ fn read<T: for<'a> Deserialize<'a>>(p: &std::path::Path) -> Result<T> {
     Ok(serde_json::from_slice(&fs::read(p)?)?)
 }
 fn write<T: Serialize>(p: &std::path::Path, v: &T) -> Result<()> {
-    fs::write(p, serde_json::to_vec_pretty(v)?)?;
+    digiworld_plugin_runtime::atomic_write(p, &serde_json::to_vec_pretty(v)?)?;
     Ok(())
 }
 fn main() -> Result<()> {
@@ -620,44 +796,61 @@ fn main() -> Result<()> {
     fs::create_dir_all(&dir)?;
     let a = App {
         dir,
+        candidate: None,
         http: Client::builder()
             .timeout(StdDuration::from_secs(15))
             .user_agent("Digiworld-Calendar/0.1")
             .build()?,
     };
-    for l in std::io::stdin().lock().lines() {
-        let r: Req = serde_json::from_str(&l?)?;
-        let stop = r.method == "shutdown";
-        let z = handle(&a, &r.method, r.params);
-        let o = match z {
-            Ok(v) => json!({"jsonrpc":"2.0","id":r.id,"result":v}),
-            Err(e) => {
-                json!({"jsonrpc":"2.0","id":r.id,"error":{"code":-32000,"message":e.to_string()}})
-            }
-        };
-        serde_json::to_writer(std::io::stdout(), &o)?;
-        std::io::stdout().write_all(b"\n")?;
-        std::io::stdout().flush()?;
-        if stop {
-            break;
-        }
-    }
-    Ok(())
+    digiworld_plugin_runtime::serve(
+        a,
+        handle,
+        &[
+            "calendar.sync",
+            "calendar.account.save",
+            "calendar.event.save",
+            "calendar.event.delete",
+            "calendar.discover",
+        ],
+    )
 }
+
 fn handle(a: &App, m: &str, p: Value) -> Result<Value> {
     match m {
         "health" => Ok(json!({"status":"ok","protocolVersion":1})),
         "shutdown" => Ok(json!({"stopped":true})),
-        "calendar.account.get" => Ok(serde_json::to_value(a.account().ok())?),
+        "calendar.account.get" => {
+            if a.dir.join("account.json").exists() {
+                Ok(serde_json::to_value(a.account()?)?)
+            } else {
+                Ok(Value::Null)
+            }
+        }
         "calendar.account.save" => {
             let mut x: Account = serde_json::from_value(p["account"].clone())?;
             if x.server_url.is_empty() {
                 x.server_url = base()
             }
             let secret = p["secret"].as_str().context("缺少 App 专用密码")?;
-            write(&a.dir.join("account.json"), &x)?;
-            keyring::Entry::new(SERVICE, "icloud-app-password")?.set_password(secret)?;
-            Ok(serde_json::to_value(a.discover()?)?)
+            validate_url(&x.server_url)?;
+            let candidate = App {
+                dir: a.dir.clone(),
+                http: a.http.clone(),
+                candidate: Some((x.clone(), secret.to_string())),
+            };
+            let calendars = candidate.discover()?;
+            let entry = keyring::Entry::new(SERVICE, "icloud-app-password")?;
+            let old = entry.get_password().ok();
+            entry.set_password(secret)?;
+            if let Err(error) = write(&a.dir.join("account.json"), &x) {
+                if let Some(old) = old {
+                    entry.set_password(&old)?;
+                } else {
+                    let _ = entry.delete_credential();
+                }
+                return Err(error);
+            }
+            Ok(serde_json::to_value(calendars)?)
         }
         "calendar.discover" => Ok(serde_json::to_value(a.discover()?)?),
         "calendar.selection.save" => {

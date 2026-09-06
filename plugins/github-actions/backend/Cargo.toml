@@ -1,11 +1,12 @@
 [package]
 name = "digiworld-github-actions"
-version = "0.1.1"
+version = "0.1.2"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
 [dependencies]
+digiworld-plugin-runtime = { path = "../../../packages/plugin-runtime" }
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true

@@ -51,18 +51,24 @@ impl Database {
         Ok(Self { connection })
     }
 
+    #[cfg(test)]
     pub fn add_counts(&mut self, counts: &BTreeMap<String, u64>) -> Result<()> {
-        if counts.is_empty() {
-            return Ok(());
-        }
-        let day = Local::now().date_naive().format("%Y-%m-%d").to_string();
+        self.add_dated_counts(
+            &counts
+                .iter()
+                .map(|(key, count)| {
+                    (
+                        (Local::now().format("%Y-%m-%d").to_string(), key.clone()),
+                        *count,
+                    )
+                })
+                .collect(),
+        )
+    }
+    pub fn add_dated_counts(&mut self, counts: &BTreeMap<(String, String), u64>) -> Result<()> {
         let transaction = self.connection.transaction()?;
-        for (key, count) in counts {
-            transaction.execute(
-                "INSERT INTO daily_key_counts(day, key_id, count) VALUES(?1, ?2, ?3)
-                 ON CONFLICT(day, key_id) DO UPDATE SET count = count + excluded.count",
-                params![day, key, count],
-            )?;
+        for ((day, key), count) in counts {
+            transaction.execute("INSERT INTO daily_key_counts(day,key_id,count) VALUES(?1,?2,?3) ON CONFLICT(day,key_id) DO UPDATE SET count=count+excluded.count", params![day,key,count])?;
         }
         transaction.commit()?;
         Ok(())
@@ -117,22 +123,35 @@ impl Database {
     }
 
     pub fn snapshot(&self, scope: &str) -> Result<Snapshot> {
-        let (query, day) = match scope {
-            "today" => (
-                "SELECT key_id, SUM(count) FROM daily_key_counts WHERE day = ?1 GROUP BY key_id",
-                Some(Local::now().date_naive().format("%Y-%m-%d").to_string()),
+        let today = Local::now().date_naive();
+        let (start, end) = match scope {
+            "today" => (Some(today.to_string()), today.to_string()),
+            "7" => (
+                Some((today - chrono::Duration::days(6)).to_string()),
+                today.to_string(),
             ),
-            "all" => (
-                "SELECT key_id, SUM(count) FROM daily_key_counts WHERE ?1 IS NULL GROUP BY key_id",
-                None,
+            "30" => (
+                Some((today - chrono::Duration::days(29)).to_string()),
+                today.to_string(),
             ),
+            "all" => (None, today.to_string()),
+            value if value.contains(':') => {
+                let (a, b) = value.split_once(':').unwrap();
+                let start = chrono::NaiveDate::parse_from_str(a, "%Y-%m-%d")?;
+                let end = chrono::NaiveDate::parse_from_str(b, "%Y-%m-%d")?;
+                if start > end {
+                    bail!("开始日期不能晚于结束日期")
+                }
+                (Some(start.to_string()), end.to_string())
+            }
             _ => bail!("unsupported scope: {scope}"),
         };
-        let mut statement = self.connection.prepare(query)?;
-        let rows = statement.query_map([day], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, u64>(1)?))
-        })?;
-        let counts: BTreeMap<_, _> = rows.collect::<std::result::Result<_, _>>()?;
+        let mut statement = self.connection.prepare("SELECT key_id,SUM(count) FROM daily_key_counts WHERE (?1 IS NULL OR day>=?1) AND day<=?2 GROUP BY key_id")?;
+        let counts = statement
+            .query_map(params![start, end], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, u64>(1)?))
+            })?
+            .collect::<std::result::Result<BTreeMap<_, _>, _>>()?;
         let total = counts.values().sum();
         let mut ranking: Vec<_> = counts
             .iter()

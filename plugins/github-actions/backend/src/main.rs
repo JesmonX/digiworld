@@ -2,28 +2,18 @@ use anyhow::{Context, Result, bail};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{
-    fs,
-    io::{BufRead, Write},
-    path::PathBuf,
-    time::Duration,
-};
+use std::{fs, path::PathBuf, time::Duration};
 
 const SERVICE: &str = "io.github.jesmonx.digiworld.github-actions";
 
-#[derive(Deserialize)]
-struct Request {
-    id: Value,
-    method: String,
-    #[serde(default)]
-    params: Value,
-}
 #[derive(Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Settings {
     repositories: Vec<String>,
     #[serde(default = "default_poll")]
     poll_seconds: u64,
+    #[serde(default)]
+    all_actors: bool,
 }
 fn default_poll() -> u64 {
     30
@@ -32,9 +22,13 @@ fn default_poll() -> u64 {
 struct App {
     dir: PathBuf,
     client: Client,
+    token_override: Option<String>,
 }
 impl App {
     fn token(&self) -> Result<String> {
+        if let Some(token) = &self.token_override {
+            return Ok(token.clone());
+        }
         keyring::Entry::new(SERVICE, "github-token")?
             .get_password()
             .context("尚未保存 GitHub Token")
@@ -45,6 +39,7 @@ impl App {
             return Ok(Settings {
                 repositories: vec![],
                 poll_seconds: 30,
+                all_actors: false,
             });
         }
         Ok(serde_json::from_slice(&fs::read(p)?)?)
@@ -56,9 +51,9 @@ impl App {
         for r in &s.repositories {
             valid_repo(r)?;
         }
-        fs::write(
-            self.dir.join("settings.json"),
-            serde_json::to_vec_pretty(s)?,
+        digiworld_plugin_runtime::atomic_write(
+            &self.dir.join("settings.json"),
+            &serde_json::to_vec_pretty(s)?,
         )?;
         Ok(())
     }
@@ -97,20 +92,32 @@ impl App {
             json!({"login":u["login"],"avatarUrl":u["avatar_url"],"rateLimitRemaining":data["remaining"]}),
         )
     }
-    fn repositories(&self) -> Result<Value> {
-        let data=self.get("/user/repos?affiliation=owner,collaborator,organization_member&sort=updated&per_page=100")?;
+    fn repositories(&self, page: u64) -> Result<Value> {
+        let data=self.get(&format!("/user/repos?affiliation=owner,collaborator,organization_member&sort=updated&per_page=100&page={}",page.clamp(1,1000)))?;
         let items=data["value"].as_array().cloned().unwrap_or_default().into_iter().map(|r|json!({"fullName":r["full_name"],"private":r["private"],"updatedAt":r["updated_at"]})).collect::<Vec<_>>();
-        Ok(json!({"items":items,"rateLimitRemaining":data["remaining"]}))
+        Ok(
+            json!({"nextPage":if items.len()==100 {Some(page+1)} else {None},"items":items,"rateLimitRemaining":data["remaining"]}),
+        )
     }
     fn runs(&self) -> Result<Value> {
         let login = self.identity()?["login"].as_str().unwrap_or("").to_string();
         let settings = self.settings()?;
         let mut runs = Vec::new();
+        let mut warnings = Vec::new();
         for repo in settings.repositories {
             valid_repo(&repo)?;
-            let data = self.get(&format!(
-                "/repos/{repo}/actions/runs?actor={login}&per_page=30"
-            ))?;
+            let actor = if settings.all_actors {
+                String::new()
+            } else {
+                format!("&actor={login}")
+            };
+            let data = match self.get(&format!("/repos/{repo}/actions/runs?per_page=30{actor}")) {
+                Ok(data) => data,
+                Err(error) => {
+                    warnings.push(json!({"repository":repo,"message":error.to_string()}));
+                    continue;
+                }
+            };
             for run in data["value"]["workflow_runs"]
                 .as_array()
                 .cloned()
@@ -118,7 +125,7 @@ impl App {
             {
                 let actor = run["actor"]["login"].as_str().unwrap_or("");
                 let triggering = run["triggering_actor"]["login"].as_str().unwrap_or(actor);
-                if actor != login && triggering != login {
+                if !settings.all_actors && actor != login && triggering != login {
                     continue;
                 }
                 let id = run["id"].as_u64().unwrap_or(0);
@@ -127,13 +134,41 @@ impl App {
                 } else {
                     self.get(&format!(
                         "/repos/{repo}/actions/runs/{id}/jobs?per_page=100"
-                    ))?
+                    ))
+                    .unwrap_or_else(|error| {
+                        warnings.push(json!({"repository":repo,"message":error.to_string()}));
+                        json!({"value":{"jobs":[]}})
+                    })
                 };
                 runs.push(json!({"id":id,"repository":repo,"name":run["name"],"title":run["display_title"],"branch":run["head_branch"],"sha":run["head_sha"],"status":run["status"],"conclusion":run["conclusion"],"event":run["event"],"attempt":run["run_attempt"],"createdAt":run["created_at"],"startedAt":run["run_started_at"],"updatedAt":run["updated_at"],"url":run["html_url"],"jobs":jobs["value"]["jobs"]}));
             }
         }
         runs.sort_by(|a, b| b["createdAt"].as_str().cmp(&a["createdAt"].as_str()));
-        Ok(json!({"login":login,"updatedAt":chrono_like_now(),"runs":runs}))
+        let cached: Value = std::fs::read(self.dir.join("runs.json"))
+            .ok()
+            .and_then(|v| serde_json::from_slice(&v).ok())
+            .unwrap_or(Value::Null);
+        for warning in &warnings {
+            if let Some(old) = cached["runs"].as_array() {
+                for run in old
+                    .iter()
+                    .filter(|r| r["repository"] == warning["repository"])
+                {
+                    if !runs.iter().any(|r| r["id"] == run["id"]) {
+                        let mut stale = run.clone();
+                        stale["stale"] = json!(true);
+                        runs.push(stale);
+                    }
+                }
+            }
+        }
+        let result =
+            json!({"login":login,"updatedAt":chrono_like_now(),"runs":runs,"warnings":warnings});
+        digiworld_plugin_runtime::atomic_write(
+            &self.dir.join("runs.json"),
+            &serde_json::to_vec(&result)?,
+        )?;
+        Ok(result)
     }
 }
 fn valid_repo(v: &str) -> Result<()> {
@@ -165,51 +200,85 @@ fn main() -> Result<()> {
     fs::create_dir_all(&dir)?;
     let app = App {
         dir,
+        token_override: None,
         client: Client::builder()
             .timeout(Duration::from_secs(12))
             .user_agent("Digiworld-Git-Actions/0.1")
             .build()?,
     };
-    for line in std::io::stdin().lock().lines() {
-        let req: Request = serde_json::from_str(&line?)?;
-        let stop = req.method == "shutdown";
-        let result = handle(&app, &req.method, req.params);
-        let out = match result {
-            Ok(v) => json!({"jsonrpc":"2.0","id":req.id,"result":v}),
-            Err(e) => {
-                json!({"jsonrpc":"2.0","id":req.id,"error":{"code":-32000,"message":e.to_string()}})
-            }
-        };
-        serde_json::to_writer(std::io::stdout(), &out)?;
-        std::io::stdout().write_all(b"\n")?;
-        std::io::stdout().flush()?;
-        if stop {
-            break;
-        }
-    }
-    Ok(())
+    digiworld_plugin_runtime::serve(
+        app,
+        handle,
+        &[
+            "git.auth.status",
+            "git.auth.save",
+            "git.repositories.list",
+            "git.runs.snapshot",
+            "git.jobs.get",
+        ],
+    )
 }
+
 fn handle(a: &App, m: &str, p: Value) -> Result<Value> {
     match m {
         "health" => Ok(json!({"status":"ok","protocolVersion":1})),
         "shutdown" => Ok(json!({"stopped":true})),
-        "git.auth.status" => Ok(match a.identity() {
-            Ok(v) => json!({"connected":true,"account":v}),
-            Err(_) => json!({"connected":false}),
-        }),
+        "git.auth.status" => {
+            if a.token().is_err() {
+                return Ok(json!({"connected":false,"state":"unconfigured"}));
+            }
+            Ok(match a.identity() {
+                Ok(v) => json!({"connected":true,"state":"ready","account":v}),
+                Err(error) => {
+                    json!({"connected":true,"state":"unavailable","error":error.to_string(),"account":std::fs::read(a.dir.join("account.json")).ok().and_then(|b| serde_json::from_slice::<Value>(&b).ok())})
+                }
+            })
+        }
         "git.auth.save" => {
             let t = p["token"].as_str().context("缺少 Token")?.trim();
             if t.len() < 20 {
                 bail!("Token 无效")
             }
-            keyring::Entry::new(SERVICE, "github-token")?.set_password(t)?;
-            Ok(a.identity()?)
+            let candidate = App {
+                dir: a.dir.clone(),
+                client: a.client.clone(),
+                token_override: Some(t.into()),
+            };
+            let identity = candidate.identity()?;
+            let entry = keyring::Entry::new(SERVICE, "github-token")?;
+            let old = entry.get_password().ok();
+            entry.set_password(t)?;
+            if let Err(error) = digiworld_plugin_runtime::atomic_write(
+                &a.dir.join("account.json"),
+                &serde_json::to_vec(&identity)?,
+            ) {
+                if let Some(old) = old {
+                    entry.set_password(&old)?;
+                } else {
+                    let _ = entry.delete_credential();
+                }
+                return Err(error);
+            }
+            Ok(identity)
         }
         "git.auth.remove" => {
             let _ = keyring::Entry::new(SERVICE, "github-token")?.delete_credential();
             Ok(json!({"removed":true}))
         }
-        "git.repositories.list" => a.repositories(),
+        "git.repositories.list" => a.repositories(p["page"].as_u64().unwrap_or(1)),
+        "git.runs.cached" => Ok(std::fs::read(a.dir.join("runs.json"))
+            .ok()
+            .and_then(|v| serde_json::from_slice::<Value>(&v).ok())
+            .unwrap_or(json!({"runs":[]}))),
+        "git.jobs.get" => {
+            let repo = p["repository"].as_str().context("缺少仓库")?;
+            valid_repo(repo)?;
+            let id = p["id"].as_u64().context("缺少运行 ID")?;
+            Ok(a.get(&format!(
+                "/repos/{repo}/actions/runs/{id}/jobs?per_page=100"
+            ))?["value"]
+                .clone())
+        }
         "git.settings.get" => Ok(serde_json::to_value(a.settings()?)?),
         "git.settings.save" => {
             let s: Settings = serde_json::from_value(p.get("settings").cloned().unwrap_or(p))?;

@@ -1,19 +1,7 @@
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{
-    fs,
-    io::{BufRead, Write},
-    path::PathBuf,
-    process::{Command, Stdio},
-};
-#[derive(Deserialize)]
-struct Req {
-    id: Value,
-    method: String,
-    #[serde(default)]
-    params: Value,
-}
+use std::{fs, path::PathBuf, process::Command};
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 enum GpuMemoryDisplay {
@@ -53,9 +41,22 @@ struct Device {
     #[serde(default = "default_gpu_memory_display")]
     gpu_memory_display: GpuMemoryDisplay,
 }
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct Settings {
     devices: Vec<Device>,
+    #[serde(default = "default_layout")]
+    layout: String,
+}
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            devices: vec![],
+            layout: default_layout(),
+        }
+    }
+}
+fn default_layout() -> String {
+    "auto".into()
 }
 fn yes() -> bool {
     true
@@ -124,12 +125,15 @@ impl App {
         Ok(serde_json::from_slice(&fs::read(p)?)?)
     }
     fn save(&self, s: &Settings) -> Result<()> {
+        if !["auto", "compact", "double", "single"].contains(&s.layout.as_str()) {
+            bail!("无效排布方式")
+        }
         for d in &s.devices {
             valid(d)?
         }
-        fs::write(
-            self.dir.join("settings.json"),
-            serde_json::to_vec_pretty(s)?,
+        digiworld_plugin_runtime::atomic_write(
+            &self.dir.join("settings.json"),
+            &serde_json::to_vec_pretty(s)?,
         )?;
         Ok(())
     }
@@ -205,8 +209,8 @@ fn ssh(h: &str, script: &str) -> Result<Value> {
         .map(|b| format!("{b:02x}"))
         .collect::<String>();
     let remote = format!("python3 -c 'exec(bytes.fromhex(\"{hex}\").decode())'");
-    let out = Command::new(if cfg!(windows) { "ssh.exe" } else { "ssh" })
-        .args([
+    let out = digiworld_plugin_runtime::command_output(
+        Command::new(if cfg!(windows) { "ssh.exe" } else { "ssh" }).args([
             "-T",
             "-o",
             "BatchMode=yes",
@@ -216,10 +220,10 @@ fn ssh(h: &str, script: &str) -> Result<Value> {
             "ConnectTimeout=10",
             h,
             &remote,
-        ])
-        .stdin(Stdio::null())
-        .output()
-        .context("无法启动系统 OpenSSH")?;
+        ]),
+        35,
+    )
+    .context("无法完成系统 OpenSSH 采样")?;
     if !out.status.success() {
         bail!(
             "SSH 采集失败：{}",
@@ -251,6 +255,16 @@ fn setup(h: &str, install: bool) -> Result<Value> {
     };
     if install && kind != "unsupported" && kind != "ready" {
         if let Err(error) = run(h, command) {
+            if run(
+                h,
+                "vnstat --version && (systemctl is-active vnstat || systemctl is-active vnstatd)",
+            )
+            .is_ok()
+            {
+                return Ok(
+                    json!({"status":"ready","verification":"已重新检测远端：vnStat 正常运行","command":command}),
+                );
+            }
             return Ok(json!({
                 "status": "install_failed",
                 "manager": kind,
@@ -280,8 +294,8 @@ fn setup(h: &str, install: bool) -> Result<Value> {
     )
 }
 fn run(h: &str, c: &str) -> Result<String> {
-    let o = Command::new(if cfg!(windows) { "ssh.exe" } else { "ssh" })
-        .args([
+    let o = digiworld_plugin_runtime::command_output(
+        Command::new(if cfg!(windows) { "ssh.exe" } else { "ssh" }).args([
             "-T",
             "-o",
             "BatchMode=yes",
@@ -291,8 +305,9 @@ fn run(h: &str, c: &str) -> Result<String> {
             "ConnectTimeout=10",
             h,
             c,
-        ])
-        .output()?;
+        ]),
+        120,
+    )?;
     if !o.status.success() {
         bail!(
             "远端命令失败：{}",
@@ -312,29 +327,19 @@ fn main() -> Result<()> {
     let dir = data_dir()?;
     fs::create_dir_all(&dir)?;
     let a = App { dir };
-    for l in std::io::stdin().lock().lines() {
-        let r: Req = serde_json::from_str(&l?)?;
-        let stop = r.method == "shutdown";
-        let z = handle(&a, &r.method, r.params);
-        let o = match z {
-            Ok(v) => json!({"jsonrpc":"2.0","id":r.id,"result":v}),
-            Err(e) => {
-                json!({"jsonrpc":"2.0","id":r.id,"error":{"code":-32000,"message":e.to_string()}})
-            }
-        };
-        serde_json::to_writer(std::io::stdout(), &o)?;
-        std::io::stdout().write_all(b"\n")?;
-        std::io::stdout().flush()?;
-        if stop {
-            break;
-        }
-    }
-    Ok(())
+    digiworld_plugin_runtime::serve(a, handle, &["servers.sample", "servers.vnstat.setup"])
 }
+
 fn handle(a: &App, m: &str, p: Value) -> Result<Value> {
     match m {
         "health" => Ok(json!({"status":"ok","protocolVersion":1})),
         "shutdown" => Ok(json!({"stopped":true})),
+        "servers.layout.save" => {
+            let mut s = a.settings()?;
+            s.layout = p["layout"].as_str().context("缺少排布方式")?.into();
+            a.save(&s)?;
+            Ok(json!({"layout": s.layout}))
+        }
         "servers.settings.get" => Ok(serde_json::to_value(a.settings()?)?),
         "servers.settings.save" => {
             let s: Settings = serde_json::from_value(p.get("settings").cloned().unwrap_or(p))?;

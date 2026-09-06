@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 use tauri_plugin_notification::NotificationExt;
 use tokio::sync::{Mutex, RwLock};
 
@@ -30,6 +30,7 @@ pub struct PluginManager {
     processes: Mutex<HashMap<String, Arc<Mutex<PluginProcess>>>>,
     catalog_cache: Mutex<Option<CatalogIndex>>,
     app: AppHandle,
+    restarts: Mutex<HashMap<String, (std::time::Instant, u32)>>,
 }
 
 impl PluginManager {
@@ -45,7 +46,7 @@ impl PluginManager {
             .and_then(|value| serde_json::from_str(&value).ok())
             .and_then(|value| network::normalized(value).ok())
             .unwrap_or_default();
-        Ok(Arc::new(Self {
+        let manager = Arc::new(Self {
             plugins_dir,
             data_dir,
             store,
@@ -54,7 +55,45 @@ impl PluginManager {
             processes: Mutex::new(HashMap::new()),
             catalog_cache: Mutex::new(None),
             app,
-        }))
+            restarts: Mutex::new(HashMap::new()),
+        });
+        let weak = Arc::downgrade(&manager);
+        tauri::async_runtime::spawn(async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                let Some(manager) = weak.upgrade() else { break };
+                let processes: Vec<_> = manager
+                    .processes
+                    .lock()
+                    .await
+                    .iter()
+                    .map(|(id, p)| (id.clone(), p.clone()))
+                    .collect();
+                for (id, process) in processes {
+                    let exited = process.try_lock().is_ok_and(|mut p| p.exited());
+                    if exited {
+                        let removed = {
+                            let mut map = manager.processes.lock().await;
+                            if map.get(&id).is_some_and(|p| Arc::ptr_eq(p, &process)) {
+                                map.remove(&id);
+                                true
+                            } else {
+                                false
+                            }
+                        };
+                        if removed {
+                            let _ = manager.store.set_state(
+                                &id,
+                                "failed",
+                                Some("插件进程已退出，请重新启动"),
+                            );
+                            let _ = manager.app.emit("plugin-state-changed", &id);
+                        }
+                    }
+                }
+            }
+        });
+        Ok(manager)
     }
 
     pub fn store(&self) -> &Store {
@@ -422,6 +461,7 @@ impl PluginManager {
             DigiworldError::Plugin(format!("plugin is not installed: {plugin_id}"))
         })?;
         if enabled {
+            self.restarts.lock().await.remove(plugin_id);
             self.store.set_enabled(plugin_id, true)?;
             if let Err(error) = self.start(&manifest).await {
                 self.store
@@ -432,6 +472,7 @@ impl PluginManager {
             self.stop(plugin_id).await;
             self.store.set_enabled(plugin_id, false)?;
         }
+        let _ = self.app.emit("plugin-state-changed", plugin_id);
         self.summary(plugin_id)
     }
 
@@ -468,6 +509,30 @@ impl PluginManager {
     pub async fn request(&self, plugin_id: &str, method: &str, payload: Value) -> Result<Value> {
         validate_plugin_id(plugin_id)?;
         validate_method(method)?;
+        if method == "host.openExternal" {
+            use tauri_plugin_opener::OpenerExt;
+            let raw = payload.get("url").and_then(Value::as_str).unwrap_or("");
+            let url =
+                url::Url::parse(raw).map_err(|_| DigiworldError::Plugin("无效外链".into()))?;
+            if url.scheme() != "https"
+                || url.host_str() != Some("github.com")
+                || !url.username().is_empty()
+                || url.password().is_some()
+            {
+                return Err(DigiworldError::Plugin(
+                    "仅允许打开 GitHub HTTPS 链接".into(),
+                ));
+            }
+            if self.store.manifest(plugin_id)?.is_none() {
+                return Err(DigiworldError::Plugin("plugin is not installed".into()));
+            }
+            self.app
+                .opener()
+                .open_url(raw, None::<&str>)
+                .map_err(|e| DigiworldError::Plugin(e.to_string()))?;
+            return Ok(serde_json::json!({"opened":true}));
+        }
+
         let process = self
             .processes
             .lock()
@@ -481,6 +546,20 @@ impl PluginManager {
             (result, process.needs_restart())
         };
         if needs_restart {
+            self.store
+                .set_state(plugin_id, "failed", Some("插件请求中断，正在恢复"))?;
+            let _ = self.app.emit("plugin-state-changed", plugin_id);
+            let allow_restart = {
+                let mut counts = self.restarts.lock().await;
+                let record = counts
+                    .entry(plugin_id.into())
+                    .or_insert((std::time::Instant::now(), 0));
+                if record.0.elapsed().as_secs() > 300 {
+                    *record = (std::time::Instant::now(), 0);
+                }
+                record.1 += 1;
+                record.1 <= 3
+            };
             let removed = {
                 let mut processes = self.processes.lock().await;
                 let should_remove = processes
@@ -492,6 +571,7 @@ impl PluginManager {
                 should_remove
             };
             if removed
+                && allow_restart
                 && let Some(manifest) = self.store.manifest(plugin_id)?
                 && let Err(error) = self.start(&manifest).await
             {
@@ -593,6 +673,7 @@ impl PluginManager {
             .await
             .insert(manifest.id.clone(), Arc::new(Mutex::new(process)));
         self.store.set_state(&manifest.id, "running", None)?;
+        let _ = self.app.emit("plugin-state-changed", &manifest.id);
         Ok(())
     }
 

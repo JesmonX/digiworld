@@ -60,6 +60,7 @@ export interface UpdateProgress {
 }
 
 export const api = {
+  onPluginStateChanged: (handler: () => void): Promise<UnlistenFn> => listen('plugin-state-changed', handler),
   appState: () => invoke<AppState>('get_app_state'),
   catalog: (refresh = false) => invoke<CatalogIndex>('get_catalog', { refresh }),
   install: (pluginId: string, version: string) =>

@@ -2,7 +2,7 @@ export type DateKey = string // YYYY-MM-DD
 
 export function dateKey(value: string | Date): DateKey {
   if (typeof value === 'string') {
-    if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value.slice(0, 10)
     if (/^\d{8}/.test(value)) {
       if (/^\d{8}T\d{6}Z$/.test(value)) {
         const utc = new Date(Date.UTC(Number(value.slice(0, 4)), Number(value.slice(4, 6)) - 1, Number(value.slice(6, 8)), Number(value.slice(9, 11)), Number(value.slice(11, 13)), Number(value.slice(13, 15))))
@@ -112,4 +112,35 @@ export function monthDays(year: number, month: number): MonthDayCell[] {
   }
 
   return cells
+}
+
+/** Floating times stay local; TZID wall times are converted before day grouping. */
+export function eventInstant(value: string, timezone?: string | null): Date | null {
+  if (!/^\d{8}T\d{6}Z?$/.test(value)) { const d = new Date(value); return Number.isNaN(+d) ? null : d }
+  const fields = [Number(value.slice(0,4)), Number(value.slice(4,6))-1, Number(value.slice(6,8)), Number(value.slice(9,11)), Number(value.slice(11,13)), Number(value.slice(13,15))] as const
+  if (value.endsWith('Z')) return new Date(Date.UTC(...fields))
+  if (!timezone) return new Date(...fields)
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
+    const wall = Date.UTC(...fields)
+    let instant = wall
+    for (let i=0; i<3; i++) {
+      const p = Object.fromEntries(formatter.formatToParts(new Date(instant)).map(p => [p.type, p.value]))
+      const rendered = Date.UTC(Number(p.year), Number(p.month)-1, Number(p.day), Number(p.hour), Number(p.minute), Number(p.second))
+      const delta = wall - rendered
+      instant += delta
+      if (!delta) return new Date(instant)
+    }
+    return null
+  } catch { return null }
+}
+export function coveredDays(event: {start: string; end: string; allDay: boolean; startTimezone?: string | null; endTimezone?: string | null}): DateKey[] {
+  const start = event.allDay ? dateKey(event.start) : dateKey(eventInstant(event.start, event.startTimezone) ?? event.start)
+  const last = event.allDay ? dateKey(event.end) : dateKey(new Date(+(eventInstant(event.end, event.endTimezone) ?? eventInstant(event.start, event.startTimezone) ?? new Date()) - 1))
+  const days: string[] = []
+  for (let key = start; key <= last && days.length < 1098; key = nextDayKey(key)) {
+    if (event.allDay && key === last && last !== start) break
+    days.push(key)
+  }
+  return days.length ? days : [start]
 }

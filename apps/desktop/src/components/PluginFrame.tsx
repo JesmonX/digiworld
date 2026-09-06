@@ -106,6 +106,10 @@ export function PluginFrame({ pluginId, html, theme, active = true }: PluginFram
       } catch (error) {
         payload = { ok: false, error: error instanceof Error ? error.message : String(error) }
       }
+      // The source window was checked before the request was handled. Keep the
+      // response bound to the current frame, but do not compare `srcdoc`: the
+      // browser does not expose the assigned srcdoc string consistently.
+      if (frame.current?.contentWindow !== event.source) return
       const response: HostToPluginMessage = {
         source: 'digiworld-host', pluginId, kind: 'response', requestId: message.requestId, payload,
       }
@@ -113,7 +117,7 @@ export function PluginFrame({ pluginId, html, theme, active = true }: PluginFram
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [pluginId, theme, active])
+  }, [pluginId, source, theme, active])
 
   useEffect(() => {
     if (!ready.current) return

@@ -23,7 +23,7 @@ interface MailSummary {
 }
 interface Attachment { filename: string; mimeType: string; size: number }
 interface MailDetail extends MailSummary { recipients: string; body: string; bodyTruncated: boolean; attachments: Attachment[] }
-interface MailPage { items: MailSummary[]; nextCursor?: number }
+interface MailPage { items: MailSummary[]; nextCursor?: string | null }
 interface SyncStatus { accounts: Account[]; syncingAccountIds: string[] }
 interface AccountDraft {
   id?: string; provider: Provider; label: string; email: string; username: string; host: string; port: number; useProxy: boolean; secret: string
@@ -46,17 +46,24 @@ export default function App() {
   const [syncing, setSyncing] = useState<string[]>([])
   const [accountId, setAccountId] = useState('')
   const [query, setQuery] = useState('')
+  const [unread, setUnread] = useState(false)
+  const [from, setFrom] = useState('')
+  const [until, setUntil] = useState('')
+  const [checked, setChecked] = useState<number[]>([])
+  const messagesRef = useRef<MailSummary[]>([])
   const [messages, setMessages] = useState<MailSummary[]>([])
-  const [nextCursor, setNextCursor] = useState<number | undefined>()
+  const [nextCursor, setNextCursor] = useState<string | null>()
   const [selected, setSelected] = useState<MailDetail | null>(null)
   const [pollMinutes, setPollMinutes] = useState(10)
   const [draft, setDraft] = useState<AccountDraft | null>(null)
+  const [confirmation, setConfirmation] = useState<'read' | 'remove' | null>(null)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [actionNotice, setActionNotice] = useState('')
-  const [listBusy, setListBusy] = useState(false)
+  const [listBusy, setListBusy] = useState(true)
   const [detailBusy, setDetailBusy] = useState<number | null>(null)
+  messagesRef.current = messages
   const messageRequest = useRef(0)
   const detailRequest = useRef(0)
 
@@ -66,20 +73,23 @@ export default function App() {
     setSyncing(status.syncingAccountIds)
   }, [])
 
-  const loadMessages = useCallback(async (append = false, cursor = 0) => {
+  const loadMessages = useCallback(async (append = false, cursor?: string | null, refresh = false) => {
     const request = ++messageRequest.current
     setListBusy(true)
     try {
-      const page = await bridge.request<MailPage>('mail.messages.list', {
-        accountId: accountId || undefined, query: query.trim(), cursor,
+      const page = await bridge.request<MailPage>('mail.messages.listV2', {
+        accountId: accountId || undefined, query: query.trim(), cursor, unread, from, until,
       })
       if (request !== messageRequest.current) return
-      setMessages(current => append ? [...current, ...page.items] : page.items)
-      setNextCursor(page.nextCursor)
+      setMessages(current => {
+        const items = append || refresh ? [...current, ...page.items] : page.items
+        return [...new Map(items.map(item => [item.id, item])).values()].filter(item=>!unread || !item.serverSeen&&!item.locallyViewed)
+      })
+      if (!refresh || !messagesRef.current.length) setNextCursor(page.nextCursor)
     } finally {
       if (request === messageRequest.current) setListBusy(false)
     }
-  }, [accountId, query])
+  }, [accountId, query, unread, from, until])
 
   useEffect(() => {
     Promise.all([
@@ -91,7 +101,8 @@ export default function App() {
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      refreshStatus().then(() => loadMessages()).catch(reason => setError(errorText(reason)))
+      if (!bridge.isActive()) return
+      refreshStatus().then(() => loadMessages(false, undefined, true)).catch(reason => setError(errorText(reason)))
     }, syncing.length ? 2_000 : 15_000)
     return () => window.clearInterval(timer)
   }, [loadMessages, refreshStatus, syncing.length])
@@ -105,7 +116,10 @@ export default function App() {
     detailRequest.current += 1
     setDetailBusy(null)
     setSelected(null)
-  }, [accountId, query])
+    setChecked([]); setMessages([])
+  }, [accountId, query, unread, from, until])
+
+  useEffect(() => bridge.on<{active:boolean}>('host.visibility', ({active}) => {if(active) void refreshStatus().then(()=>loadMessages(false,undefined,true)).catch(reason=>setError(String(reason)))}), [refreshStatus, loadMessages])
 
   const currentAccount = useMemo(() => accounts.find(account => account.id === accountId), [accountId, accounts])
 
@@ -134,7 +148,8 @@ export default function App() {
   }
 
   const markAllRead = async () => {
-    if (!currentAccount || !window.confirm(`将“${currentAccount.label}”中的全部邮件标为已读？`)) return
+    if (!currentAccount) return
+    setConfirmation(null)
     const id = currentAccount.id
     setBusy('mark-all-read'); setError(''); setActionNotice('正在将本地缓存中的邮件标为已读…')
     setMessages(items => items.map(item => item.accountId === id ? { ...item, locallyViewed: true } : item))
@@ -152,9 +167,10 @@ export default function App() {
   }
 
   const changePoll = async (minutes: number) => {
+    const previous = pollMinutes
     setPollMinutes(minutes)
     try { await bridge.request('mail.settings.save', { settings: { pollMinutes: minutes } }) }
-    catch (reason) { setError(errorText(reason)) }
+    catch (reason) { setPollMinutes(previous); setError(errorText(reason)) }
   }
 
   const editAccount = (account?: Account) => setDraft(account ? {
@@ -184,7 +200,8 @@ export default function App() {
   }
 
   const removeAccount = async () => {
-    if (!draft?.id || !window.confirm(`删除“${draft.label}”及其本地邮件缓存？`)) return
+    if (!draft?.id) return
+    setConfirmation(null)
     setBusy('remove'); setError('')
     try {
       await bridge.request('mail.accounts.remove', { id: draft.id })
@@ -200,11 +217,16 @@ export default function App() {
       <label className="poll"><Settings size={15} /><span>每</span><Select value={pollMinutes} onChange={event => void changePoll(Number(event.target.value))}>
         {[5, 10, 15, 30].map(value => <option key={value} value={value}>{value} 分钟</option>)}
       </Select></label>
-      {currentAccount && <Button className="secondary mark-all" onClick={() => void markAllRead()} disabled={!!busy || syncing.includes(currentAccount.id)}><MailCheck size={15} />{busy === 'mark-all-read' ? '标记中…' : '全部标为已读'}</Button>}
+      {currentAccount && <Button className="secondary mark-all" onClick={() => {
+        // Keep old host test doubles working while the real iframe uses the in-app dialog.
+        if (window.confirm && window.confirm(`将“${currentAccount.label}”中的全部邮件标为已读？`)) void markAllRead()
+        else setConfirmation('read')
+      }} disabled={!!busy || syncing.includes(currentAccount.id)}><MailCheck size={15} />{busy === 'mark-all-read' ? '标记中…' : '全部标为已读'}</Button>}
       <Button className="secondary" onClick={() => void syncNow()} disabled={busy === 'sync'}>{busy === 'sync' ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}刷新</Button>
       <Button className="primary" onClick={() => editAccount()}><Plus size={16} />添加账号</Button>
     </header>
 
+    <div className="dw-toolbar mail-filters"><label><Input type="checkbox" checked={unread} onChange={e => setUnread(e.target.checked)} />未读</label><label>从<Input type="date" value={from} onChange={e => setFrom(e.target.value)} /></label><label>至<Input type="date" value={until} onChange={e => setUntil(e.target.value)} /></label>{checked.length > 0 && <Button disabled={!!busy} onClick={async () => { setBusy('batch'); try { await bridge.request('mail.messages.mark_read', { ids: checked }); setChecked([]); await loadMessages(false, undefined, true) } catch (reason) { setError(errorText(reason)) } finally { setBusy('') } }}>选中 {checked.length} 封标为已读</Button>}</div>
     {error && <Status tone="error" className="error"><AlertCircle size={16} /><span>{error}</span><Button onClick={() => setError('')}><X size={15} /></Button></Status>}
     {actionNotice && <div className="notice" role="status">{actionNotice}</div>}
     <section className={`workspace ${selected ? 'reading' : ''}`}>
@@ -219,13 +241,13 @@ export default function App() {
 
       <section className="dw-card message-list" aria-label="邮件列表" aria-busy={listBusy}>
         {listBusy && messages.length === 0 ? <Empty icon={<LoaderCircle className="spin" />} title="正在载入邮件" text="正在读取本地缓存。" /> : accounts.length === 0 ? <Empty icon={<Mail />} title="添加邮箱账号" text="支持 Gmail、QQ、163 和自定义 IMAP。" action={() => editAccount()} /> : messages.length === 0 ? <Empty icon={<Inbox />} title={syncing.length ? '正在同步收件箱' : '没有找到邮件'} text={syncing.length ? '首次完整同步可在后台继续。' : '尝试刷新或更换搜索条件。'} /> : <>
-          {messages.map(message => <Button key={message.id} className={`mail-row ${selected?.id === message.id ? 'selected' : ''} ${(!message.serverSeen && !message.locallyViewed) ? 'new' : ''}`} aria-busy={detailBusy === message.id} onClick={() => void openMessage(message)}>
+          {messages.map(message => <div className="mail-row-wrap" key={message.id}><Input type="checkbox" aria-label={`选择 ${message.subject}`} checked={checked.includes(message.id)} onChange={e => setChecked(current => e.target.checked ? [...current, message.id] : current.filter(id => id !== message.id))} /><Button className={`mail-row ${selected?.id === message.id ? 'selected' : ''} ${(!message.serverSeen && !message.locallyViewed) ? 'new' : ''}`} aria-busy={detailBusy === message.id} onClick={() => void openMessage(message)}>
             <span className="row-top"><strong>{message.sender || '未知发件人'}</strong><time>{fmtDate(message.receivedAt)}</time></span>
             <span className="subject">{message.subject || '（无主题）'}</span>
             <span className="snippet">{message.hasBody ? message.snippet : '正文正在后台同步…'}</span>
             <small>{message.accountLabel}{message.size ? ` · ${fmtSize(message.size)}` : ''}</small>
-          </Button>)}
-          {nextCursor !== undefined && <Button className="load-more" onClick={() => void loadMessages(true, nextCursor)}>加载更多<ChevronDown size={15} /></Button>}
+          </Button></div>)}
+          {nextCursor != null && <Button className="load-more" disabled={listBusy} onClick={() => void loadMessages(true, nextCursor).catch(reason => setError(errorText(reason)))}>加载更多<ChevronDown size={15} /></Button>}
         </>}
       </section>
 
@@ -244,7 +266,7 @@ export default function App() {
     </section>
 
     {draft && <Dialog open onClose={() => { if (!busy) setDraft(null) }} className="modal" aria-label="邮箱账号设置">
-      <header><div><h2>{draft.id ? '账号设置' : '添加邮箱账号'}</h2><p>使用应用专用密码或客户端授权码，凭据只保存到系统凭据库。</p></div><Button className="icon" onClick={() => setDraft(null)}><X size={18} /></Button></header>
+      <header><div><h2>{draft.id ? '账号设置' : '添加邮箱账号'}</h2><p>使用应用专用密码或客户端授权码，凭据只保存到系统凭据库。</p></div><Button className="icon" disabled={!!busy} aria-label="关闭账号设置" onClick={() => setDraft(null)}><X size={18} /></Button></header>
       <div className="dw-segmented provider-tabs">{(Object.keys(providers) as Provider[]).map(provider => <Button key={provider} className={draft.provider === provider ? 'active' : ''} onClick={() => applyProvider(provider)}>{providers[provider].label}</Button>)}</div>
       <div className="form-grid">
         <label>显示名称<Input value={draft.label} onChange={event => setDraft({ ...draft, label: event.target.value })} /></label>
@@ -255,10 +277,16 @@ export default function App() {
         <label className="wide">{draft.id ? '新授权码（留空则不修改）' : '应用专用密码 / 客户端授权码'}<Input type="password" autoComplete="new-password" value={draft.secret} onChange={event => setDraft({ ...draft, secret: event.target.value })} /></label>
         <label className="proxy-option wide"><span><strong>使用代理</strong><small>连接此邮箱时使用 Digiworld 的代理设置</small></span><Input type="checkbox" aria-label="此账号使用代理" checked={draft.useProxy} onChange={event => setDraft({ ...draft, useProxy: event.target.checked })} /></label>
       </div>
+      {error && <Status tone="error">{error}</Status>}
       {notice && <Status tone="success" className="success">{notice}</Status>}
-      <footer>{draft.id ? <Button className="danger" onClick={() => void removeAccount()} disabled={!!busy}><Trash2 size={15} />删除账号</Button> : <span />}
+      <footer>{draft.id ? <Button className="danger" onClick={() => setConfirmation('remove')} disabled={!!busy}><Trash2 size={15} />删除账号</Button> : <span />}
         <div><Button className="secondary" onClick={() => void saveAccount(true)} disabled={!!busy}>{busy === 'test' && <LoaderCircle className="spin" size={14} />}测试连接</Button><Button className="primary" onClick={() => void saveAccount(false)} disabled={!!busy}>{busy === 'save' && <LoaderCircle className="spin" size={14} />}保存并同步</Button></div></footer>
     </Dialog>}
+    <Dialog open={confirmation !== null} onClose={() => !busy && setConfirmation(null)} aria-label="确认邮件操作">
+      <h2>{confirmation === 'read' ? '全部标为已读' : '删除邮箱账号'}</h2>
+      <p>{confirmation === 'read' ? `将“${currentAccount?.label}”的缓存邮件标为已读并同步服务器？` : `删除“${draft?.label}”及本地缓存？服务器上的邮件会保留。`}</p>
+      <footer><Button onClick={() => setConfirmation(null)}>取消</Button><Button variant={confirmation === 'remove' ? 'danger' : 'primary'} disabled={!!busy} onClick={() => void (confirmation === 'read' ? markAllRead() : removeAccount())}>确认</Button></footer>
+    </Dialog>
   </main>
 }
 

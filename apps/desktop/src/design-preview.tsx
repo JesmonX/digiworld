@@ -12,12 +12,13 @@ import { getAccentTheme, pluginTheme } from './theme'
 const names = ['keyboard-heatmap', 'agent-token-heatmap', 'mail-assistant', 'github-actions', 'server-monitor', 'calendar-todo']
 const labels = ['键盘热力图', 'Agent Overview', '邮件助手', 'Git Actions', 'Servers', '日历与 Todo']
 const previewState = new URLSearchParams(location.search).get('state')
-const plugins = names.map((name, index) => ({ id: `io.github.jesmonx.digiworld.${name}`, version: '1.0.0', name: labels[index]!, description: '界面验证数据', enabled: previewState !== 'disabled', state: previewState === 'disabled' ? 'disabled' as const : 'running' as const, permissions: [], uiDesignVersion: 1 }))
+const plugins = names.map((name, index) => ({ id: `io.github.jesmonx.digiworld.${name}`, version: '1.0.0', icon: ['keyboard','chatgpt','mail','git-branch','server','calendar-days'][index]!, name: labels[index]!, description: '界面验证数据', enabled: previewState !== 'disabled', state: previewState === 'disabled' ? 'disabled' as const : 'running' as const, permissions: [], uiDesignVersion: 1 }))
 api.appState = async () => ({ version: 'Design preview', platform: 'windows', target: 'windows-x86_64', plugins, catalogSequence: 1, launchAtStartup: false })
 api.catalog = async () => ({ schemaVersion: 1, sequence: 1, generatedAt: '2026-09-05', plugins: plugins.map(plugin => ({ ...plugin, author: 'Digiworld', minCoreVersion: '0.2.27', artifacts: [] })) })
 api.pluginUi = async id => (await fetch(`/__design-plugin/${names.find(name => id.endsWith(name))!}`)).text()
 api.pluginRequest = async <T,>(_id: string, method: string, payload?: unknown) => fixture(method, payload) as T
 api.proxySettings = async () => ({ mode: 'system' })
+api.onPluginStateChanged = async () => () => {}
 api.onUpdateProgress = async () => () => {}
 api.checkPluginUpdates = async () => []
 api.checkCoreUpdate = async () => null

@@ -99,3 +99,9 @@ html[data-dw-glass="disabled"] .accounts, html[data-dw-glass="disabled"] .messag
 .mail-row { align-items: stretch; justify-content: flex-start; text-align: left; border-radius: 0; }
 .message-list, .detail { padding: 0; }
 .search .dw-input:not([type=checkbox]):not([type=range]) { border: 0; background: transparent; padding-inline: 0; }
+
+.mail-row-wrap { display: flex; align-items: start; }
+.mail-row-wrap > input { flex: 0 0 auto; margin: var(--dw-space-3) 0 0 var(--dw-space-2); }
+.mail-row-wrap > .mail-row { flex: 1; min-width: 0; }
+.mail-filters { flex-wrap: wrap; }
+.mail-filters label { display: flex; align-items: center; gap: var(--dw-space-2); }

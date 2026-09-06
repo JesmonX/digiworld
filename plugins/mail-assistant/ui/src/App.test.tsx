@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('@digiworld/plugin-sdk', () => ({
-  createPluginBridge: () => ({ ready: mocks.ready, request: mocks.request, on: vi.fn() }),
+  createPluginBridge: () => ({ ready: mocks.ready, request: mocks.request, on: vi.fn(() => () => {}), isActive: () => true }),
 }))
 
 const account = {
@@ -49,7 +49,7 @@ describe('mail assistant status and search', () => {
     mocks.request.mockImplementation(async (method: string) => {
       if (method === 'mail.sync.status') return { accounts: [account], syncingAccountIds: [] }
       if (method === 'mail.settings.get') return { pollMinutes: 10 }
-      if (method === 'mail.messages.list') return page()
+      if (method === 'mail.messages.listV2') return page()
       throw new Error(`unexpected method: ${method}`)
     })
   })
@@ -78,9 +78,9 @@ describe('mail assistant status and search', () => {
     mocks.request.mockImplementation(async (method: string, payload?: { query?: string }) => {
       if (method === 'mail.sync.status') return { accounts: [account], syncingAccountIds: [] }
       if (method === 'mail.settings.get') return { pollMinutes: 10 }
-      if (method === 'mail.messages.list' && payload?.query === '旧查询') return oldResponse
-      if (method === 'mail.messages.list' && payload?.query === '新查询') return page('新结果')
-      if (method === 'mail.messages.list') return page()
+      if (method === 'mail.messages.listV2' && payload?.query === '旧查询') return oldResponse
+      if (method === 'mail.messages.listV2' && payload?.query === '新查询') return page('新结果')
+      if (method === 'mail.messages.listV2') return page()
       throw new Error(`unexpected method: ${method}`)
     })
 
@@ -135,7 +135,7 @@ describe('mail assistant status and search', () => {
     mocks.request.mockImplementation(async (method: string) => {
       if (method === 'mail.sync.status') return { accounts: [account], syncingAccountIds: [] }
       if (method === 'mail.settings.get') return { pollMinutes: 10 }
-      if (method === 'mail.messages.list') return {
+      if (method === 'mail.messages.listV2') return {
         items: [
           {
             id: 1, accountId: 'mail-1', accountLabel: '工作邮箱',

@@ -245,11 +245,10 @@ impl Database {
         let end_day = end.format("%Y-%m-%d").to_string();
         let mut statement = self.connection.prepare(
             "SELECT source_id, agent, day, model,
-                    SUM(input_tokens), SUM(output_tokens),
-                    SUM(cache_read_tokens), SUM(cache_write_tokens), MAX(cache_available)
+                    input_tokens, output_tokens,
+                    cache_read_tokens, cache_write_tokens, cache_available
              FROM daily_file_usage
              WHERE day <= ?1 AND (?2 IS NULL OR day >= ?2)
-             GROUP BY source_id, agent, day, model
              ORDER BY day",
         )?;
         let rows = statement.query_map(params![end_day, start_day], |row| {
@@ -267,6 +266,9 @@ impl Database {
                 },
             ))
         })?;
+        let mut known_input = 0u64;
+        let mut day_known = BTreeMap::<String, u64>::new();
+        let mut source_known = BTreeMap::<(String, AgentKind), u64>::new();
         let mut totals = TokenUsage::default();
         let mut by_day = BTreeMap::<String, TokenUsage>::new();
         let mut by_day_model = BTreeMap::<(String, String), u64>::new();
@@ -280,6 +282,11 @@ impl Database {
             if !source_ids.contains(&source_id) || (!agents.is_empty() && !agents.contains(&agent))
             {
                 continue;
+            }
+            if usage.cache_available {
+                known_input = known_input.saturating_add(usage.input_tokens);
+                *day_known.entry(day.clone()).or_default() += usage.input_tokens;
+                *source_known.entry((source_id.clone(), agent)).or_default() += usage.input_tokens;
             }
             totals.add_assign(&usage);
             by_day.entry(day.clone()).or_default().add_assign(&usage);
@@ -308,12 +315,14 @@ impl Database {
         }
         let statuses = self.statuses(&source_ids)?;
         let total_tokens = totals.total_tokens();
-        let cache_rate = (totals.cache_available && totals.input_tokens > 0)
-            .then_some(totals.cache_read_tokens as f64 / totals.input_tokens as f64);
+        let cache_rate =
+            (known_input > 0).then_some(totals.cache_read_tokens as f64 / known_input as f64);
         Ok(UsageSnapshot {
             start_day,
             end_day,
             totals: UsageTotals {
+                cache_coverage: (totals.input_tokens > 0)
+                    .then_some(known_input as f64 / totals.input_tokens as f64),
                 usage: totals,
                 total_tokens,
                 cache_rate,
@@ -323,6 +332,7 @@ impl Database {
                 .map(|(day, usage)| {
                     let models = models_by_day.remove(&day).unwrap_or_default();
                     DaySnapshot {
+                        cache_input_tokens: day_known.get(&day).copied().unwrap_or(0),
                         total_tokens: usage.total_tokens(),
                         day,
                         models,
@@ -338,8 +348,17 @@ impl Database {
                         .cloned()
                         .unwrap_or_else(|| source_id.clone()),
                     total_tokens: usage.total_tokens(),
-                    cache_rate: (usage.cache_available && usage.input_tokens > 0)
-                        .then_some(usage.cache_read_tokens as f64 / usage.input_tokens as f64),
+                    cache_coverage: (usage.input_tokens > 0).then_some(
+                        source_known
+                            .get(&(source_id.clone(), agent))
+                            .copied()
+                            .unwrap_or(0) as f64
+                            / usage.input_tokens as f64,
+                    ),
+                    cache_rate: source_known
+                        .get(&(source_id.clone(), agent))
+                        .filter(|v| **v > 0)
+                        .map(|v| usage.cache_read_tokens as f64 / *v as f64),
                     source_id,
                     agent,
                     usage,

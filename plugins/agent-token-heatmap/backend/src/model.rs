@@ -297,6 +297,7 @@ pub struct DaySnapshot {
     pub usage: TokenUsage,
     pub total_tokens: u64,
     pub models: Vec<DailyModelSnapshot>,
+    pub cache_input_tokens: u64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -309,6 +310,7 @@ pub struct Breakdown {
     pub usage: TokenUsage,
     pub total_tokens: u64,
     pub cache_rate: Option<f64>,
+    pub cache_coverage: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -330,6 +332,7 @@ pub struct UsageTotals {
     pub usage: TokenUsage,
     pub total_tokens: u64,
     pub cache_rate: Option<f64>,
+    pub cache_coverage: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]

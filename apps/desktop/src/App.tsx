@@ -1,4 +1,4 @@
-import { Button, Input, Card, Dialog, Switch, Status, RadioGroup } from '@digiworld/design-system/react'
+import { Button, Input, Card, Dialog, Switch, Status, RadioGroup, Menu } from '@digiworld/design-system/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
@@ -20,7 +20,6 @@ import {
   saveFontWeight, loadGlassMode, saveGlassMode, type AccentThemeId, type FontThemeId, type FontWeight, type GlassMode,
 } from './theme'
 import './styles.css'
-
 type Page = 'home' | 'catalog' | 'settings' | { pluginId: string }
 
 const PROXY_TEST_DEADLINE_MS = 20_000
@@ -120,11 +119,14 @@ function App() {
   const reduceMotion = useReducedMotion()
   const [state, setState] = useState<AppState | null>(null)
   const [catalog, setCatalog] = useState<CatalogIndex | null>(null)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('digiworld.sidebar') === 'collapsed' || (!localStorage.getItem('digiworld.sidebar') && window.innerWidth < 1000))
+  const [recent, setRecent] = useState<string[]>(() => {try{return JSON.parse(localStorage.getItem('digiworld.recent') ?? '[]')}catch{return []}})
+  const [uiErrors, setUiErrors] = useState<Record<string,string>>({})
   const [page, setPage] = useState<Page>('home')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const isDesignPreview = typeof window !== 'undefined' && (
-    window.location.pathname.includes('design.html') || window.location.search.includes('state=')
+    (window.location.pathname.includes('design.html') && !window.location.search.includes('keepalive')) || window.location.search.includes('state=')
   )
   const [pluginHtmlMap, setPluginHtmlMap] = useState<Record<string, { version: string; html: string }>>({})
   const [openedPluginIds, setOpenedPluginIds] = useState<string[]>([])
@@ -158,6 +160,11 @@ function App() {
   const refreshCatalog = useCallback(async (force = false) => setCatalog(await api.catalog(force)), [])
 
   useEffect(() => suppressContextMenu(), [])
+  useEffect(() => {
+    let disposed=false; let stop: (()=>void) | undefined
+    void api.onPluginStateChanged?.(()=>{void refreshState().catch(reason=>setError(errorMessage(reason)))}).then(unlisten=>{if(disposed)unlisten();else stop=unlisten}).catch(reason=>setError(errorMessage(reason)))
+    return ()=>{disposed=true;stop?.()}
+  },[refreshState])
 
   useEffect(() => {
     let disposed = false
@@ -177,6 +184,8 @@ function App() {
   }, [refreshCatalog, refreshState])
 
   const installed = useMemo(() => new Map(state?.plugins.map(plugin => [plugin.id, plugin]) ?? []), [state])
+  useEffect(() => {localStorage.setItem('digiworld.sidebar',sidebarCollapsed?'collapsed':'expanded')},[sidebarCollapsed])
+  useEffect(() => {if(typeof page !== 'string') setRecent(prev => {const next=[page.pluginId,...prev.filter(id=>id!==page.pluginId)].slice(0,6);localStorage.setItem('digiworld.recent',JSON.stringify(next));return next})},[page])
   const selectedPlugin = typeof page === 'string' ? undefined : installed.get(page.pluginId)
 
   useEffect(() => {
@@ -192,7 +201,7 @@ function App() {
     if (!cached || (currentVersion && cached.version !== currentVersion)) {
       api.pluginUi(id)
         .then(html => setPluginHtmlMap(prev => ({ ...prev, [id]: { version: currentVersion ?? '', html } })))
-        .catch(reason => setError(errorMessage(reason)))
+        .catch(reason => setUiErrors(prev=>({...prev,[id]:errorMessage(reason)})))
     }
   }, [page, isDesignPreview, pluginHtmlMap, installed])
 
@@ -256,10 +265,10 @@ function App() {
   useEffect(() => setPluginMenuOpen(false), [page])
 
   return (
-    <div className={`app-window glass-${glassMode} ${pluginOpen ? 'plugin-open' : ''}`} data-dw-glass={glassMode} style={themeStyle(activeTheme)}>
+    <div className={`app-window glass-${glassMode} ${pluginOpen ? 'plugin-open' : ''} ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`} data-dw-glass={glassMode} style={themeStyle(activeTheme)}>
       <WindowChrome />
       <div className="app-shell">
-        <aside className="sidebar">
+        <aside className="sidebar"><Button aria-label={sidebarCollapsed ? '展开侧栏' : '收起侧栏'} title={sidebarCollapsed ? '展开侧栏' : '收起侧栏'} onClick={()=>setSidebarCollapsed(value=>!value)}><MoreHorizontal /></Button>
           <div className="sidebar-scroll">
             <SidebarGroup label="工作台">
               <NavButton active={page === 'home'} icon={<Gauge />} label="概览" onClick={() => setPage('home')} />
@@ -292,9 +301,9 @@ function App() {
                 </Button>
                 <div className="plugin-more">
                   <Button className="secondary compact icon-button" aria-label="更多插件操作" aria-expanded={pluginMenuOpen} onClick={() => setPluginMenuOpen(open => !open)}><MoreHorizontal /></Button>
-                  {pluginMenuOpen && <div className="plugin-more-menu" role="menu">
+                  {pluginMenuOpen && <Menu className="plugin-more-menu" onKeyDown={event=>{if(event.key==='Escape')setPluginMenuOpen(false)}}>
                     <Button role="menuitem" className="danger-button" disabled={busy === selectedPlugin.id} onClick={() => { setPluginMenuOpen(false); void uninstall(selectedPlugin) }}>移除插件</Button>
-                  </div>}
+                  </Menu>}
                 </div>
               </div>
             )}
@@ -302,9 +311,10 @@ function App() {
 
           {error && <Status tone="error" className="error-banner"><CircleAlert /><span>{error}</span><Button onClick={() => setError(null)}>关闭</Button></Status>}
 
-          <section className="content">
+          {updateProgress && updateProgress.stage !== 'completed' && <Status>{updateProgress.itemName} · {updateProgress.stage} · {updateProgress.completedItems}/{updateProgress.totalItems}</Status>}
+          <section className="content"><div hidden={page!=='settings'}>{state && <SettingsPage state={state} progress={updateProgress} onProgressReset={() => setUpdateProgress(null)} onPluginsUpdated={refreshState} textScale={textScale} onTextScaleChange={setTextScale} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} colorSchemeId={colorSchemeId} onColorSchemeChange={setColorSchemeId} fontThemeId={fontThemeId} onFontThemeChange={setFontThemeId} fontWeight={fontWeight} onFontWeightChange={setFontWeight} glassMode={glassMode} onGlassModeChange={setGlassMode} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}</div>
             {!pluginOpen && (
-              <AnimatePresence initial={false} mode={reduceMotion ? 'sync' : 'wait'}>
+              <AnimatePresence initial={false} mode="sync">
                 <motion.div
                   key={page}
                   className="page-transition"
@@ -313,9 +323,9 @@ function App() {
                   exit={reduceMotion ? { opacity: 1, x: 0, scale: 1 } : { opacity: 0, x: -6, scale: .995 }}
                   transition={reduceMotion ? { duration: 0 } : { duration: .18, ease: [.2, .8, .2, 1] }}
                 >
-                  {page === 'home' && <Home plugins={state?.plugins ?? []} version={state?.version} onCatalog={() => setPage('catalog')} onOpen={id => setPage({ pluginId: id })} onRefresh={() => { void refreshState().catch(reason => setError(errorMessage(reason))) }} reducedMotion={Boolean(reduceMotion)} />}
+                  {page === 'home' && <Home plugins={[...(state?.plugins ?? [])].sort((a,b)=>(recent.includes(a.id)?recent.indexOf(a.id):99)-(recent.includes(b.id)?recent.indexOf(b.id):99))} version={state?.version} onCatalog={() => setPage('catalog')} onOpen={id => setPage({ pluginId: id })} onRefresh={() => { void refreshState().catch(reason => setError(errorMessage(reason))) }} reducedMotion={Boolean(reduceMotion)} />}
                   {page === 'catalog' && <Catalog catalog={catalog} installed={installed} busy={busy} onInstall={setConfirmInstall} onRefresh={() => refreshCatalog(true)} onOpen={id => setPage({ pluginId: id })} currentTarget={state?.target} />}
-                  {page === 'settings' && state && <SettingsPage state={state} progress={updateProgress} onProgressReset={() => setUpdateProgress(null)} onPluginsUpdated={refreshState} textScale={textScale} onTextScaleChange={setTextScale} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} colorSchemeId={colorSchemeId} onColorSchemeChange={setColorSchemeId} fontThemeId={fontThemeId} onFontThemeChange={setFontThemeId} fontWeight={fontWeight} onFontWeightChange={setFontWeight} glassMode={glassMode} onGlassModeChange={setGlassMode} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
+
                 </motion.div>
               </AnimatePresence>
             )}
@@ -335,6 +345,8 @@ function App() {
                     <Loading label="载入插件" />
                   ) : !plugin.enabled ? (
                     <div className="plugin-disabled"><Pause /><h2>已停用</h2></div>
+                  ) : plugin.state === 'failed' ? (
+                    <Status tone="error">{plugin.error || '插件启动失败'}<Button disabled={busy===id} onClick={()=>void manageEnabled(plugin,true)}>重新启动</Button></Status>
                   ) : html ? (
                     <PluginFrame
                       pluginId={id}
@@ -343,7 +355,7 @@ function App() {
                       theme={plugin?.uiDesignVersion === 1 ? activeTheme : pluginTheme(getAccentTheme('catppuccin-latte'), fontTheme, fontWeight, glassMode, textScale)}
                     />
                   ) : (
-                    <Loading label="载入界面" />
+                    uiErrors[id] ? <Status tone="error">{uiErrors[id]}<Button onClick={()=>{setUiErrors(prev=>({...prev,[id]:''}));void api.pluginUi(id).then(html=>setPluginHtmlMap(prev=>({...prev,[id]:{version:plugin.version,html}}))).catch(reason=>setUiErrors(prev=>({...prev,[id]:errorMessage(reason)})))}}>重试加载</Button></Status> : <Loading label="载入界面" />
                   )}
                 </div>
               )
@@ -383,8 +395,8 @@ function Home({ plugins, version, onCatalog, onOpen, onRefresh, reducedMotion }:
       <div className="home-intro">
         <div>
           <span className="eyebrow"><Activity />数字工作台</span>
-          <h2>你的功能，都在这里</h2>
-          <p>{healthy ? '当前没有停用或异常功能。' : `${attention} 个功能需要你的注意。`}</p>
+          <h2>工作台</h2>
+          <p>{healthy ? `暂无异常 · ${plugins.filter(p=>!p.enabled).length} 个已停用` : `${attention} 个功能需要你的注意。`}</p>
         </div>
         <div className={`health-pill ${healthy ? 'healthy' : 'attention'}`}><span />{healthy ? '运行稳定' : '需要关注'}</div>
       </div>
@@ -393,9 +405,11 @@ function Home({ plugins, version, onCatalog, onOpen, onRefresh, reducedMotion }:
         <SummaryCard label="运行中" value={running} detail={`共 ${plugins.length} 个`} icon={<Gauge />} tone="success" />
         <SummaryCard label="需关注" value={attention} detail={attention ? '请查看状态' : '暂无异常'} icon={attention ? <AlertTriangle /> : <ShieldCheck />} tone={attention ? 'warning' : 'success'} />
         <SummaryCard label="当前版本" value={version ?? '—'} detail="Digiworld" icon={<ShieldCheck />} tone="neutral" />
+
       </div>
+      {attention>0 && <Status tone="error">{plugins.filter(p=>p.enabled&&p.state==='failed').map(plugin=><Button key={plugin.id} onClick={()=>onOpen(plugin.id)}>{plugin.name}：{plugin.error || '启动失败'}</Button>)}</Status>}
       <div className="section-heading installed-heading">
-        <div><span className="section-kicker">你的工作台</span><h2>已安装功能</h2></div>
+        <div><h2>已安装功能</h2><small>按最近使用排列</small></div>
         <Button className="secondary" onClick={onCatalog}><Library />添加功能</Button>
       </div>
       <div className="installed-list">
@@ -410,7 +424,6 @@ function Home({ plugins, version, onCatalog, onOpen, onRefresh, reducedMotion }:
       <div className="quick-actions" aria-label="快捷操作">
         <span className="section-kicker">快捷操作</span>
         <div>
-          <Button className="quick-action" onClick={onCatalog}><span><Library /></span><b>浏览功能库</b><ChevronRight /></Button>
           <Button className="quick-action" onClick={onRefresh}><span><RefreshCw /></span><b>刷新状态</b><ChevronRight /></Button>
         </div>
       </div>
@@ -422,16 +435,20 @@ function SummaryCard({ label, value, detail, icon, tone = 'accent' }: { label: s
   return <Card className={`summary-card ${tone}`}><span className="summary-card-icon">{icon}</span><div><small>{label}</small><strong>{value}</strong><span>{detail}</span></div></Card>
 }
 
-function Catalog({ catalog, installed, busy, onInstall, onRefresh, onOpen, currentTarget }: { catalog: CatalogIndex | null; installed: Map<string, PluginSummary>; busy: string | null; onInstall(plugin: CatalogPlugin): void; onRefresh(): void; onOpen(id: string): void; currentTarget?: string | undefined }) {
+function Catalog({ catalog, installed, busy, onInstall, onRefresh, onOpen, currentTarget }: { catalog: CatalogIndex | null; installed: Map<string, PluginSummary>; busy: string | null; onInstall(plugin: CatalogPlugin): void; onRefresh(): Promise<void>; onOpen(id: string): void; currentTarget?: string | undefined }) {
+  const [query,setQuery]=useState('')
+  const [refreshing,setRefreshing]=useState(false)
+  const [error,setError]=useState('')
+  const refresh=async()=>{setRefreshing(true);setError('');try{await onRefresh()}catch(reason){setError(errorMessage(reason))}finally{setRefreshing(false)}}
   if (!catalog) return <Loading label="载入功能库" />
   return (
     <div>
       <div className="section-heading">
-        <h2>可用功能</h2>
-        <Button className="icon-button" aria-label="刷新功能库" title="刷新" onClick={onRefresh}><RefreshCw /></Button>
+<h2>可用功能</h2><Input aria-label="搜索功能" placeholder="搜索功能" value={query} onChange={e=>setQuery(e.target.value)} />
+        <Button className="icon-button" aria-label="刷新功能库" title="刷新" disabled={refreshing} onClick={()=>void refresh()}><RefreshCw /></Button>
       </div>
-      <div className="catalog-grid">
-        {catalog.plugins.map(plugin => {
+      {error && <Status tone="error">{error}</Status>}<div className="catalog-grid">
+        {catalog.plugins.filter(plugin=>plugin.name.toLowerCase().includes(query.toLowerCase())).map(plugin => {
           const current = installed.get(plugin.id)
           const supported = Boolean(currentTarget && plugin.artifacts.some(artifact => artifact.target === currentTarget))
           return (
@@ -475,6 +492,7 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, text
   onGlassModeChange(mode: GlassMode): void
   onChange(enabled: boolean): Promise<void>
 }) {
+  const [section,setSection]=useState('appearance')
   const [proxy, setProxy] = useState<ProxySettings>({ mode: 'system' })
   const [proxyBusy, setProxyBusy] = useState<'save' | 'test' | null>(null)
   const [proxyMessage, setProxyMessage] = useState<string | null>(null)
@@ -588,10 +606,10 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, text
   }
 
   return (
-    <div className="settings-stack">
+    <div className="settings-stack" data-section={section}><div className="dw-toolbar settings-navigation">{[['appearance','外观'],['network','网络'],['startup','启动'],['updates','更新与关于']].map(([id,label])=><Button key={id} aria-pressed={section===id} onClick={()=>setSection(id!)}>{label}</Button>)}</div>
       <Card className="settings-card theme-card">
         <div className="theme-copy">
-          <h3><Palette />主题颜色</h3>
+          <h3><Palette />主题</h3>
           <p>框架与插件使用同一套完整配色</p>
         </div>
         <RadioGroup className="theme-options" aria-label="主题颜色">
@@ -617,7 +635,7 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, text
       </Card>
       <Card className="settings-card scheme-card">
         <div className="theme-copy">
-          <h3><Palette />主题配色</h3>
+          <h3><Palette />强调色</h3>
           <p>在当前主题风格下自定义主色调与图表色彩</p>
         </div>
         <RadioGroup className="scheme-options" aria-label="主题配色">
@@ -686,7 +704,7 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, text
         </div>
       </Card>
       <Card className="settings-card appearance-card"><div><h3>玻璃效果</h3><p>应用到 Digiworld 界面和已安装插件</p></div><Switch aria-label="切换玻璃效果" checked={glassMode === 'enabled'} onCheckedChange={enabled => onGlassModeChange(enabled ? 'enabled' : 'disabled')} /></Card>
-      <Card className="settings-card"><div><h3>开机启动</h3><p>在后台启动已启用的插件</p></div><Switch aria-label="切换开机启动" checked={state.launchAtStartup} onCheckedChange={enabled => void onChange(enabled)} /></Card>
+      <Card className="settings-card startup-card"><div><h3>开机启动</h3><p>在后台启动已启用的插件</p></div><Switch aria-label="切换开机启动" checked={state.launchAtStartup} onCheckedChange={enabled => void onChange(enabled).catch(reason=>setProxyMessage(errorMessage(reason)))} /></Card>
       <Card className="settings-card proxy-card">
         <div className="proxy-copy">
           <h3><Network />网络代理</h3>

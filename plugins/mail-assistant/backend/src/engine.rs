@@ -264,6 +264,15 @@ impl MailEngine {
         })
     }
 
+    pub fn list_messages_v2(&self, params: &serde_json::Value) -> Result<serde_json::Value> {
+        self.database.list_messages_v2(params)
+    }
+    pub fn mark_read_ids(self: &Arc<Self>, ids: &[i64]) -> Result<()> {
+        for account in self.database.mark_read_ids(ids)? {
+            self.start_sync(Some(&account));
+        }
+        Ok(())
+    }
     pub fn list_messages(
         &self,
         account: Option<&str>,

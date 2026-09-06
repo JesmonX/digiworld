@@ -56,7 +56,7 @@ button, input, select, textarea { font: inherit; }
 .window-controls svg { width: 13px; height: 13px; stroke-width: 1.7; }
 
 .app-shell { position: relative; z-index: 1; flex: 1; min-height: 0; display: grid; grid-template-columns: 206px 1fr; transition: grid-template-columns var(--dw-motion-normal) var(--dw-ease-out); }
-.plugin-open .app-shell { grid-template-columns: 74px 1fr; }
+.sidebar-collapsed .app-shell { grid-template-columns: 74px 1fr; }
 .sidebar { display: flex; flex-direction: column; min-width: 0; margin: 10px 0 10px 10px; padding: 16px 10px 13px; border: 1px solid color-mix(in srgb, var(--border) 82%, transparent); border-radius: var(--dw-radius-lg); background: color-mix(in srgb, var(--dw-surface) 68%, transparent); box-shadow: var(--dw-shadow-sm); backdrop-filter: var(--dw-glass-filter); overflow: hidden; }
 .sidebar-scroll { min-height: 0; overflow: auto; scrollbar-width: none; -ms-overflow-style: none; }
 .sidebar-scroll::-webkit-scrollbar { width: 0; height: 0; display: none; }
@@ -76,11 +76,11 @@ button, input, select, textarea { font: inherit; }
 .state-dot { flex: 0 0 7px; width: 7px; height: 7px; margin-left: auto; border-radius: 50%; background: var(--dw-surface-subtle); }
 .state-dot.running { background: var(--dw-success); }
 .state-dot.failed { background: var(--danger); }
-.plugin-open .nav-item { justify-content: center; padding: 0; }
-.plugin-open .nav-item b { display: none; }
-.plugin-open .state-dot { position: absolute; top: 8px; right: 8px; width: 6px; height: 6px; }
-.plugin-open .sidebar-section + .sidebar-section { margin-top: 12px; }
-.plugin-open .sidebar-section-label { display: none; }
+.sidebar-collapsed .nav-item { justify-content: center; padding: 0; }
+.sidebar-collapsed .nav-item b { display: none; }
+.sidebar-collapsed .state-dot { position: absolute; top: 8px; right: 8px; width: 6px; height: 6px; }
+.sidebar-collapsed .sidebar-section + .sidebar-section { margin-top: 12px; }
+.sidebar-collapsed .sidebar-section-label { display: none; }
 
 .main { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: transparent; }
 .topbar { position: relative; z-index: 10; flex: 0 0 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; border-bottom: 1px solid color-mix(in srgb, var(--border) 78%, transparent); background: color-mix(in srgb, var(--dw-surface) 66%, transparent); backdrop-filter: var(--dw-glass-filter); }
@@ -329,7 +329,7 @@ button, input, select, textarea { font: inherit; }
 
 @media (max-width: 760px) {
   .app-shell { grid-template-columns: 174px 1fr; }
-  .plugin-open .app-shell { grid-template-columns: 66px 1fr; }
+  .sidebar-collapsed .app-shell { grid-template-columns: 66px 1fr; }
   .topbar { padding-inline: 18px; }
   .content { padding: 21px 18px 24px; }
   .home-intro { align-items: flex-start; flex-direction: column; gap: 12px; }
@@ -373,3 +373,17 @@ button, input, select, textarea { font: inherit; }
 .summary-card strong { font-size: var(--dw-type-metric); font-variant-numeric: tabular-nums; }
 .home-intro h2 { font-family: var(--dw-font-display); font-size: var(--dw-type-page); }
 .design-gallery { display: grid; gap: var(--dw-space-4); max-width: 960px; height: 100%; overflow: auto; margin: auto; padding: var(--dw-space-5); }
+
+.dashboard-summary { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.summary-card { min-height: 80px; padding: var(--dw-space-3); }
+.installed-list .plugin-row { min-height: 90px; }
+.settings-navigation { position: sticky; top: 0; z-index: 2; background: var(--dw-bg); padding: var(--dw-space-2); }
+.settings-stack[data-section="appearance"] > :is(.proxy-card,.startup-card,.update-card,.version-line),
+.settings-stack[data-section="network"] > .settings-card:not(.proxy-card),
+.settings-stack[data-section="startup"] > .settings-card:not(.startup-card),
+.settings-stack[data-section="updates"] > .settings-card:not(.update-card),
+.settings-stack:not([data-section="updates"]) > .version-line { display: none; }
+.theme-options { grid-template-columns: repeat(4,minmax(0,1fr)); }
+.theme-miniature { min-height: 54px; }
+@media(max-width:960px) { .theme-options {grid-template-columns:repeat(2,minmax(0,1fr));} }
+@media(max-width:760px) { .dashboard-summary {grid-template-columns:1fr;} }

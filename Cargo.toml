@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+  "packages/plugin-runtime",
   "apps/desktop/src-tauri",
   "plugins/keyboard-heatmap/backend",
   "plugins/agent-token-heatmap/backend",

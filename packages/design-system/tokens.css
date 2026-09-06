@@ -8,7 +8,7 @@
   --dw-weight-semibold: 600;
   --dw-weight-bold: 700;
   --dw-type-caption: calc(12px * var(--dw-text-scale));
-  --dw-type-body-sm: calc(13px * var(--dw-text-scale));
+  --dw-type-body-sm: calc(14px * var(--dw-text-scale));
   --dw-type-body: calc(14px * var(--dw-text-scale));
   --dw-type-title: calc(16px * var(--dw-text-scale));
   --dw-type-page: calc(20px * var(--dw-text-scale));

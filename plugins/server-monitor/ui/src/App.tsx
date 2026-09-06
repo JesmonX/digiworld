@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Button, Input, Card, Status, Select } from '@digiworld/design-system/react'
+import { Button, Input, Card, Status, Select, Dialog } from '@digiworld/design-system/react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import { Server, Plus, RefreshCw, HardDrive, MemoryStick, Cpu, Gauge, Network, Settings, X, LoaderCircle, AlertCircle } from 'lucide-react'
 
@@ -68,6 +68,8 @@ type Device = {
 type LayoutMode = 'auto' | 'compact' | 'double' | 'single'
 
 const previous = new Map<string, { at: number; rx: number; tx: number }>()
+// Keep the familiar GB label while using the binary conversion used by the
+// backend counters; this matches the values users see in system monitors.
 const size = (v: number) => `${(v / 1024 ** 3).toFixed(1)} GB`
 const rate = (v: number) => v < 1024 ? `${v.toFixed(0)} B/s` : v < 1024 ** 2 ? `${(v / 1024).toFixed(1)} KB/s` : `${(v / 1024 ** 2).toFixed(1)} MB/s`
 const pct = (a: number, b: number) => b ? Math.round((a / b) * 100) : 0
@@ -79,21 +81,17 @@ export default function App() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [actionBusy, setActionBusy] = useState<'detect' | 'install' | 'save' | null>(null)
+  const [deleteId,setDeleteId]=useState<string | null>(null)
+  const [history,setHistory]=useState<Record<string,{at:number;memory:number}[]>>({})
   const [setup, setSetup] = useState('')
-  const [layout, setLayout] = useState<LayoutMode>(() => {
-    try {
-      const saved = localStorage.getItem('digiworld.server-monitor.layout')
-      return (saved === 'compact' || saved === 'double' || saved === 'single' || saved === 'auto') ? saved : 'auto'
-    } catch {
-      return 'auto'
-    }
-  })
-
-  const changeLayout = (mode: LayoutMode) => {
+  const [layout, setLayout] = useState<LayoutMode>('auto')
+  const configsRef = useRef<Config[]>([])
+  configsRef.current = configs
+  const changeLayout = async (mode: LayoutMode) => {
+    const old = layout
     setLayout(mode)
-    try {
-      localStorage.setItem('digiworld.server-monitor.layout', mode)
-    } catch {}
+    try { await bridge.request('servers.layout.save', { layout: mode }) }
+    catch (reason) { setLayout(old); setError(String(reason)) }
   }
 
   const isActiveRef = useRef(true)
@@ -102,36 +100,46 @@ export default function App() {
   const draftRef = useRef<Config | null>(null)
   draftRef.current = draft
 
-  const refreshSamples = useCallback(async (currentConfigs?: Config[]) => {
+  const refreshSamples = useCallback(async (currentConfigs?: Config[], deviceId?: string) => {
     if (isRefreshingRef.current) return
     isRefreshingRef.current = true
     const currentGen = sampleGenerationRef.current
     try {
-      const activeConfigs = currentConfigs ?? configs
+      const activeConfigs = currentConfigs ?? configsRef.current
       if (!activeConfigs.length) {
         setDevices([])
         return
       }
-      const sampleRes = await bridge.request<{ devices: Device[] }>('servers.sample')
+      const sampleRes = await bridge.job<{ devices: Device[] }>('servers.sample', deviceId ? {id:deviceId} : {})
       if (sampleGenerationRef.current !== currentGen) return
 
-      setDevices(sampleRes.devices.map(d => {
+      setHistory(current=>{
+        const next={...current}
+        for(const device of sampleRes.devices) if(!device.error && device.timestamp && device.memory?.total) {
+          const points=current[device.id] ?? []
+          if(points.at(-1)?.at !== device.timestamp) next[device.id]=[...points,{at:device.timestamp,memory:pct(device.memory.used,device.memory.total)}].filter(p=>p.at>=device.timestamp!-1800).slice(-360)
+        }
+        return next
+      })
+      const updated = sampleRes.devices.map(d => {
         if (!d.network || !d.timestamp) return d
         return {
           ...d,
           network: d.network.map(n => {
             const key = `${d.id}:${n.name}`
             const p = previous.get(key)
-            const seconds = p ? Math.max(1, d.timestamp! - p.at) : 1
+            const seconds = p ? d.timestamp! - p.at : 0
             previous.set(key, { at: d.timestamp!, rx: n.receivedBytes, tx: n.sentBytes })
             return {
               ...n,
-              receivedPerSecond: p && n.receivedBytes >= p.rx ? (n.receivedBytes - p.rx) / seconds : undefined,
-              sentPerSecond: p && n.sentBytes >= p.tx ? (n.sentBytes - p.tx) / seconds : undefined,
+              receivedPerSecond: p && seconds > 0 && n.receivedBytes >= p.rx ? (n.receivedBytes - p.rx) / seconds : undefined,
+              sentPerSecond: p && seconds > 0 && n.sentBytes >= p.tx ? (n.sentBytes - p.tx) / seconds : undefined,
             }
           }),
         }
-      }))
+      })
+      setDevices(current => deviceId ? current.map(d=>updated.find(next=>next.id===d.id)??d) : updated)
+      setError('')
     } catch (e) {
       if (sampleGenerationRef.current === currentGen) {
         setError(String(e))
@@ -139,12 +147,14 @@ export default function App() {
     } finally {
       isRefreshingRef.current = false
     }
-  }, [configs])
+  }, [])
 
   const loadSettings = useCallback(async () => {
     setBusy(true)
     try {
-      const s = await bridge.request<{ devices: Config[] }>('servers.settings.get')
+      const s = await bridge.request<{ devices: Config[]; layout?: LayoutMode }>('servers.settings.get')
+      setLayout(s.layout ?? 'auto')
+      configsRef.current = s.devices
       setConfigs(s.devices)
       await refreshSamples(s.devices)
     } catch (e) {
@@ -160,7 +170,7 @@ export default function App() {
 
     const unlisten = bridge.on<{ active: boolean }>('host.visibility', ({ active }) => {
       isActiveRef.current = active
-      if (active) {
+      if (active && !isRefreshingRef.current) {
         void refreshSamples()
       }
     })
@@ -222,7 +232,7 @@ export default function App() {
           return [...prev, { id: draft.id, label: draft.label, selection: draft, disks: [], gpus: [], network: [] }]
         }
       })
-      await bridge.request('servers.settings.save', { settings: { devices: next } })
+      await bridge.request('servers.settings.save', { settings: { devices: next, layout } })
       setDraft(null)
       void refreshSamples(next)
     } catch (e) {
@@ -239,13 +249,13 @@ export default function App() {
     setActionBusy(install ? 'install' : 'detect')
     setSetup('')
     try {
-      const r = await bridge.request<{
+      const r = await bridge.job<{
         status: string
         command: string
         error?: string
         verification?: string
         manager?: string
-      }>('servers.vnstat.setup', { host: draft.host, install }, { timeoutMs: 120_000 })
+      }>('servers.vnstat.setup', { host: draft.host, install })
       const parts = [
         r.status === 'ready' ? 'vnStat 状态：正常就绪' : r.status === 'installed' ? 'vnStat 状态：已安装' : `vnStat 状态：${r.status}`,
         r.manager ? `包管理器：${r.manager}` : '',
@@ -269,7 +279,7 @@ export default function App() {
           <strong>远程 Linux 设备</strong>
         </div>
         <div className="layout-select">
-          <Select aria-label="排布方式" value={layout} onChange={e => changeLayout(e.target.value as LayoutMode)}>
+          <Select aria-label="排布方式" value={layout} onChange={e => void changeLayout(e.target.value as LayoutMode)}>
             <option value="auto">自适应排布</option>
             <option value="compact">紧凑多列</option>
             <option value="double">标准双列</option>
@@ -307,7 +317,9 @@ export default function App() {
                   <Button aria-label="设备设置" onClick={() => edit(configs.find(x => x.id === d.id))}>
                     <Settings size={15} />
                   </Button>
+                  <Button disabled={isRefreshingRef.current} onClick={()=>void refreshSamples(undefined,d.id)}>重试采样</Button><Button variant="danger" onClick={()=>setDeleteId(d.id)}>移除</Button>
                 </header>
+                {(history[d.id]?.length ?? 0)>1 && <details><summary>最近 30 分钟内存趋势</summary><svg role="img" aria-label={`${d.label} 内存趋势`} viewBox="0 0 360 110"><polyline fill="none" stroke="var(--dw-accent)" strokeWidth="2" points={(history[d.id]??[]).map((p,i,all)=>`${i*360/Math.max(1,all.length-1)},${100-p.memory}`).join(' ')} /></svg><table><thead><tr><th>采样时间</th><th>内存占用</th></tr></thead><tbody>{history[d.id]?.slice(-12).map(p=><tr key={p.at}><td>{new Date(p.at*1000).toLocaleTimeString()}</td><td>{p.memory}%</td></tr>)}</tbody></table></details>}
 
                 {d.error ? (
                   <Status tone="error" className="device-error">
@@ -553,6 +565,7 @@ export default function App() {
           </footer>
         </Card>
       )}
+      <Dialog open={deleteId!==null} onClose={()=>setDeleteId(null)} aria-label="移除设备"><h2>移除监控设备</h2><p>移除本地配置，远端服务保持运行。</p><Button onClick={()=>setDeleteId(null)}>取消</Button><Button variant="danger" disabled={!!actionBusy} onClick={async()=>{setActionBusy('save');try{const next=configs.filter(c=>c.id!==deleteId);await bridge.request('servers.settings.save',{settings:{devices:next,layout}});sampleGenerationRef.current+=1;setConfigs(next);setDevices(current=>current.filter(d=>d.id!==deleteId));setDeleteId(null)}catch(reason){setError(String(reason))}finally{setActionBusy(null)}}}>确认移除</Button></Dialog>
     </main>
   )
 }

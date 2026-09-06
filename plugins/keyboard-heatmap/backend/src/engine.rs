@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 
 pub struct StatsEngine {
     database: Mutex<Database>,
-    pending: Mutex<BTreeMap<String, u64>>,
+    pending: Mutex<BTreeMap<(String, String), u64>>,
     paused: AtomicBool,
     stopping: AtomicBool,
 }
@@ -45,7 +45,12 @@ impl StatsEngine {
             return;
         }
         let mut pending = self.pending.lock().expect("pending count lock poisoned");
-        *pending.entry(key.to_string()).or_default() += 1;
+        *pending
+            .entry((
+                chrono::Local::now().format("%Y-%m-%d").to_string(),
+                key.to_string(),
+            ))
+            .or_default() += 1;
         if pending.values().sum::<u64>() >= 100 {
             drop(pending);
             if let Err(error) = self.flush() {
@@ -66,7 +71,7 @@ impl StatsEngine {
             .database
             .lock()
             .expect("database lock poisoned")
-            .add_counts(&counts)
+            .add_dated_counts(&counts)
         {
             let mut pending = self.pending.lock().expect("pending count lock poisoned");
             for (key, count) in counts {

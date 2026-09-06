@@ -110,6 +110,12 @@ fn handle(engine: &Arc<MailEngine>, method: &str, params: Value) -> Result<Value
             Ok(json!({ "startedAccountIds": engine.start_sync(account) }))
         }
         "mail.sync.status" => Ok(serde_json::to_value(engine.status()?)?),
+        "mail.messages.listV2" => engine.list_messages_v2(&params),
+        "mail.messages.mark_read" => {
+            let ids: Vec<i64> = serde_json::from_value(params["ids"].clone())?;
+            engine.mark_read_ids(&ids)?;
+            Ok(json!({"updated":ids.len()}))
+        }
         "mail.messages.list" => {
             let account = params.get("accountId").and_then(Value::as_str);
             let query = params.get("query").and_then(Value::as_str).unwrap_or("");

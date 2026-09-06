@@ -197,9 +197,16 @@ impl PluginProcess {
                 "plugin request exceeds 4 MiB".into(),
             ));
         }
-        self.stdin.write_all(&line).await?;
-        self.stdin.write_all(b"\n").await?;
-        self.stdin.flush().await?;
+        if let Err(error) = async {
+            self.stdin.write_all(&line).await?;
+            self.stdin.write_all(b"\n").await?;
+            self.stdin.flush().await
+        }
+        .await
+        {
+            self.needs_restart = true;
+            return Err(error.into());
+        }
 
         let value =
             match tokio::time::timeout(std::time::Duration::from_secs(15), self.responses.recv())
@@ -207,6 +214,7 @@ impl PluginProcess {
             {
                 Ok(Some(value)) => value,
                 Ok(None) => {
+                    self.needs_restart = true;
                     return Err(DigiworldError::Plugin(
                         "plugin process closed its output".into(),
                     ));
@@ -221,6 +229,7 @@ impl PluginProcess {
                 }
             };
         if value.get("id").and_then(Value::as_u64) != Some(id) {
+            self.needs_restart = true;
             return Err(DigiworldError::Plugin(
                 "plugin returned an unexpected response id".into(),
             ));
@@ -243,6 +252,13 @@ impl PluginProcess {
             return Err(DigiworldError::Plugin("plugin health check failed".into()));
         }
         Ok(())
+    }
+
+    pub fn exited(&mut self) -> bool {
+        self.child
+            .try_wait()
+            .map(|status| status.is_some())
+            .unwrap_or(true)
     }
 
     pub fn needs_restart(&self) -> bool {

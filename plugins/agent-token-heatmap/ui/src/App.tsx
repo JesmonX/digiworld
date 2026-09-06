@@ -1,7 +1,7 @@
 import { Button, Input, Select, Textarea, Card, Dialog, Status } from '@digiworld/design-system/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Check, Clock3, Database, Gauge, HardDrive, PieChart, Plus, RefreshCw, Server, Settings2, Ticket, Trash2, X } from 'lucide-react'
-import { createPluginBridge } from '@digiworld/plugin-sdk'
+import { exportJson, createPluginBridge } from '@digiworld/plugin-sdk'
 import { cacheRateScale, calendarCells, formatTokens, heatLevel, weeklyModelCategories, weeklyUsage, type Metric, type UsageDay, type WeeklyUsagePoint } from './heatmap'
 import './styles.css'
 
@@ -41,6 +41,7 @@ interface Totals {
   cacheWriteTokens: number
   totalTokens: number
   cacheRate?: number
+  cacheCoverage?: number
 }
 interface Breakdown extends Totals { sourceId: string; sourceLabel: string; agent: Agent }
 interface ModelBreakdown extends Totals { sourceId: string; sourceLabel: string; agent: Agent; model: string }
@@ -151,6 +152,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
+  const snapshotGeneration = useRef(0)
   const loadSnapshot = useCallback(async (nextSettings?: UsageSettings, currentAgents?: Agent[], currentSources?: string[]) => {
     const configured = nextSettings ?? settings
     if (!configured) return
@@ -158,11 +160,13 @@ export default function App() {
     const activeSources = currentSources ?? sources
     const allowedSources = ['local', ...configured.sshSources.map(source => source.id)]
     const selectedSources = activeSources.filter(source => allowedSources.includes(source))
-    setSnapshot(await bridge.request<Snapshot>('usage.snapshot', {
+    const generation = ++snapshotGeneration.current
+    const result = await bridge.request<Snapshot>('usage.snapshot', {
       range,
       agents: activeAgents,
       sources: selectedSources.length ? selectedSources : allowedSources,
-    }))
+    })
+    if (generation === snapshotGeneration.current) setSnapshot(result)
   }, [agents, range, settings, sources])
 
   useEffect(() => {
@@ -242,7 +246,7 @@ export default function App() {
 
   const refreshAll = useCallback(async () => {
     if (autoRefreshRunningRef.current) return
-    if (document.visibilityState === 'hidden') return
+    if (!bridge.isActive()) return
     autoRefreshRunningRef.current = true
     try {
       const status = await bridge.request<RefreshStatus>('usage.refreshStatus')
@@ -259,14 +263,14 @@ export default function App() {
   useEffect(() => {
     if (!autoRefreshInterval || autoRefreshInterval <= 0) return
     const timer = window.setInterval(() => {
-      void refreshAll()
+      void refreshAll().catch(reason => setError(String(reason)))
     }, autoRefreshInterval * 1000)
 
     const onVisibilityChange = () => {
       if (document.visibilityState !== 'hidden') {
         const elapsed = Date.now() - lastRefreshedAtRef.current
         if (elapsed >= autoRefreshInterval * 1000) {
-          void refreshAll()
+          void refreshAll().catch(reason => setError(String(reason)))
         }
       }
     }
@@ -281,7 +285,7 @@ export default function App() {
   useEffect(() => {
     const seconds = settings?.codexQuota.refreshIntervalSeconds
     if (!seconds) return
-    const timer = window.setInterval(() => void loadQuota(), seconds * 1000)
+    const timer = window.setInterval(() => { if (bridge.isActive()) void loadQuota() }, seconds * 1000)
     return () => window.clearInterval(timer)
   }, [loadQuota, settings?.codexQuota.refreshIntervalSeconds])
 
@@ -296,19 +300,21 @@ export default function App() {
     }
   }
 
+  useEffect(() => bridge.on<{active:boolean}>('host.visibility', ({active}) => {if(active) void loadSnapshot().catch(reason=>setError(String(reason)))}), [loadSnapshot])
+
   const toggleAgent = (agent: Agent) => {
     const next = agents.includes(agent)
       ? (agents.length === 1 ? agents : agents.filter(value => value !== agent))
       : [...agents, agent]
     setAgents(next)
-    void bridge.request('usage.saveFilters', { agents: next, sources }).catch(() => {})
+    void bridge.request('usage.saveFilters', { agents: next, sources }).catch(reason => setError(String(reason)))
   }
   const toggleSource = (source: string) => {
     const next = sources.includes(source)
       ? (sources.length === 1 ? sources : sources.filter(value => value !== source))
       : [...sources, source]
     setSources(next)
-    void bridge.request('usage.saveFilters', { agents, sources: next }).catch(() => {})
+    void bridge.request('usage.saveFilters', { agents, sources: next }).catch(reason => setError(String(reason)))
   }
 
   const cells = useMemo(() => {
@@ -367,13 +373,13 @@ export default function App() {
           <Summary label="输出" value={snapshot?.totals.outputTokens} />
           <Summary label="缓存读取" value={snapshot?.totals.cacheReadTokens} />
           <Summary label="缓存写入" value={snapshot?.totals.cacheWriteTokens} />
-          <Summary label="缓存率" text={snapshot?.totals.cacheRate == null ? '—' : `${(snapshot.totals.cacheRate * 100).toFixed(1)}%`} />
+          <Summary label={snapshot?.totals.cacheCoverage != null && snapshot.totals.cacheCoverage < 1 ? `缓存率（覆盖 ${(snapshot.totals.cacheCoverage*100).toFixed(0)}% 输入）` : '缓存率'} text={snapshot?.totals.cacheRate == null ? '—' : `${(snapshot.totals.cacheRate * 100).toFixed(1)}%`} />
         </div>
         {snapshot && cells.length ? <div className="calendar-wrap"><div className="weekday-labels"><span>一</span><span>三</span><span>五</span><span>日</span></div><div className="calendar-grid">{cells.map((cell, index) => <i key={cell.day ?? `blank-${index}`} tabIndex={cell.day ? 0 : undefined} aria-label={cell.day ? `${cell.day}，${formatTokens(cell.value)}` : undefined} className={`level-${heatLevel(cell.value, max)} ${cell.day ? '' : 'blank'}`} title={cell.day ? `${cell.day} · ${formatTokens(cell.value)}` : undefined} />)}</div><div className="legend"><span>低</span>{[0, 1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>高</span></div></div> : <Empty />}
       </section>
 
       <section className="lower-grid">
-        <Card className="dw-card breakdown-card"><h2>来源明细</h2>{snapshot?.breakdown.length ? <div className="breakdown-table">{[...snapshot.breakdown].sort((a, b) => b.totalTokens - a.totalTokens).map(row => <div key={`${row.sourceId}-${row.agent}`}><AgentIcon agent={row.agent} className={`agent-breakdown-icon ${row.agent}`} /><strong>{agentLabel[row.agent]}</strong><span>{row.sourceLabel}</span><b>{formatTokens(row.totalTokens)}</b><small>{row.cacheRate == null ? `${formatTokens(row.cacheReadTokens)} cache` : `${(row.cacheRate * 100).toFixed(1)}% cache`}</small></div>)}</div> : <Empty />}</Card>
+        <Button disabled={!snapshot} onClick={() => exportJson('agent-usage.json', {agents,sources,range,snapshot})}>导出当前统计</Button><Card className="dw-card breakdown-card"><h2>来源明细</h2>{snapshot?.breakdown.length ? <div className="breakdown-table">{[...snapshot.breakdown].sort((a, b) => b.totalTokens - a.totalTokens).map(row => <div key={`${row.sourceId}-${row.agent}`}><AgentIcon agent={row.agent} className={`agent-breakdown-icon ${row.agent}`} /><strong>{agentLabel[row.agent]}</strong><span>{row.sourceLabel}</span><b>{formatTokens(row.totalTokens)}</b><small>{row.cacheRate == null ? `${formatTokens(row.cacheReadTokens)} cache` : `${(row.cacheRate * 100).toFixed(1)}% cache`}</small></div>)}</div> : <Empty />}</Card>
         <Card className="dw-card daily-ranking-card"><h2>每日用量排行</h2>{dailyRanking.length ? <div className="daily-ranking">{dailyRanking.map((day, index) => <div key={day.day}><b>{index + 1}</b><span>{day.day}</span><i><em style={{ width: `${(day.totalTokens / dailyMax) * 100}%` }} /></i><strong>{formatTokens(day.totalTokens)}</strong></div>)}</div> : <Empty />}</Card>
       </section>
 
@@ -382,6 +388,7 @@ export default function App() {
         <ModelPieChart rows={modelTotals} />
       </Card>
 
+      <details className="dw-card"><summary>每日统计明细</summary><table><thead><tr><th>日期</th><th>模型</th><th>Token</th></tr></thead><tbody>{snapshot?.days.flatMap(day => (day.models ?? []).map(model => <tr key={`${day.day}-${model.model}`}><td>{day.day}</td><td>{model.model}</td><td>{model.totalTokens.toLocaleString()}</td></tr>))}</tbody></table></details>
       {settingsOpen && settings && <SourceDialog settings={settings} refreshRunning={refresh.running} onClose={() => setSettingsOpen(false)} onSave={async value => {
         const nextSources = sources.filter(id => id === 'local' || value.sshSources.some(source => source.id === id))
         const saved = await bridge.request<UsageSettings>('usage.saveSettings', {

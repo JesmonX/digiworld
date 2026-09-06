@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { Button, Input, Card, Status, Textarea, Select, Dialog } from '@digiworld/design-system/react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import { CalendarDays, CheckSquare, Plus, RefreshCw, Settings, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   DateKey,
+  coveredDays,
+  eventInstant,
   dateKey,
   todayKey,
   toIcalDate,
@@ -81,6 +83,10 @@ export default function App() {
   const [cals, setCals] = useState<Cal[]>([])
   const [events, setEvents] = useState<Event[]>([])
   const [todos, setTodos] = useState<Todo[]>([])
+  const [connecting, setConnecting] = useState(false)
+  const [todoEdit,setTodoEdit]=useState<Todo | null>(null)
+  const [todoFilter, setTodoFilter] = useState('open')
+  const [conflict, setConflict] = useState(false)
   const [tab, setTab] = useState<'calendar' | 'todo'>('calendar')
   const [edit, setEdit] = useState<Event | null>(null)
   const [todoText, setTodoText] = useState('')
@@ -121,25 +127,29 @@ export default function App() {
 
   const createEventForDate = (dk: DateKey) => {
     setSelectedDate(dk)
-    setEdit(blank(cals[0]?.id, dk))
+    setEdit(blank(cals.find(c => !c.readOnly)?.id, dk))
   }
 
+  const loading = useRef(false)
   const load = async (sync = false) => {
+    if (loading.current) return
+    loading.current = true
     setBusy(true)
     setError('')
     try {
+      setTodos(await bridge.request<Todo[]>('todo.list'))
       const a = await bridge.request<typeof account>('calendar.account.get')
       setAccount(a)
       const data = sync && a
-        ? await bridge.request<CalendarSyncResult>('calendar.sync')
+        ? await bridge.job<CalendarSyncResult>('calendar.sync')
         : await bridge.request<CalendarSyncResult>('calendar.cached')
       setCals(data.calendars)
       setEvents(data.events)
       if (data.warnings?.length) setError(data.warnings.join('；'))
-      setTodos(await bridge.request<Todo[]>('todo.list'))
     } catch (e) {
       setError(String(e))
     } finally {
+      loading.current = false
       setBusy(false)
       setInitialized(true)
     }
@@ -152,18 +162,16 @@ export default function App() {
 
   useEffect(() => {
     if (!account) return
-    const t = setInterval(() => void load(true), 60000)
+    const t = setInterval(() => { if (bridge.isActive()) void load(true) }, 60000)
     return () => clearInterval(t)
   }, [account?.username])
 
   const eventMap = useMemo(() => {
     const m = new Map<DateKey, Event[]>()
     for (const e of events) {
-      const k = dateKey(e.start)
-      const list = m.get(k) || []
-      list.push(e)
-      m.set(k, list)
+      for (const k of coveredDays(e)) { const list = m.get(k) || []; list.push(e); m.set(k, list) }
     }
+    for (const list of m.values()) list.sort((a,b) => a.start.localeCompare(b.start))
     return m
   }, [events])
 
@@ -185,11 +193,12 @@ export default function App() {
   const connect = async () => {
     setBusy(true)
     try {
-      const found = await bridge.request<Cal[]>('calendar.account.save', { account: accountDraft, secret })
+      const found = await bridge.job<Cal[]>('calendar.account.save', { account: accountDraft, secret })
       setCals(found)
       const calendarIds = found.map(c => c.id)
       const updated = await bridge.request<typeof account>('calendar.selection.save', { calendarIds })
       setAccount(updated || { ...accountDraft, selectedCalendars: calendarIds })
+      setConnecting(false); setSecret('')
       await load(true)
     } catch (e) {
       setError(String(e))
@@ -198,15 +207,15 @@ export default function App() {
     }
   }
 
-  const saveEvent = async () => {
+  const saveEvent = async (overwrite = false) => {
     if (!edit) return
     setBusy(true); setError('')
     try {
-      await bridge.request('calendar.event.save', { event: edit, overwrite: false })
-      setEdit(null)
+      await bridge.job('calendar.event.save', { event: edit, overwrite })
+      setConflict(false); setEdit(null)
       await load(true)
     } catch (e) {
-      setError(String(e))
+      setError(String(e)); setConflict(String(e).includes('conflict') || String(e).includes('其他设备'))
     } finally {
       setBusy(false)
     }
@@ -214,21 +223,20 @@ export default function App() {
 
   const delEvent = async () => {
     if (!edit) return
+    setBusy(true)
     try {
-      await bridge.request('calendar.event.delete', { event: edit, overwrite: false })
+      await bridge.job('calendar.event.delete', { event: edit, overwrite: false })
       setEdit(null)
       await load(true)
     } catch (e) {
       setError(String(e))
-    }
+    } finally { setBusy(false) }
   }
 
   const selectCalendar = async (id: string, checked: boolean) => {
     if (!account) return
     const ids = checked ? [...account.selectedCalendars, id] : account.selectedCalendars.filter(x => x !== id)
-    const updated = await bridge.request<typeof account>('calendar.selection.save', { calendarIds: ids })
-    setAccount(updated || { ...account, selectedCalendars: ids })
-    await load(true)
+    try { const updated = await bridge.request<typeof account>('calendar.selection.save', { calendarIds: ids }); setAccount(updated || { ...account, selectedCalendars: ids }); await load(true) } catch (reason) { setError(String(reason)) }
   }
 
   const saveTodo = async () => {
@@ -239,17 +247,17 @@ export default function App() {
   }
 
   const toggle = async (t: Todo) => {
-    await bridge.request('todo.save', { todo: { ...t, done: !t.done } })
-    await load()
+    try { await bridge.request('todo.save', { todo: { ...t, done: !t.done } }); await load() } catch (reason) { setError(String(reason)) }
   }
 
   const removeTodo = async (id: string) => {
-    await bridge.request('todo.delete', { id })
-    await load()
+    try { await bridge.request('todo.delete', { id }); await load() } catch (reason) { setError(String(reason)) }
   }
 
+  useEffect(() => bridge.on<{active:boolean}>('host.visibility', ({active}) => {if(active) void load().catch(reason=>setError(String(reason)))}), [])
+
   if (!initialized) return <main className="connect"><Status>正在载入日历…</Status></main>
-  if (!account) {
+  if (connecting) {
     return (
       <main className="connect">
         <Card>
@@ -267,7 +275,7 @@ export default function App() {
           <Button variant="primary" onClick={() => void connect()} disabled={busy || !secret}>
             {busy ? '连接中…' : '连接并发现日历'}
           </Button>
-          {previousAccount && <Button onClick={() => { setAccount(previousAccount); setPreviousAccount(null); setError('') }}>取消</Button>}
+          <Button onClick={() => { setConnecting(false); setPreviousAccount(null); setError('') }}>取消</Button>
           {error && <Status tone="error">{error}</Status>}
         </Card>
       </main>
@@ -288,14 +296,14 @@ export default function App() {
         <Button onClick={() => void load(true)} disabled={busy}>
           <RefreshCw size={15} />同步
         </Button>
-        <Button onClick={() => { setPreviousAccount(account); setAccountDraft(account); setAccount(null) }}>
+        <Button onClick={() => { setPreviousAccount(account); if (account) setAccountDraft(account); setConnecting(true) }}>
           <Settings size={15} />账号
         </Button>
       </header>
 
       {error && <Status tone="error">{error}</Status>}
 
-      {tab === 'calendar' ? (
+      {tab === 'calendar' && !account ? <Card><h2>连接 iCloud 日历</h2><p>连接后查看日程；Todo 无需账号即可使用。</p><Button variant="primary" onClick={() => setConnecting(true)}>连接日历</Button><Button onClick={() => setTab('todo')}>使用 Todo</Button></Card> : tab === 'calendar' ? (
         <div className="calendar-view">
           <div className="calendar-sidebar">
             <Card className="month-card">
@@ -309,7 +317,7 @@ export default function App() {
                     variant="primary"
                     aria-label="新建日程"
                     title="在选定日期新建日程"
-                    disabled={!cals.length}
+                    disabled={!cals.some(c => !c.readOnly)}
                     onClick={() => createEventForDate(selectedDate || today)}
                   >
                     <Plus size={15} />
@@ -336,7 +344,16 @@ export default function App() {
                       onClick={() => setSelectedDate(cell.key)}
                       onDoubleClick={() => createEventForDate(cell.key)}
                       aria-label={`${cell.key}${dayEvents.length ? `，有 ${dayEvents.length} 个日程` : ''}`}
-                      aria-selected={isSelected}
+                      aria-pressed={isSelected}
+                      tabIndex={isSelected || (!selectedDate && cell.isToday) ? 0 : -1}
+                      onKeyDown={event => {
+                        const delta = ({ArrowLeft:-1,ArrowRight:1,ArrowUp:-7,ArrowDown:7} as Record<string,number>)[event.key]
+                        if (delta === undefined) return
+                        event.preventDefault()
+                        const d = new Date(`${cell.key}T12:00:00`); d.setDate(d.getDate()+delta)
+                        const next = dateKey(d); setSelectedDate(next); setViewYear(d.getFullYear()); setViewMonth(d.getMonth()+1)
+                        requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(`[aria-label^="${next}"]`)?.focus())
+                      }}
                     >
                       <span className="cell-day">{cell.dayNum}</span>
                       <span className="cell-dots">
@@ -359,7 +376,7 @@ export default function App() {
                   <label key={c.id}>
                     <input
                       type="checkbox"
-                      checked={account.selectedCalendars.includes(c.id)}
+                      checked={account?.selectedCalendars.includes(c.id) ?? false}
                       onChange={e => void selectCalendar(c.id, e.target.checked)}
                     />
                     {c.name}
@@ -384,7 +401,7 @@ export default function App() {
                 <Button
                   variant="primary"
                   onClick={() => createEventForDate(selectedDate || today)}
-                  disabled={!cals.length}
+                  disabled={!cals.some(c => !c.readOnly)}
                 >
                   <Plus size={15} />新建日程
                 </Button>
@@ -398,10 +415,10 @@ export default function App() {
                     <time>{formatDisplayDate(day)}</time>
                     <div className="agenda-day-events">
                       {list.map(e => (
-                        <Button key={`${e.href}-${e.id}`} className="event" onClick={() => setEdit(e)}>
+                        <Button key={`${e.href}-${e.id}-${e.start}`} className="event" onClick={() => setEdit(e)}>
                           <span>
                             <strong>{e.title || '无标题'}</strong>
-                            <small>{e.allDay ? '全天' : formatTime(e.start)}{e.location ? ` · ${e.location}` : ''}</small>
+                            <small>{e.allDay ? '全天' : formatTime(e.start, e.startTimezone)}{e.location ? ` · ${e.location}` : ''}</small>
                           </span>
                           {e.recurring && <small>重复</small>}
                         </Button>
@@ -418,7 +435,7 @@ export default function App() {
           </div>
         </div>
       ) : (
-        <section className="todo">
+        <section className="todo"><Select aria-label="筛选 Todo" value={todoFilter} onChange={e => setTodoFilter(e.target.value)}><option value="open">未完成</option><option value="done">已完成</option><option value="overdue">逾期</option><option value="all">全部</option></Select>
           <Card className="todo-add">
             <Input
               value={todoText}
@@ -427,18 +444,19 @@ export default function App() {
               onKeyDown={e => { if (e.key === 'Enter') void saveTodo() }}
             />
             <Input type="date" aria-label="截止日期" value={todoDue} onChange={e => setTodoDue(e.target.value)} />
-            <Button variant="primary" onClick={() => void saveTodo()}><Plus size={15} /></Button>
+            <Button aria-label="添加 Todo" variant="primary" disabled={busy || !todoText.trim()} onClick={() => void saveTodo()}><Plus size={15} /></Button>
           </Card>
-          {todos.map(t => (
+          {todos.filter(t => todoFilter === 'all' || (todoFilter === 'done' ? t.done : !t.done && (todoFilter !== 'overdue' || !!t.due && t.due < today))).map(t => (
             <Card key={t.id} className={t.done ? 'done' : ''}>
-              <input type="checkbox" checked={t.done} onChange={() => void toggle(t)} />
-              <span>{t.title}{t.due && <small>截止 {t.due}</small>}</span>
-              <Button onClick={() => void removeTodo(t.id)}><Trash2 size={15} /></Button>
+              <input type="checkbox" aria-label={`完成 ${t.title}`} checked={t.done} onChange={() => void toggle(t)} />
+              <Button onClick={()=>setTodoEdit({...t})}>{t.title}{t.due && <small>截止 {t.due}</small>}</Button>
+              <Button aria-label={`删除 ${t.title}`} onClick={() => void removeTodo(t.id)}><Trash2 size={15} /></Button>
             </Card>
           ))}
         </section>
       )}
 
+      <Dialog open={todoEdit!==null} onClose={()=>setTodoEdit(null)} aria-label="编辑 Todo"><h2>编辑 Todo</h2><label>标题<Input value={todoEdit?.title??''} onChange={e=>setTodoEdit(current=>current?{...current,title:e.target.value}:null)} /></label><label>截止日期<Input type="date" value={todoEdit?.due??''} onChange={e=>setTodoEdit(current=>current?{...current,due:e.target.value}:null)} /></label><Button onClick={()=>setTodoEdit(null)}>取消</Button><Button disabled={busy||!todoEdit?.title.trim()} onClick={async()=>{setBusy(true);try{await bridge.request('todo.save',{todo:todoEdit});setTodoEdit(null);await load()}catch(reason){setError(String(reason))}finally{setBusy(false)}}}>保存 Todo</Button></Dialog>
       {edit && (
         <Dialog open onClose={() => !busy && setEdit(null)} className="editor" aria-label={edit.href ? '编辑事件' : '新建事件'}>
           <header>
@@ -502,12 +520,14 @@ export default function App() {
             备注
             <Textarea disabled={edit.recurring} value={edit.notes} onChange={e => setEdit({ ...edit, notes: e.target.value })} />
           </label>
+          {conflict && <Status tone="error">日程版本冲突，草稿已保留。<Button onClick={async()=>{await load(true);try{const data=await bridge.request<CalendarSyncResult>('calendar.cached');const current=data.events.find(e=>e.href===edit.href);if(current)setEdit(current);setConflict(false)}catch(reason){setError(String(reason))}}}>读取服务器版本</Button><Button onClick={() => void saveEvent(true)}>覆盖保存</Button></Status>}
+          {error && <Status tone="error">{error}</Status>}
           <footer>
             {edit.href && !edit.recurring ? (
               <Button variant="danger" disabled={busy || cals.find(calendar => calendar.id === edit.calendarId)?.readOnly} onClick={() => void delEvent()}>删除</Button>
             ) : <span />}
             <div>
-              <Button onClick={() => setEdit(null)}>取消</Button>
+              <Button disabled={busy} onClick={() => setEdit(null)}>取消</Button>
               <Button variant="primary" disabled={busy || edit.recurring || cals.find(calendar => calendar.id === edit.calendarId)?.readOnly || !edit.title || !edit.start || !edit.end} onClick={() => void saveEvent()}>
                 {busy ? '保存中…' : '保存'}
               </Button>
@@ -519,7 +539,8 @@ export default function App() {
   )
 }
 
-function formatTime(v: string) {
+function formatTime(v: string, timezone?: string | null) {
+  if (timezone) { const instant = eventInstant(v, timezone); return instant ? new Intl.DateTimeFormat('zh-CN', {hour:'2-digit',minute:'2-digit'}).format(instant) : `${v} (${timezone})` }
   if (/^\d{8}T\d{6}Z$/.test(v)) {
     const date = icalUtcDate(v)
     return new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(date)

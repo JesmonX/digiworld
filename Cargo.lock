@@ -977,7 +977,7 @@ dependencies = [
 
 [[package]]
 name = "digiworld-agent-token-heatmap"
-version = "0.1.14"
+version = "0.1.15"
 dependencies = [
  "anyhow",
  "chrono",
@@ -991,10 +991,11 @@ dependencies = [
 
 [[package]]
 name = "digiworld-calendar-todo"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "chrono",
+ "digiworld-plugin-runtime",
  "keyring",
  "regex",
  "reqwest 0.12.28",
@@ -1006,9 +1007,10 @@ dependencies = [
 
 [[package]]
 name = "digiworld-github-actions"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
+ "digiworld-plugin-runtime",
  "keyring",
  "reqwest 0.12.28",
  "serde",
@@ -1018,7 +1020,7 @@ dependencies = [
 
 [[package]]
 name = "digiworld-keyboard-heatmap"
-version = "0.1.11"
+version = "0.1.12"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1034,7 +1036,7 @@ dependencies = [
 
 [[package]]
 name = "digiworld-mail-assistant"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1056,10 +1058,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "digiworld-server-monitor"
-version = "0.1.4"
+name = "digiworld-plugin-runtime"
+version = "0.1.0"
 dependencies = [
  "anyhow",
+ "serde_json",
+]
+
+[[package]]
+name = "digiworld-server-monitor"
+version = "0.1.5"
+dependencies = [
+ "anyhow",
+ "digiworld-plugin-runtime",
  "serde",
  "serde_json",
  "tracing-subscriber",

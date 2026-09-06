@@ -452,6 +452,63 @@ impl Database {
         })
     }
 
+    pub fn list_messages_v2(&self, p: &serde_json::Value) -> Result<serde_json::Value> {
+        let connection = self.connection.lock().expect("database lock poisoned");
+        let account = p["accountId"].as_str().unwrap_or("");
+        let search = fts_query(p["query"].as_str().unwrap_or(""));
+        let unread = p["unread"].as_bool().unwrap_or(false);
+        let from = p["from"].as_str().unwrap_or("");
+        let until = p["until"].as_str().unwrap_or("");
+        let cursor: (String, i64) = match p["cursor"].as_str() {
+            Some(v) => serde_json::from_str(v)?,
+            None => (String::new(), 0),
+        };
+        let sql = "SELECT m.id,m.account_id,a.label,m.subject,m.sender,m.received_at,m.snippet,m.server_seen,m.locally_viewed,m.size,m.has_body FROM messages m JOIN accounts a ON a.id=m.account_id
+          WHERE (?1='' OR m.account_id=?1) AND (?2='' OR m.id IN (SELECT rowid FROM messages_fts WHERE messages_fts MATCH ?2))
+          AND (?3=0 OR (m.server_seen=0 AND m.locally_viewed=0)) AND (?4='' OR COALESCE(m.received_at,'')>=?4)
+          AND (?5='' OR substr(COALESCE(m.received_at,''),1,10)<=?5)
+          AND (?7=0 OR (COALESCE(m.received_at,''),m.id)<(?6,?7))
+          ORDER BY COALESCE(m.received_at,'') DESC,m.id DESC LIMIT 51";
+        let mut statement = connection.prepare(sql)?;
+        let mut rows = statement
+            .query_map(
+                params![account, search, unread, from, until, cursor.0, cursor.1],
+                message_summary_from_row,
+            )?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        let more = rows.len() > 50;
+        rows.truncate(50);
+        let next = if more {
+            rows.last()
+                .map(|row| {
+                    serde_json::to_string(&(row.received_at.clone().unwrap_or_default(), row.id))
+                })
+                .transpose()?
+        } else {
+            None
+        };
+        Ok(serde_json::json!({"items":rows,"nextCursor":next}))
+    }
+    pub fn mark_read_ids(&self, ids: &[i64]) -> Result<Vec<String>> {
+        if ids.len() > 500 {
+            anyhow::bail!("每次最多选择 500 封邮件")
+        }
+        let mut connection = self.connection.lock().expect("database lock poisoned");
+        let transaction = connection.transaction()?;
+        let mut accounts = std::collections::BTreeSet::new();
+        for id in ids {
+            let account: String = transaction.query_row(
+                "SELECT account_id FROM messages WHERE id=?1",
+                [id],
+                |r| r.get(0),
+            )?;
+            transaction.execute("UPDATE messages SET locally_viewed=1 WHERE id=?1", [id])?;
+            accounts.insert(account);
+        }
+        transaction.commit()?;
+        Ok(accounts.into_iter().collect())
+    }
+
     pub fn message(&self, id: i64) -> Result<MessageDetail> {
         let connection = self.connection.lock().expect("database lock poisoned");
         connection.execute("UPDATE messages SET locally_viewed=1 WHERE id=?1", [id])?;
