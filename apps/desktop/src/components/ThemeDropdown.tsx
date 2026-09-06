@@ -6,14 +6,19 @@ export interface ThemeDropdownProps {
   value: AccentThemeId
   onChange(id: AccentThemeId): void
   themes: AccentTheme[]
+  onOpenChange?(open: boolean): void
 }
 
-export function ThemeDropdown({ value, onChange, themes }: ThemeDropdownProps) {
+export function ThemeDropdown({ value, onChange, themes, onOpenChange }: ThemeDropdownProps) {
   const [open, setOpen] = useState(false)
   const [highlightedId, setHighlightedId] = useState<AccentThemeId>(value)
   const containerRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const listboxRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    onOpenChange?.(open)
+  }, [open, onOpenChange])
 
   const currentTheme = themes.find(t => t.id === value) ?? themes[0]!
   const lightThemes = themes.filter(t => t.scheme === 'light')

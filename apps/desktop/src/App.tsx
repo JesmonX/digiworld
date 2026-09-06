@@ -588,11 +588,12 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, text
     }
   }
 
+  const [themeDropdownOpen, setThemeDropdownOpen] = useState(false)
   const currentTheme = ACCENT_THEMES.find(t => t.id === accentThemeId) ?? ACCENT_THEMES[0]!
 
   return (
     <div className="settings-stack">
-      <Card className="settings-card theme-card">
+      <Card className={`settings-card theme-card ${themeDropdownOpen ? 'dropdown-open' : ''}`}>
         <div className="theme-header-row">
           <div className="theme-copy">
             <h3><Palette />主题颜色</h3>
@@ -602,6 +603,7 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, text
             value={accentThemeId}
             onChange={onAccentThemeChange}
             themes={ACCENT_THEMES}
+            onOpenChange={setThemeDropdownOpen}
           />
         </div>
         <div
