@@ -194,3 +194,38 @@ test('agent overview auto-refresh interval selector', async ({ page }) => {
   await refreshSelect.selectOption('60')
   await expect(refreshSelect).toHaveValue('60')
 })
+
+test('navigation rail maintains 72px compact rail with 40x40 items', async ({ page }) => {
+  await gotoWithRetry(page, '/design.html')
+  const rail = page.locator('.nav-rail')
+  await expect(rail).toBeVisible()
+  const box = await rail.boundingBox()
+  expect(box?.width).toBeCloseTo(72, 1)
+
+  const item = page.locator('.nav-rail-item').first()
+  await expect(item).toBeVisible()
+  const itemBox = await item.boundingBox()
+  expect(itemBox?.width).toBeCloseTo(40, 1)
+  expect(itemBox?.height).toBeCloseTo(40, 1)
+})
+
+test('github actions renders master-detail runs and jobs timeline', async ({ page }) => {
+  await gotoWithRetry(page, '/design.html')
+  await page.getByRole('button', { name: 'Git Actions', exact: true }).click()
+  const frame = page.frameLocator('iframe')
+  await expect(frame.locator('.actions-workspace')).toBeVisible()
+  await expect(frame.locator('.runs')).toBeVisible()
+  await expect(frame.locator('.run-details')).toBeVisible()
+  await expect(frame.locator('.job-item')).toBeVisible()
+})
+
+test('mail assistant renders 3-pane soft glass layout', async ({ page }) => {
+  await gotoWithRetry(page, '/design.html')
+  await page.getByRole('button', { name: '邮件助手', exact: true }).click()
+  const frame = page.frameLocator('iframe')
+  await expect(frame.locator('.workspace')).toBeVisible()
+  await expect(frame.locator('.accounts')).toBeVisible()
+  await expect(frame.locator('.message-list')).toBeVisible()
+  await expect(frame.locator('.detail')).toBeVisible()
+})
+

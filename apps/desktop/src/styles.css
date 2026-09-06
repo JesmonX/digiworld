@@ -238,11 +238,11 @@ html[data-dw-scheme="dark"] .app-window {
   position: relative;
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   padding: 0;
   border: 0;
-  border-radius: var(--dw-radius-sm);
+  border-radius: var(--dw-radius-md);
   color: var(--dw-text-muted);
   background: transparent;
   cursor: pointer;
