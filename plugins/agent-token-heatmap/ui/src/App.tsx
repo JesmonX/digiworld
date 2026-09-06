@@ -2,7 +2,7 @@ import { Button, Input, Select, Textarea, Card, Dialog, Status, Metric } from '@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Check, Clock3, Database, Gauge, HardDrive, PieChart, Plus, RefreshCw, Server, Settings2, Ticket, Trash2, X } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
-import { cacheRateScale, calendarCells, formatTokens, heatLevel, weeklyModelCategories, weeklyUsage, type Metric, type UsageDay, type WeeklyUsagePoint } from './heatmap'
+import { cacheRateScale, calendarCells, formatTokens, heatLevel, weeklyModelCategories, weeklyUsage, type Metric as HeatmapMetric, type UsageDay, type WeeklyUsagePoint } from './heatmap'
 import './styles.css'
 
 const PLUGIN_ID = 'io.github.jesmonx.digiworld.agent-token-heatmap'
@@ -144,7 +144,7 @@ export default function App() {
   const [agents, setAgents] = useState<Agent[]>([...AGENTS])
   const [sources, setSources] = useState<string[]>(['local'])
   const [range, setRange] = useState<Range>('365')
-  const [metric, setMetric] = useState<Metric>('totalTokens')
+  const [metric, setMetric] = useState<HeatmapMetric>('totalTokens')
   const [refresh, setRefresh] = useState<RefreshStatus>({ running: false, completed: 0, total: 0, errors: [] })
   const [quota, setQuota] = useState<CodexQuotaSnapshot | null>(null)
   const [quotaLoading, setQuotaLoading] = useState(false)
@@ -391,7 +391,7 @@ export default function App() {
           <div><h2>每日热力图</h2><p>{snapshot?.startDay ?? snapshot?.days[0]?.day ?? '—'} 至 {snapshot?.endDay ?? '—'}</p></div>
           <div className="heatmap-controls">
             <div className="dw-segmented range-group" aria-label="统计范围">{(['30', '90', '365', 'all'] as Range[]).map(value => <Button key={value} className={range === value ? 'active' : ''} onClick={() => setRange(value)}>{value === 'all' ? '全部' : `${value} 天`}</Button>)}</div>
-            <Select aria-label="热力图指标" value={metric} onChange={event => setMetric(event.target.value as Metric)}><option value="totalTokens">总 Token</option><option value="inputTokens">输入</option><option value="outputTokens">输出</option><option value="cacheReadTokens">缓存读取</option></Select>
+            <Select aria-label="热力图指标" value={metric} onChange={event => setMetric(event.target.value as HeatmapMetric)}><option value="totalTokens">总 Token</option><option value="inputTokens">输入</option><option value="outputTokens">输出</option><option value="cacheReadTokens">缓存读取</option></Select>
           </div>
         </div>
         <div className="summary-grid" aria-label="所选范围用量汇总">
