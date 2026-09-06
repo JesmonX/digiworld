@@ -9,6 +9,7 @@ import {
 import { suppressContextMenu, type CatalogIndex, type CatalogPlugin, type PluginSummary } from '@digiworld/plugin-sdk'
 import { PluginFrame } from './components/PluginFrame'
 import { WindowChrome } from './components/WindowChrome'
+import { ThemeDropdown } from './components/ThemeDropdown'
 import {
   api, type AppState, type CoreUpdateInfo, type PluginUpdateInfo, type ProxyMode,
   type ProxySettings, type UpdateProgress,
@@ -587,33 +588,48 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, text
     }
   }
 
+  const currentTheme = ACCENT_THEMES.find(t => t.id === accentThemeId) ?? ACCENT_THEMES[0]!
+
   return (
     <div className="settings-stack">
       <Card className="settings-card theme-card">
-        <div className="theme-copy">
-          <h3><Palette />主题颜色</h3>
-          <p>框架与插件使用同一套完整配色</p>
+        <div className="theme-header-row">
+          <div className="theme-copy">
+            <h3><Palette />主题颜色</h3>
+            <p>框架与插件使用同一套完整配色</p>
+          </div>
+          <ThemeDropdown
+            value={accentThemeId}
+            onChange={onAccentThemeChange}
+            themes={ACCENT_THEMES}
+          />
         </div>
-        <RadioGroup className="theme-options" aria-label="主题颜色">
-          {ACCENT_THEMES.map(theme => (
-            <Button
-              key={theme.id}
-              type="button"
-              className={accentThemeId === theme.id ? 'active' : ''}
-              role="radio"
-              aria-checked={accentThemeId === theme.id}
-              tabIndex={accentThemeId === theme.id ? 0 : -1}
-              aria-label={theme.label}
-              title={theme.label}
-              style={{ '--theme-swatch': theme.colors.accent, '--preview-bg': theme.colors.bg, '--preview-surface': theme.colors.surface, '--preview-text': theme.colors.text } as React.CSSProperties}
-              onClick={() => onAccentThemeChange(theme.id)}
-            >
-              <span className="theme-miniature" aria-hidden="true"><i /><b><em />Aa 123</b></span>
-              <small>{theme.label}</small>
-              {accentThemeId === theme.id && <Check />}
-            </Button>
-          ))}
-        </RadioGroup>
+        <div
+          className="theme-active-preview"
+          style={{
+            '--theme-swatch': currentTheme.colors.accent,
+            '--preview-bg': currentTheme.colors.bg,
+            '--preview-surface': currentTheme.colors.surface,
+            '--preview-text': currentTheme.colors.text,
+            '--preview-border': currentTheme.colors.border,
+          } as React.CSSProperties}
+        >
+          <span className="theme-miniature" aria-hidden="true"><i /><b><em />Aa 123</b></span>
+          <div className="theme-preview-details">
+            <div className="theme-preview-meta">
+              <strong>{currentTheme.label}</strong>
+              <span className="theme-preview-pill">{currentTheme.scheme === 'light' ? '浅色模式' : '深色模式'}</span>
+            </div>
+            <div className="theme-preview-swatches" aria-label="主题核心色彩" title="主题核心色彩">
+              <span style={{ background: currentTheme.colors.bg }} title={`背景色: ${currentTheme.colors.bg}`} />
+              <span style={{ background: currentTheme.colors.surface }} title={`表面色: ${currentTheme.colors.surface}`} />
+              <span style={{ background: currentTheme.colors['surface-raised'] }} title={`浮层色: ${currentTheme.colors['surface-raised']}`} />
+              <span style={{ background: currentTheme.colors.accent }} title={`主强调色: ${currentTheme.colors.accent}`} />
+              <span style={{ background: currentTheme.colors['accent-secondary'] }} title={`次强调色: ${currentTheme.colors['accent-secondary']}`} />
+              <span style={{ background: currentTheme.colors.text }} title={`文字色: ${currentTheme.colors.text}`} />
+            </div>
+          </div>
+        </div>
       </Card>
       <Card className="settings-card scheme-card">
         <div className="theme-copy">

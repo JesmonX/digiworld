@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import { COLOR_SCHEME_STORAGE_KEY, FONT_THEME_STORAGE_KEY, FONT_WEIGHT_STORAGE_KEY, GLASS_STORAGE_KEY } from './theme'
+import { COLOR_SCHEME_STORAGE_KEY, FONT_THEME_STORAGE_KEY, FONT_WEIGHT_STORAGE_KEY, GLASS_STORAGE_KEY, THEME_STORAGE_KEY } from './theme'
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -251,6 +251,35 @@ describe('explicit update consent', () => {
 
     expect(container.querySelector<HTMLElement>('.app-window')?.style.getPropertyValue('--dw-accent')).toBe('#1e66f5')
     expect(localStorage.getItem(COLOR_SCHEME_STORAGE_KEY)).toBe('ocean')
+    await act(async () => root.unmount())
+  })
+
+  it('applies and persists theme selection via dropdown menu', async () => {
+    const root = createRoot(container)
+    await act(async () => { root.render(<App />); await flush() })
+    await navigate(container, '设置')
+
+    const trigger = container.querySelector<HTMLButtonElement>('.theme-dropdown-trigger')
+    expect(trigger).not.toBeNull()
+    expect(trigger?.getAttribute('aria-expanded')).toBe('false')
+
+    // Open dropdown
+    await act(async () => { trigger?.click(); await flush() })
+    expect(trigger?.getAttribute('aria-expanded')).toBe('true')
+    const listbox = container.querySelector('#theme-dropdown-listbox')
+    expect(listbox).not.toBeNull()
+
+    // Select tokyo-night
+    const tokyoOption = container.querySelector<HTMLButtonElement>('[data-theme-id="tokyo-night"]')
+    expect(tokyoOption).not.toBeNull()
+    await act(async () => { tokyoOption?.click(); await flush() })
+
+    // Menu should close and theme should be persisted and applied
+    expect(container.querySelector('#theme-dropdown-listbox')).toBeNull()
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('tokyo-night')
+    expect(container.querySelector<HTMLElement>('.app-window')?.style.getPropertyValue('--dw-color-scheme')).toBe('dark')
+    expect(container.querySelector<HTMLElement>('.app-window')?.style.getPropertyValue('--dw-bg')).toBe('#1a1b26')
+
     await act(async () => root.unmount())
   })
 

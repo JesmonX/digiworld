@@ -11,6 +11,11 @@ import {
 describe('accent themes', () => {
   it('loads a stored theme and falls back for unknown values', () => {
     expect(loadAccentThemeId({ getItem: () => 'catppuccin-mocha' })).toBe('catppuccin-mocha')
+    expect(loadAccentThemeId({ getItem: () => 'tokyo-night' })).toBe('tokyo-night')
+    expect(loadAccentThemeId({ getItem: () => 'tokyo-night-day' })).toBe('tokyo-night-day')
+    expect(loadAccentThemeId({ getItem: () => 'nord' })).toBe('nord')
+    expect(loadAccentThemeId({ getItem: () => 'github-light' })).toBe('github-light')
+    expect(loadAccentThemeId({ getItem: () => 'dracula' })).toBe('dracula')
     expect(loadAccentThemeId({ getItem: () => 'dark' })).toBe(DEFAULT_ACCENT_THEME_ID)
   })
 
@@ -18,6 +23,8 @@ describe('accent themes', () => {
     const setItem = vi.fn()
     saveAccentThemeId('rose-pine-moon', { setItem })
     expect(setItem).toHaveBeenCalledWith(THEME_STORAGE_KEY, 'rose-pine-moon')
+    saveAccentThemeId('tokyo-night', { setItem })
+    expect(setItem).toHaveBeenCalledWith(THEME_STORAGE_KEY, 'tokyo-night')
   })
 
   it('resolves complete palette and typography for plugins', () => {
@@ -34,6 +41,28 @@ describe('accent themes', () => {
       'font-brand': expect.stringContaining('Digiworld Smiley Sans'),
       success: '#436b58',
       warning: '#916000',
+    })
+
+    const tokyo = pluginTheme(getAccentTheme('tokyo-night'))
+    expect(tokyo).toMatchObject({
+      'color-scheme': 'dark',
+      'bg': '#1a1b26',
+      'surface': '#202333',
+      'accent': '#7aa2f7',
+      success: '#9ece6a',
+      warning: '#e0af68',
+      danger: '#f7768e',
+    })
+
+    const github = pluginTheme(getAccentTheme('github-light'))
+    expect(github).toMatchObject({
+      'color-scheme': 'light',
+      'bg': '#f6f8fa',
+      'surface': '#ffffff',
+      'accent': '#0969da',
+      success: '#147432',
+      warning: '#8c5c00',
+      danger: '#cf222e',
     })
   })
 })

@@ -5,7 +5,7 @@ export default class DesignReporter implements Reporter {
   private complete = false
   onBegin(_config: FullConfig, suite: Suite) {
     const titles = new Set(suite.allTests().map(test => test.title))
-    this.complete = ['catppuccin-latte', 'catppuccin-mocha', 'rose-pine-dawn', 'rose-pine-moon'].every(theme => [100, 110, 125].every(scale => ['900x600', '1280x800', '1600x1000'].every(size => titles.has(`${theme} ${scale}% ${size}`)))) && ['plugin empty states', 'plugin error states', 'live theme and typography update preserves plugin document and UI state', 'shared controls retain keyboard focus and modal focus containment'].every(title => titles.has(title))
+    this.complete = ['catppuccin-latte', 'catppuccin-mocha', 'rose-pine-dawn', 'rose-pine-moon', 'tokyo-night', 'tokyo-night-day', 'nord', 'github-light', 'dracula'].every(theme => [100, 110, 125].every(scale => ['900x600', '1280x800', '1600x1000'].every(size => titles.has(`${theme} ${scale}% ${size}`)))) && ['plugin empty states', 'plugin error states', 'live theme and typography update preserves plugin document and UI state', 'shared controls retain keyboard focus and modal focus containment'].every(title => titles.has(title))
   }
   async onEnd(result: FullResult) {
     const plugins: Record<string, string> = {}
