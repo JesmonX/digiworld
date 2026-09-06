@@ -306,8 +306,10 @@ function buildPreset(id: ThemeId, schemeId: ColorSchemeId = DEFAULT_COLOR_SCHEME
       'heat-count-text': scheme === 'light' ? text : '#ffffff',
       'heat-count-strong': '#ffffff',
       'glass-surface': mix(surface, 92, 'transparent'), 'glass-filter': 'blur(14px) saturate(115%)',
-      'shadow-xs': '0 1px 2px rgba(15, 17, 26, .04)', 'shadow-sm': '0 2px 8px rgba(15, 17, 26, .04)',
-      'shadow-md': '0 4px 16px rgba(15, 17, 26, .06)', 'shadow-lg': '0 12px 32px rgba(15, 17, 26, .16)',
+      'shadow-xs': scheme === 'dark' ? '0 1px 2px rgba(0, 0, 0, .15)' : '0 1px 2px rgba(30, 35, 55, .025)',
+      'shadow-sm': scheme === 'dark' ? '0 4px 14px rgba(0, 0, 0, .20)' : '0 6px 18px rgba(30, 35, 55, .045)',
+      'shadow-md': scheme === 'dark' ? '0 8px 24px rgba(0, 0, 0, .25)' : '0 12px 30px rgba(30, 35, 55, .060)',
+      'shadow-lg': scheme === 'dark' ? '0 16px 36px rgba(0, 0, 0, .35)' : '0 20px 48px rgba(30, 35, 55, .085)',
     },
   }
 }

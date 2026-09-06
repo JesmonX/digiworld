@@ -13,12 +13,14 @@
   --dw-type-title: calc(16px * var(--dw-text-scale));
   --dw-type-page: calc(20px * var(--dw-text-scale));
   --dw-type-metric: calc(24px * var(--dw-text-scale));
+  --dw-type-display: calc(28px * var(--dw-text-scale));
   --dw-leading-caption: calc(18px * var(--dw-text-scale));
   --dw-leading-body-sm: calc(20px * var(--dw-text-scale));
   --dw-leading-body: calc(22px * var(--dw-text-scale));
   --dw-leading-title: calc(24px * var(--dw-text-scale));
   --dw-leading-page: calc(28px * var(--dw-text-scale));
   --dw-leading-metric: calc(30px * var(--dw-text-scale));
+  --dw-leading-display: calc(36px * var(--dw-text-scale));
   --dw-space-1: 4px;
   --dw-space-2: 8px;
   --dw-space-3: 12px;
@@ -32,6 +34,7 @@
   --type-title-sm: var(--dw-type-title);
   --type-title: var(--dw-type-title);
   --type-page: var(--dw-type-page);
+  --type-display: var(--dw-type-display);
   --font-sans: var(--dw-font-sans);
   --font-display: var(--dw-font-display);
   --font-brand: var(--dw-font-brand);
@@ -83,19 +86,43 @@
   --dw-heat-count-text: #4c4f69;
   --dw-heat-count-strong: #ffffff;
   --dw-glass-surface: color-mix(in srgb, var(--dw-surface) 92%, transparent);
-  --dw-glass-filter: blur(14px) saturate(115%);
+  --dw-glass-filter: blur(18px) saturate(115%);
 
-  --dw-radius-sm: 8px;
-  --dw-radius-md: 12px;
-  --dw-radius-lg: 16px;
+  /* Soft Dashboard Material System */
+  --dw-material-panel: color-mix(in srgb, var(--dw-surface) 78%, transparent);
+  --dw-material-card: color-mix(in srgb, var(--dw-surface) 88%, transparent);
+  --dw-material-raised: color-mix(in srgb, var(--dw-surface-raised) 94%, transparent);
+  --dw-material-inset: color-mix(in srgb, var(--dw-surface-subtle) 64%, transparent);
+  --dw-material-border: color-mix(in srgb, var(--dw-border) 64%, transparent);
+  --dw-material-border-strong: color-mix(in srgb, var(--dw-border-strong) 72%, transparent);
 
-  --dw-shadow-xs: 0 1px 2px rgba(47, 55, 80, .045);
-  --dw-shadow-sm: 0 4px 12px rgba(47, 55, 80, .045);
-  --dw-shadow-md: 0 8px 22px rgba(47, 55, 80, .065);
-  --dw-shadow-lg: 0 14px 32px rgba(47, 55, 80, .11);
+  --dw-radius-sm: 10px;
+  --dw-radius-md: 14px;
+  --dw-radius-lg: 20px;
+
+  --dw-shadow-xs: 0 1px 2px rgba(30, 35, 55, .025);
+  --dw-shadow-sm: 0 6px 18px rgba(30, 35, 55, .045);
+  --dw-shadow-md: 0 12px 30px rgba(30, 35, 55, .060);
+  --dw-shadow-lg: 0 20px 48px rgba(30, 35, 55, .085);
 
   --dw-motion-fast: 120ms;
   --dw-motion-normal: 180ms;
   --dw-motion-slow: 300ms;
   --dw-ease-out: cubic-bezier(.2, .8, .2, 1);
+}
+
+:root[data-dw-scheme="dark"],
+[data-dw-scheme="dark"],
+html[data-dw-scheme="dark"] {
+  --dw-material-panel: color-mix(in srgb, var(--dw-surface) 88%, transparent);
+  --dw-material-card: color-mix(in srgb, var(--dw-surface) 92%, transparent);
+  --dw-material-raised: color-mix(in srgb, var(--dw-surface-raised) 96%, transparent);
+  --dw-material-inset: color-mix(in srgb, var(--dw-surface-subtle) 75%, transparent);
+  --dw-material-border: color-mix(in srgb, var(--dw-border) 75%, transparent);
+  --dw-material-border-strong: color-mix(in srgb, var(--dw-border-strong) 80%, transparent);
+
+  --dw-shadow-xs: 0 1px 2px rgba(0, 0, 0, .15);
+  --dw-shadow-sm: 0 4px 14px rgba(0, 0, 0, .20);
+  --dw-shadow-md: 0 8px 24px rgba(0, 0, 0, .25);
+  --dw-shadow-lg: 0 16px 36px rgba(0, 0, 0, .35);
 }
