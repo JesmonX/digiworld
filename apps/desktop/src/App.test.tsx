@@ -182,6 +182,25 @@ describe('explicit update consent', () => {
     await act(async () => root.unmount())
   })
 
+  it('does not render redundant explanatory text in settings', async () => {
+    const root = createRoot(container)
+    await act(async () => { root.render(<App />); await flush() })
+    await navigate(container, '设置')
+
+    expect(container.textContent).not.toContain('在当前主题风格下自定义主色调与图表色彩')
+    expect(container.textContent).not.toContain('高雅紫调，源自主题原生主色')
+    expect(container.textContent).not.toContain('框架与插件使用同一套完整配色')
+    expect(container.textContent).not.toContain('字体会同步应用到主界面')
+    expect(container.textContent).not.toContain('清晰现代，正文与标题保持统一')
+    expect(container.textContent).not.toContain('同步调整主界面与插件正文')
+    expect(container.textContent).not.toContain('应用到 Digiworld 界面和已安装插件')
+    expect(container.textContent).not.toContain('在后台启动已启用的插件')
+    expect(container.textContent).not.toContain('用于功能库、程序更新和声明网络权限的插件')
+    expect(container.textContent).not.toContain('一次检查并更新所有已安装插件')
+    expect(container.textContent).not.toContain('检查后由你确认是否下载和安装')
+    await act(async () => root.unmount())
+  })
+
   it('checks a core update without installing until the user confirms', async () => {
     mocks.checkCoreUpdate.mockResolvedValue({ version: '0.2.3', notes: '更新说明' })
     // Keep the promise pending so the test can inspect the installation call before restart.

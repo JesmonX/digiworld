@@ -597,7 +597,6 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, text
         <div className="theme-header-row">
           <div className="theme-copy">
             <h3><Palette />主题颜色</h3>
-            <p>框架与插件使用同一套完整配色</p>
           </div>
           <ThemeDropdown
             value={accentThemeId}
@@ -636,7 +635,6 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, text
       <Card className="settings-card scheme-card">
         <div className="theme-copy">
           <h3><Palette />主题配色</h3>
-          <p>在当前主题风格下自定义主色调与图表色彩</p>
         </div>
         <RadioGroup className="scheme-options" aria-label="主题配色">
           {COLOR_SCHEMES.map(scheme => (
@@ -654,7 +652,6 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, text
               <span className="scheme-swatch" style={{ background: getColorSchemePreview(accentThemeId, scheme.id) }} aria-hidden="true" />
               <div className="scheme-label-wrap">
                 <strong>{scheme.label}</strong>
-                <small>{scheme.description}</small>
               </div>
               {colorSchemeId === scheme.id && <Check />}
             </Button>
@@ -664,7 +661,6 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, text
       <Card className="settings-card font-card">
         <div className="theme-copy">
           <h3><Type />界面字体</h3>
-          <p>字体会同步应用到主界面、插件、图表数字与键盘按键</p>
         </div>
         <RadioGroup className="font-options" aria-label="界面字体">
           {FONT_THEMES.map(theme => (
@@ -681,13 +677,12 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, text
             >
               <span className="font-option-heading"><strong>{theme.label}</strong>{fontThemeId === theme.id && <Check />}</span>
               <span className="font-sample">数字世界 Digiworld 2026</span>
-              <small>{theme.description}</small>
             </Button>
           ))}
         </RadioGroup>
       </Card>
       <Card className="settings-card">
-        <div><h3>文字大小</h3><p>同步应用到框架、插件与图表</p></div>
+        <h3>文字大小</h3>
         <div className="dw-segmented" role="group" aria-label="文字大小">
           {([100, 110, 125] as TextScale[]).map(scale => <Button key={scale} className={textScale === scale ? 'active' : ''} aria-pressed={textScale === scale} onClick={() => onTextScaleChange(scale)}>{scale}%</Button>)}
         </div>
@@ -695,7 +690,6 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, text
       <Card className="settings-card weight-card">
         <div className="theme-copy">
           <h3><Type />字体粗细</h3>
-          <p>同步调整主界面与插件正文，同时保留标题的信息层级</p>
         </div>
         <div className="weight-control">
           <div><span>标准</span><span>清晰</span><span>粗重</span></div>
@@ -703,12 +697,17 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, text
           <output>{fontWeight}</output>
         </div>
       </Card>
-      <Card className="settings-card appearance-card"><div><h3>玻璃效果</h3><p>应用到 Digiworld 界面和已安装插件</p></div><Switch aria-label="切换玻璃效果" checked={glassMode === 'enabled'} onCheckedChange={enabled => onGlassModeChange(enabled ? 'enabled' : 'disabled')} /></Card>
-      <Card className="settings-card"><div><h3>开机启动</h3><p>在后台启动已启用的插件</p></div><Switch aria-label="切换开机启动" checked={state.launchAtStartup} onCheckedChange={enabled => void onChange(enabled)} /></Card>
+      <Card className="settings-card appearance-card">
+        <h3>玻璃效果</h3>
+        <Switch aria-label="切换玻璃效果" checked={glassMode === 'enabled'} onCheckedChange={enabled => onGlassModeChange(enabled ? 'enabled' : 'disabled')} />
+      </Card>
+      <Card className="settings-card">
+        <h3>开机启动</h3>
+        <Switch aria-label="切换开机启动" checked={state.launchAtStartup} onCheckedChange={enabled => void onChange(enabled)} />
+      </Card>
       <Card className="settings-card proxy-card">
         <div className="proxy-copy">
           <h3><Network />网络代理</h3>
-          <p>用于功能库、程序更新和声明网络权限的插件</p>
           <div className="dw-segmented proxy-modes" role="group" aria-label="代理模式">
             {([['system', '系统代理'], ['custom', '自定义'], ['direct', '直连']] as const).map(([mode, label]) => (
               <Button key={mode} className={proxy.mode === mode ? 'active' : ''} aria-pressed={proxy.mode === mode} onClick={() => updateMode(mode)}>{label}</Button>
@@ -720,11 +719,11 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, text
         <div className="proxy-actions"><Button className="secondary" disabled={proxyBusy !== null} onClick={() => void runProxyAction('test')}>{proxyBusy === 'test' ? '测试中…' : '测试连接'}</Button><Button className="primary" disabled={proxyBusy !== null} onClick={() => void runProxyAction('save')}>{proxyBusy === 'save' ? '保存中…' : '保存'}</Button></div>
       </Card>
       <Card className="settings-card update-card">
-        <div><h3>插件更新</h3><p>一次检查并更新所有已安装插件，通过上方已保存的代理连接</p>{pluginMessage && <small className="update-message">{pluginMessage}</small>}</div>
+        <div><h3>插件更新</h3>{pluginMessage && <small className="update-message">{pluginMessage}</small>}</div>
         <Button className="secondary" disabled={updateBusy !== null} onClick={() => void checkPluginUpdates()}>{updateBusy === 'plugin-check' ? <><LoaderCircle className="spin" />检查中…</> : '检查全部插件'}</Button>
       </Card>
       <Card className="settings-card update-card">
-        <div><h3>主程序更新</h3><p>当前版本 {state.version}，检查后由你确认是否下载和安装</p>{coreMessage && <small className="update-message">{coreMessage}</small>}</div>
+        <div><h3>主程序更新</h3>{coreMessage && <small className="update-message">{coreMessage}</small>}</div>
         <Button className="secondary" disabled={updateBusy !== null} onClick={() => void checkCoreUpdate()}>{updateBusy === 'core-check' ? <><LoaderCircle className="spin" />检查中…</> : '检查主程序'}</Button>
       </Card>
       <div className="version-line"><ShieldCheck /> Digiworld {state.version}</div>
