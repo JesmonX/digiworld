@@ -1,4 +1,4 @@
-import { Button, Input, Select, Card, Dialog, Status } from '@digiworld/design-system/react'
+import { Button, Input, Select, Card, Dialog, Status, Panel } from '@digiworld/design-system/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertCircle, ArrowLeft, ChevronDown, Inbox, LoaderCircle, Mail, MailCheck, Paperclip, Plus, RefreshCw,
@@ -208,16 +208,16 @@ export default function App() {
     {error && <Status tone="error" className="error"><AlertCircle size={16} /><span>{error}</span><Button onClick={() => setError('')}><X size={15} /></Button></Status>}
     {actionNotice && <div className="notice" role="status">{actionNotice}</div>}
     <section className={`workspace ${selected ? 'reading' : ''}`}>
-      <aside className="dw-card accounts">
+      <Panel className="accounts" variant="default" padding="none">
         <Button className={!accountId ? 'active' : ''} onClick={() => setAccountId('')}><Inbox size={17} /><span>全部收件箱</span></Button>
         {accounts.map(account => <Button key={account.id} className={accountId === account.id ? 'active' : ''} onClick={() => { setAccountId(account.id); setActionNotice('') }} onDoubleClick={() => editAccount(account)}>
           <Mail size={17} /><span><strong>{account.label}</strong><small title={account.lastError}>{syncing.includes(account.id) ? `${account.syncPhase === 'indexing' ? '索引' : '正文'} ${account.indexed}/${account.total}` : account.lastError || account.email}</small></span>
           {syncing.includes(account.id) ? <LoaderCircle className="spin" size={14} /> : account.lastError ? <span aria-label="同步失败" title={account.lastError}><AlertCircle className="warn" size={14} /></span> : null}
         </Button>)}
         {currentAccount && <Button className="manage" onClick={() => editAccount(currentAccount)}><Settings size={15} />账号设置</Button>}
-      </aside>
+      </Panel>
 
-      <section className="dw-card message-list" aria-label="邮件列表" aria-busy={listBusy}>
+      <Panel className="message-list" variant="default" padding="none" aria-label="邮件列表" aria-busy={listBusy}>
         {listBusy && messages.length === 0 ? <Empty icon={<LoaderCircle className="spin" />} title="正在载入邮件" text="正在读取本地缓存。" /> : accounts.length === 0 ? <Empty icon={<Mail />} title="添加邮箱账号" text="支持 Gmail、QQ、163 和自定义 IMAP。" action={() => editAccount()} /> : messages.length === 0 ? <Empty icon={<Inbox />} title={syncing.length ? '正在同步收件箱' : '没有找到邮件'} text={syncing.length ? '首次完整同步可在后台继续。' : '尝试刷新或更换搜索条件。'} /> : <>
           {messages.map(message => <Button key={message.id} className={`mail-row ${selected?.id === message.id ? 'selected' : ''} ${(!message.serverSeen && !message.locallyViewed) ? 'new' : ''}`} aria-busy={detailBusy === message.id} onClick={() => void openMessage(message)}>
             <span className="row-top"><strong>{message.sender || '未知发件人'}</strong><time>{fmtDate(message.receivedAt)}</time></span>
@@ -227,9 +227,9 @@ export default function App() {
           </Button>)}
           {nextCursor !== undefined && <Button className="load-more" onClick={() => void loadMessages(true, nextCursor)}>加载更多<ChevronDown size={15} /></Button>}
         </>}
-      </section>
+      </Panel>
 
-      <Card className="dw-card detail">
+      <Panel className="detail" variant="raised" padding="none">
         {!selected ? <Empty icon={<Mail />} title="选择一封邮件" text="正文以纯文本显示，不加载远程图片。" /> : <>
           <Button className="back-to-list" onClick={() => setSelected(null)}><ArrowLeft size={15} />返回邮件列表</Button>
           <div className="detail-head">
@@ -240,7 +240,7 @@ export default function App() {
           {selected.attachments.length > 0 && <div className="attachments">{selected.attachments.map((attachment, index) => <span key={`${attachment.filename}-${index}`}><Paperclip size={13} />{attachment.filename}<small>{fmtSize(attachment.size)}</small></span>)}</div>}
           <pre>{selected.body || (selected.hasBody ? '这封邮件没有纯文本正文。' : '正文正在后台同步…')}{selected.bodyTruncated ? '\n\n[正文已截断]' : ''}</pre>
         </>}
-      </Card>
+      </Panel>
     </section>
 
     {draft && <Dialog open onClose={() => { if (!busy) setDraft(null) }} className="modal" aria-label="邮箱账号设置">
