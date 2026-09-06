@@ -1,7 +1,8 @@
 
 * { box-sizing: border-box; }
 html, body, #root { width: 100%; height: 100%; margin: 0; }
-body { overflow: hidden; background: var(--dw-bg); font-feature-settings: "liga" 1, "calt" 1; font-variant-numeric: normal; }
+html, body { background: transparent; }
+body { overflow: hidden; font-feature-settings: "liga" 1, "calt" 1; font-variant-numeric: normal; }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 .usage-app { width: 100%; height: 100%; padding: 0 3px 22px 0; overflow: auto; scrollbar-gutter: stable; }

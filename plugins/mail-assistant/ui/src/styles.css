@@ -2,7 +2,8 @@
 * { box-sizing: border-box; }
 small { font-size: var(--type-caption); }
 html, body, #root { width: 100%; height: 100%; margin: 0; }
-body { overflow: hidden; background: var(--dw-bg); font-feature-settings: "liga" 1, "calt" 1; font-variant-numeric: normal; }
+html, body { background: transparent; }
+body { overflow: hidden; font-feature-settings: "liga" 1, "calt" 1; font-variant-numeric: normal; }
 button, input, select { font: inherit; }
 button { cursor: pointer; }
 .mail-app { height: 100%; display: flex; flex-direction: column; }

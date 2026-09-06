@@ -1,6 +1,10 @@
+html,
+body {
+  background: transparent;
+}
+
 body {
   margin: 0;
-  background: var(--dw-bg);
   color: var(--dw-text);
 }
 

@@ -10,7 +10,7 @@
   accent-color: var(--dw-accent);
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--dw-bg); }
+body { margin: 0; background: transparent; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: default; opacity: .55; }
