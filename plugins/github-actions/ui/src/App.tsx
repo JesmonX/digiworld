@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Input, Card, Status, Dialog } from '@digiworld/design-system/react'
+import { Button, Input, Card, Status, Dialog, Panel } from '@digiworld/design-system/react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import { Github, RefreshCw, Settings, ExternalLink, CheckCircle2, XCircle, LoaderCircle, Clock3, CircleSlash2, Search, X } from 'lucide-react'
 import './styles.css'
@@ -32,6 +32,7 @@ export default function App() {
   const [repos, setRepos] = useState<Repo[]>([])
   const [selected, setSelected] = useState<string[]>([])
   const [runs, setRuns] = useState<Run[]>([])
+  const [selectedRunId, setSelectedRunId] = useState<number | null>(null)
   const [settings, setSettings] = useState(false)
   const [repoQuery, setRepoQuery] = useState('')
   const [busy, setBusy] = useState(false)
@@ -70,16 +71,97 @@ export default function App() {
     catch (reason) { setError(String(reason)) } finally { setSaving(false) }
   }
   const filteredRepos = useMemo(() => repos.filter(repo => repo.fullName.toLowerCase().includes(repoQuery.trim().toLowerCase())), [repos, repoQuery])
+  const activeRun = useMemo(() => {
+    return runs.find(r => r.id === selectedRunId) ?? runs[0] ?? null
+  }, [runs, selectedRunId])
 
   if (!connected) return <main className="center"><Card><Github size={28} /><h1>连接 GitHub</h1><p>Token 只保存在系统凭据库，需要仓库 Actions 只读权限。</p><Input aria-label="GitHub Token" type="password" value={token} onChange={event => setToken(event.target.value)} placeholder="github_pat_…" /><Button variant="primary" onClick={() => void connect()} disabled={busy || !token}>{busy && <LoaderCircle className="spin" />}连接账号</Button>{error && <Status tone="error">{error}</Status>}</Card></main>
   return <main>
-    <header className="dw-toolbar"><div><Github size={18} /><strong>{login} 的 Actions</strong><small>{updatedAt ? `更新于 ${dateText(updatedAt)}` : ''}</small></div><Button onClick={() => setSettings(true)}><Settings size={15} />仓库</Button><Button onClick={() => { setBusy(true); void loadRuns().catch(reason => setError(String(reason))).finally(() => setBusy(false)) }} disabled={busy}>{busy ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}刷新</Button></header>
+    <header className="dw-toolbar">
+      <div>
+        <Github size={18} />
+        <strong>{login} 的 Actions</strong>
+        <small>{updatedAt ? `更新于 ${dateText(updatedAt)}` : ''}</small>
+      </div>
+      <Button onClick={() => setSettings(true)}><Settings size={15} />仓库</Button>
+      <Button onClick={() => { setBusy(true); void loadRuns().catch(reason => setError(String(reason))).finally(() => setBusy(false)) }} disabled={busy}>{busy ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}刷新</Button>
+    </header>
+
     {error && <Status tone="error" className="error"><span>{error}</span><Button aria-label="关闭错误" onClick={() => setError('')}><X size={14} /></Button></Status>}
-    <section className="runs">{runs.length === 0 ? <Status>{selected.length ? '没有找到由你触发的运行' : '请先选择仓库'}</Status> : runs.map(run => <Card key={run.id} className="run">
-      <div className="run-head"><RunIcon run={run} /><div><strong>{run.title || run.name}</strong><small>{run.repository} · {run.branch} · {run.sha?.slice(0, 7)}</small></div><span className={`run-status ${run.conclusion ?? run.status}`}>{statusText(run.status, run.conclusion)}</span><a href={run.url} target="_blank" rel="noreferrer">GitHub <ExternalLink size={13} /></a></div>
-      <div className="run-meta"><span>开始于 {dateText(run.startedAt || run.createdAt)}</span>{(run.attempt ?? 1) > 1 && <span>第 {run.attempt} 次尝试</span>}</div>
-      {run.jobs.length > 0 && <div className="jobs">{run.jobs.map(job => <div key={job.id}><span>{job.name}</span><small>{statusText(job.status, job.conclusion)}</small></div>)}</div>}
-    </Card>)}</section>
+
+    <div className="actions-workspace">
+      <Panel className="runs" variant="default">
+        <div className="runs-head">
+          <strong>运行记录</strong>
+          <small>{runs.length} 次</small>
+        </div>
+        {runs.length === 0 ? (
+          <Status>{selected.length ? '没有找到由你触发的运行' : '请先选择仓库'}</Status>
+        ) : (
+          <div className="runs-list">
+            {runs.map(run => {
+              const isSelected = activeRun?.id === run.id
+              return (
+                <button
+                  type="button"
+                  key={run.id}
+                  className={`run ${isSelected ? 'active' : ''}`}
+                  onClick={() => setSelectedRunId(run.id)}
+                >
+                  <RunIcon run={run} />
+                  <div className="run-info">
+                    <strong>{run.title || run.name}</strong>
+                    <small>{run.repository} · {run.branch}</small>
+                  </div>
+                  <span className={`run-status ${run.conclusion ?? run.status}`}>{statusText(run.status, run.conclusion)}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </Panel>
+
+      <div className="run-details-pane">
+        {activeRun ? (
+          <Panel className="run-details" variant="raised">
+            <header className="details-header">
+              <div className="details-head">
+                <RunIcon run={activeRun} />
+                <div>
+                  <h3>{activeRun.title || activeRun.name}</h3>
+                  <p>{activeRun.repository} · {activeRun.branch} · {activeRun.sha?.slice(0, 7)}</p>
+                </div>
+              </div>
+              <a href={activeRun.url} target="_blank" rel="noreferrer">GitHub <ExternalLink size={13} /></a>
+            </header>
+            <div className="run-meta">
+              <span>开始于 {dateText(activeRun.startedAt || activeRun.createdAt)}</span>
+              {(activeRun.attempt ?? 1) > 1 && <span>第 {activeRun.attempt} 次尝试</span>}
+            </div>
+            <div className="details-jobs-wrapper">
+              <h4>Jobs ({activeRun.jobs.length})</h4>
+              {activeRun.jobs.length > 0 ? (
+                <div className="jobs">
+                  {activeRun.jobs.map(job => (
+                    <div key={job.id} className="job-item">
+                      <span className={`job-indicator ${job.conclusion ?? job.status}`} />
+                      <span className="job-name">{job.name}</span>
+                      <small className="job-status-text">{statusText(job.status, job.conclusion)}</small>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="no-jobs">无工作流任务</p>
+              )}
+            </div>
+          </Panel>
+        ) : (
+          <Panel className="run-details empty" variant="default">
+            <p>请选择左侧运行记录</p>
+          </Panel>
+        )}
+      </div>
+    </div>
     <Dialog open={settings} onClose={() => !saving && setSettings(false)} className="settings" aria-label="监控仓库">
       <header><div><h2>监控仓库</h2><p>选择需要显示运行状态的仓库。</p></div><Button aria-label="关闭" onClick={() => setSettings(false)} disabled={saving}><X size={16} /></Button></header>
       <label className="repo-search"><Search size={15} /><Input aria-label="搜索仓库" value={repoQuery} onChange={event => setRepoQuery(event.target.value)} placeholder="搜索 owner/repo" /></label>
