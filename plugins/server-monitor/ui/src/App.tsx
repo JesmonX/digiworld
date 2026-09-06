@@ -296,6 +296,7 @@ export default function App() {
               <Card key={d.id}>
                 <header>
                   <div>
+                    <span className={`status-dot ${d.error ? 'failed' : 'connected'}`} />
                     <Server size={16} />
                     <span>
                       <strong>{d.label}</strong>
