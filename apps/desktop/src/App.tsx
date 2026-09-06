@@ -1,21 +1,17 @@
-import { Button, Status } from '@digiworld/design-system/react'
+import { Status } from '@digiworld/design-system/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import {
-  CircleAlert, Gauge, Library, Pause, Settings,
-} from 'lucide-react'
+import { CircleAlert, Pause } from 'lucide-react'
 import { suppressContextMenu, type CatalogIndex, type CatalogPlugin, type PluginSummary } from '@digiworld/plugin-sdk'
 import { PluginFrame } from './components/PluginFrame'
-import { WindowChrome } from './components/WindowChrome'
-import { PluginIcon } from './components/PluginIcon'
 import { Loading } from './components/Loading'
 import { PluginManagement } from './components/plugin/PluginManagement'
+import { NavigationRail } from './layout/NavigationRail'
+import { PageHeader } from './layout/PageHeader'
 import { HomePage } from './pages/HomePage'
 import { CatalogPage, InstallDialog } from './pages/CatalogPage'
 import { SettingsPage } from './pages/SettingsPage'
-import {
-  api, type AppState, type UpdateProgress,
-} from './lib/api'
+import { api, type AppState, type UpdateProgress } from './lib/api'
 import {
   themeStyle,
   type ColorSchemeId, getAccentTheme, getFontTheme, loadAccentThemeId, loadColorSchemeId,
@@ -28,14 +24,6 @@ export type Page = 'home' | 'catalog' | 'settings' | { pluginId: string }
 
 function errorMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason)
-}
-
-function SidebarGroup({ label, children }: { label: string; children: React.ReactNode }) {
-  return <section className="sidebar-section"><h2 className="sidebar-section-label">{label}</h2><nav>{children}</nav></section>
-}
-
-function NavButton({ active, icon, label, status, onClick }: { active: boolean; icon: React.ReactNode; label: string; status?: string; onClick(): void }) {
-  return <Button title={label} className={`nav-item ${active ? 'active' : ''}`} onClick={onClick}><span>{icon}</span><b>{label}</b>{status && <i className={`state-dot ${status}`} />}</Button>
 }
 
 export function App() {
@@ -66,6 +54,7 @@ export function App() {
     for (const [key, value] of Object.entries(activeTheme)) if (value !== undefined) document.documentElement.style.setProperty('--dw-' + key, value)
     document.documentElement.style.colorScheme = activeTheme['color-scheme']
     document.documentElement.dataset.dwGlass = glassMode
+    document.documentElement.dataset.dwScheme = activeTheme['color-scheme']
   }, [activeTheme, glassMode])
 
   useEffect(() => saveAccentThemeId(accentThemeId), [accentThemeId])
@@ -168,61 +157,55 @@ export function App() {
     }
   }
 
-  const pageTitle = typeof page === 'string'
-    ? { home: '概览', catalog: '功能库', settings: '设置' }[page]
-    : selectedPlugin?.name ?? '插件'
   const pluginOpen = typeof page !== 'string'
+
+  const { headerTitle, headerSubtitle } = useMemo(() => {
+    if (page === 'home') return { headerTitle: 'Dashboard', headerSubtitle: '你的本地数字工作台' }
+    if (page === 'catalog') return { headerTitle: '功能库', headerSubtitle: '浏览并安装可用插件' }
+    if (page === 'settings') return { headerTitle: '设置', headerSubtitle: '个性化外观与应用偏好' }
+    return { headerTitle: selectedPlugin?.name ?? '插件', headerSubtitle: undefined }
+  }, [page, selectedPlugin])
 
   useEffect(() => setPluginMenuOpen(false), [page])
 
   return (
-    <div className={`app-window glass-${glassMode} ${pluginOpen ? 'plugin-open' : ''}`} data-dw-glass={glassMode} style={themeStyle(activeTheme)}>
-      <WindowChrome />
+    <div
+      className={`app-window glass-${glassMode} ${pluginOpen ? 'plugin-open' : ''}`}
+      data-dw-glass={glassMode}
+      style={themeStyle(activeTheme)}
+    >
       <div className="app-shell">
-        <aside className="sidebar">
-          <div className="sidebar-scroll">
-            <SidebarGroup label="工作台">
-              <NavButton active={page === 'home'} icon={<Gauge />} label="概览" onClick={() => setPage('home')} />
-              <NavButton active={page === 'catalog'} icon={<Library />} label="功能库" onClick={() => setPage('catalog')} />
-            </SidebarGroup>
-            {state?.plugins.length ? (
-              <SidebarGroup label="已安装">
-                {state.plugins.map(plugin => (
-                  <NavButton
-                    key={plugin.id}
-                    active={pluginOpen && page.pluginId === plugin.id}
-                    icon={<PluginIcon plugin={plugin} />}
-                    label={plugin.name}
-                    status={plugin.state}
-                    onClick={() => setPage({ pluginId: plugin.id })}
-                  />
-                ))}
-              </SidebarGroup>
-            ) : null}
-          </div>
-          <div className="sidebar-bottom">
-            <SidebarGroup label="系统">
-              <NavButton active={page === 'settings'} icon={<Settings />} label="设置" onClick={() => setPage('settings')} />
-            </SidebarGroup>
-          </div>
-        </aside>
+        <NavigationRail
+          page={page}
+          plugins={state?.plugins ?? []}
+          onNavigate={setPage}
+        />
 
         <main className="main">
-          <header className="topbar">
-            <h1>{pageTitle}</h1>
-            {selectedPlugin && (
-              <PluginManagement
-                plugin={selectedPlugin}
-                busy={busy === selectedPlugin.id}
-                menuOpen={pluginMenuOpen}
-                onMenuOpenChange={setPluginMenuOpen}
-                onToggleEnabled={() => void manageEnabled(selectedPlugin, !selectedPlugin.enabled)}
-                onUninstall={() => void uninstall(selectedPlugin)}
-              />
-            )}
-          </header>
+          <PageHeader
+            title={headerTitle}
+            subtitle={headerSubtitle}
+            actions={
+              selectedPlugin ? (
+                <PluginManagement
+                  plugin={selectedPlugin}
+                  busy={busy === selectedPlugin.id}
+                  menuOpen={pluginMenuOpen}
+                  onMenuOpenChange={setPluginMenuOpen}
+                  onToggleEnabled={() => void manageEnabled(selectedPlugin, !selectedPlugin.enabled)}
+                  onUninstall={() => void uninstall(selectedPlugin)}
+                />
+              ) : undefined
+            }
+          />
 
-          {error && <Status tone="error" className="error-banner"><CircleAlert /><span>{error}</span><Button onClick={() => setError(null)}>关闭</Button></Status>}
+          {error && (
+            <Status tone="error" className="error-banner">
+              <CircleAlert />
+              <span>{error}</span>
+              <button type="button" onClick={() => setError(null)}>关闭</button>
+            </Status>
+          )}
 
           <section className="content">
             {!pluginOpen && (
