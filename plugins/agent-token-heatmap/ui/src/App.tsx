@@ -1,4 +1,4 @@
-import { Button, Input, Select, Textarea, Card, Dialog, Status } from '@digiworld/design-system/react'
+import { Button, Input, Select, Textarea, Card, Dialog, Status, Metric } from '@digiworld/design-system/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Check, Clock3, Database, Gauge, HardDrive, PieChart, Plus, RefreshCw, Server, Settings2, Ticket, Trash2, X } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
@@ -331,10 +331,20 @@ export default function App() {
   }, [snapshot])
   const weekly = useMemo(() => snapshot ? weeklyUsage(snapshot.endDay, snapshot.days) : [], [snapshot])
   const sourceOptions = settings ? [{ id: 'local', label: '本机' }, ...settings.sshSources] : []
+  const todayUsage = useMemo(() => {
+    const t = new Date().toISOString().slice(0, 10)
+    return snapshot?.days.find(d => d.day === t) ?? snapshot?.days.at(-1)
+  }, [snapshot])
+  const todayTokens = todayUsage?.totalTokens ?? 0
+  const cacheRateStr = snapshot?.totals.cacheRate != null ? `${(snapshot.totals.cacheRate * 100).toFixed(1)}%` : '—'
+  const primaryQuotaRemaining = quota?.windows?.[0] != null ? 100 - Math.max(0, Math.min(100, quota.windows[0].usedPercent)) : null
 
   return (
     <div className="usage-app">
       <header className="dw-toolbar usage-header">
+        <div className="usage-header-title">
+          <h2>Agent Overview</h2>
+        </div>
         <div className="header-buttons">
           <Button className="secondary" onClick={() => setSettingsOpen(true)}><Settings2 />设置</Button>
           <Button className="primary" disabled={refresh.running} onClick={() => void startRefresh()}><RefreshCw className={refresh.running ? 'spin' : ''} />{refresh.running ? `${refresh.completed}/${refresh.total} ${refresh.currentSource ?? ''}` : '手动刷新'}</Button>
@@ -342,6 +352,29 @@ export default function App() {
       </header>
 
       {(error || refresh.errors.length > 0) && <Status tone="error" className="error-banner"><AlertTriangle /><span>{error ?? refresh.errors.join('；')}</span><Button onClick={() => { setError(null); setRefresh(current => ({ ...current, errors: [] })) }}><X /></Button></Status>}
+
+      <div className="agent-metric-strip">
+        <Metric
+          label="今日 Token"
+          value={formatTokens(todayTokens)}
+          hint={todayUsage ? `${todayUsage.models?.length ?? 0} 个模型` : '今日已记录'}
+        />
+        <Metric
+          label="缓存命中率"
+          value={cacheRateStr}
+          hint="所选范围平均"
+        />
+        <Metric
+          label="活跃 Agent"
+          value={`${agents.length} / ${AGENTS.length}`}
+          hint="已启用筛选"
+        />
+        <Metric
+          label="Codex 剩余"
+          value={primaryQuotaRemaining != null ? `${primaryQuotaRemaining}%` : '—'}
+          hint={quota?.planType ?? '限额监控'}
+        />
+      </div>
 
       <section className="filter-bar">
         <FilterGroup label="Agent">{AGENTS.map(agent => <FilterChip key={agent} active={agents.includes(agent)} label={agentLabel[agent]} icon={<AgentIcon agent={agent} />} onClick={() => toggleAgent(agent)} />)}</FilterGroup>
