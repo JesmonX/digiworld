@@ -3,7 +3,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getAccentTheme, getFontTheme, pluginTheme } from '../theme'
-import { PluginFrame, resolveTypographyUrls, withHostTypography } from './PluginFrame'
+import { PluginFrame, resolveTypographyUrls, withHostTypography, withInitialTheme } from './PluginFrame'
 
 describe('PluginFrame theme', () => {
   let container: HTMLDivElement
@@ -45,7 +45,7 @@ describe('PluginFrame theme', () => {
   it('sends the current theme when ready and after a live theme change', async () => {
     const root = createRoot(container)
     const violet = pluginTheme(getAccentTheme('catppuccin-latte'))
-    const blue = pluginTheme(getAccentTheme('catppuccin-mocha'), getFontTheme('wenkai'), 500, 'disabled')
+    const blue = pluginTheme(getAccentTheme('catppuccin-mocha'), getFontTheme('harmony'), 500, 'disabled')
     await act(async () => root.render(<PluginFrame pluginId="sample" html="<main />" theme={violet} />))
 
     const iframe = container.querySelector('iframe')!
@@ -68,7 +68,7 @@ describe('PluginFrame theme', () => {
     }), '*')
     expect(iframe.srcdoc).toContain('data-digiworld-host-design')
     expect(iframe.srcdoc).toContain('--dw-bg:#eff1f5')
-    expect(blue['font-sans']).toContain('LXGW WenKai')
+    expect(blue['font-sans']).toContain('HarmonyOS Sans SC')
     expect(blue['weight-regular']).toBe('500')
 
     await act(async () => root.unmount())
@@ -96,5 +96,27 @@ describe('PluginFrame theme', () => {
     }), '*')
 
     await act(async () => root.unmount())
+  })
+
+  it('guarantees host design styles win over bundled fallback styles in both full documents and fragments', () => {
+    const darkTheme = pluginTheme(getAccentTheme('catppuccin-mocha'))
+
+    // 1. Full document test
+    const fullHtml = '<!doctype html><html lang="zh-CN"><head><title>Test</title><style>:root{--dw-success:#16835b;--dw-success-soft:#e8f5ee;}</style></head><body><div id="root"></div></body></html>'
+    const fullThemed = withInitialTheme(fullHtml, darkTheme)
+    expect(fullThemed).toContain('data-dw-scheme="dark"')
+    const fullBundledIndex = fullThemed.indexOf(':root{--dw-success:#16835b')
+    const fullHostIndex = fullThemed.indexOf('data-digiworld-host-design')
+    expect(fullHostIndex).toBeGreaterThan(fullBundledIndex)
+    expect(fullThemed).toContain(`--dw-success-soft:${darkTheme['surface-subtle']}`)
+
+    // 2. Fragment test (no <html> or <head>)
+    const fragmentHtml = '<style>:root{--dw-success:#16835b;--dw-success-soft:#e8f5ee;}</style><div id="root"></div>'
+    const fragmentThemed = withInitialTheme(fragmentHtml, darkTheme)
+    expect(fragmentThemed).toContain('data-dw-scheme="dark"')
+    const fragBundledIndex = fragmentThemed.indexOf(':root{--dw-success:#16835b')
+    const fragHostIndex = fragmentThemed.indexOf('data-digiworld-host-design')
+    expect(fragHostIndex).toBeGreaterThan(fragBundledIndex)
+    expect(fragmentThemed).toContain(`--dw-success-soft:${darkTheme['surface-subtle']}`)
   })
 })

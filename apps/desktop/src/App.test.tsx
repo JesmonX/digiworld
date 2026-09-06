@@ -205,11 +205,11 @@ describe('explicit update consent', () => {
     await act(async () => { root.render(<App />); await flush() })
     await navigate(container, '设置')
 
-    const wenkai = container.querySelector<HTMLButtonElement>('button[aria-label="霞鹜文楷"]')
-    await act(async () => { wenkai?.click(); await flush() })
+    const harmony = container.querySelector<HTMLButtonElement>('button[aria-label="HarmonyOS Sans SC"]')
+    await act(async () => { harmony?.click(); await flush() })
 
-    expect(container.querySelector<HTMLElement>('.app-window')?.style.getPropertyValue('--dw-font-sans')).toContain('LXGW WenKai')
-    expect(localStorage.getItem(FONT_THEME_STORAGE_KEY)).toBe('wenkai')
+    expect(container.querySelector<HTMLElement>('.app-window')?.style.getPropertyValue('--dw-font-sans')).toContain('HarmonyOS Sans SC')
+    expect(localStorage.getItem(FONT_THEME_STORAGE_KEY)).toBe('harmony')
 
     const weight = container.querySelector<HTMLInputElement>('input[aria-label="字体粗细"]')!
     await act(async () => {

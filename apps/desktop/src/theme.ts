@@ -8,7 +8,7 @@ import {
 export type { TextScale, ColorSchemeId }
 export { COLOR_SCHEMES, DEFAULT_COLOR_SCHEME_ID, getColorSchemePreview }
 export type AccentThemeId = ThemeId
-export type FontThemeId = 'plex' | 'wenkai' | 'system'
+export type FontThemeId = 'plex' | 'harmony' | 'sarasa'
 export type FontWeight = 400 | 500 | 600
 export type GlassMode = 'enabled' | 'disabled'
 
@@ -35,20 +35,20 @@ export const FONT_THEMES: FontTheme[] = [
     fontBrand: '"Digiworld Smiley Sans", "Digiworld Inter Variable", "Digiworld Plex Sans SC", "Microsoft YaHei UI", sans-serif',
   },
   {
-    id: 'wenkai',
-    label: '霞鹜文楷',
-    description: '温润舒展，中文与数字都更具人文感',
-    fontSans: '"Digiworld LXGW WenKai", "KaiTi", serif',
-    fontDisplay: '"Digiworld LXGW WenKai", "KaiTi", serif',
-    fontBrand: '"Digiworld Smiley Sans", "Digiworld LXGW WenKai", "KaiTi", serif',
+    id: 'harmony',
+    label: 'HarmonyOS Sans SC',
+    description: '圆润纯净，多端设备一致的现代阅读质感',
+    fontSans: '"Digiworld HarmonyOS Sans SC", "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei UI", sans-serif',
+    fontDisplay: '"Digiworld HarmonyOS Sans SC", "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei UI", sans-serif',
+    fontBrand: '"Digiworld Smiley Sans", "Digiworld HarmonyOS Sans SC", "HarmonyOS Sans SC", sans-serif',
   },
   {
-    id: 'system',
-    label: 'Windows 原生',
-    description: '紧凑克制，保持熟悉的桌面观感',
-    fontSans: '"Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", sans-serif',
-    fontDisplay: '"Segoe UI Variable Display", "Segoe UI Variable Text", "Microsoft YaHei UI", sans-serif',
-    fontBrand: '"Digiworld Smiley Sans", "Segoe UI Variable Display", "Microsoft YaHei UI", sans-serif',
+    id: 'sarasa',
+    label: 'Sarasa Gothic',
+    description: '紧凑精致，融合等宽与黑体的规整排版',
+    fontSans: '"Digiworld Sarasa Gothic SC", "Sarasa Gothic SC", "Microsoft YaHei UI", sans-serif',
+    fontDisplay: '"Digiworld Sarasa Gothic SC", "Sarasa Gothic SC", "Microsoft YaHei UI", sans-serif',
+    fontBrand: '"Digiworld Smiley Sans", "Digiworld Sarasa Gothic SC", "Sarasa Gothic SC", sans-serif',
   },
 ]
 

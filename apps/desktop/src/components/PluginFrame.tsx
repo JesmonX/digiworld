@@ -57,8 +57,19 @@ export function withInitialTheme(html: string, theme: PluginTheme): string {
     .map(([key, value]) => `--dw-${key}:${String(value).replace(/[<>;{}]/g, '')}`)
     .join(';')
   const style = `<style data-digiworld-host-design>${designTokensCss}\n${designBaseCss}\n:root{${declarations};color-scheme:${theme['color-scheme']}}</style>`
-  // Last in head: initial host values must win over bundled fallback tokens.
-  const themed = /<\/head>/i.test(html) ? html.replace(/<\/head>/i, `${style}</head>`) : `${style}${html}`
+
+  let themed: string
+  if (/<\/head>/i.test(html)) {
+    // Last in head: initial host values must win over bundled fallback tokens.
+    themed = html.replace(/<\/head>/i, `${style}</head>`)
+  } else if (/<\/body>/i.test(html)) {
+    themed = html.replace(/<\/body>/i, `${style}</body>`)
+  } else if (/<html(?:\s[^>]*)?>/i.test(html)) {
+    themed = `${html}${style}`
+  } else {
+    themed = `<!doctype html><html lang="zh-CN" data-dw-scheme="${theme['color-scheme']}"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head><body>${html}${style}</body></html>`
+  }
+
   return /<html(?:\s[^>]*)?>/i.test(themed)
     ? themed.replace(/<html(\s[^>]*)?>/i, (match, attrs) => {
         if (attrs && attrs.includes('data-dw-scheme')) return match

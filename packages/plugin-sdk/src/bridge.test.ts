@@ -16,8 +16,8 @@ describe('plugin presentation helpers', () => {
       'color-scheme': 'light',
       text: '#172033',
       accent: '#5b5ce2',
-      'font-sans': '"Digiworld LXGW WenKai", serif',
-      'font-display': '"Digiworld LXGW WenKai", serif',
+      'font-sans': '"Digiworld HarmonyOS Sans SC", sans-serif',
+      'font-display': '"Digiworld HarmonyOS Sans SC", sans-serif',
       'font-brand': '"Digiworld Smiley Sans", sans-serif',
       'weight-regular': '500',
       'weight-semibold': '600',
@@ -27,8 +27,8 @@ describe('plugin presentation helpers', () => {
     expect(root.style.colorScheme).toBe('light')
     expect(properties.get('--dw-text')).toBe('#172033')
     expect(properties.get('--dw-accent')).toBe('#5b5ce2')
-    expect(properties.get('--dw-font-sans')).toBe('"Digiworld LXGW WenKai", serif')
-    expect(properties.get('--dw-font-display')).toBe('"Digiworld LXGW WenKai", serif')
+    expect(properties.get('--dw-font-sans')).toBe('"Digiworld HarmonyOS Sans SC", sans-serif')
+    expect(properties.get('--dw-font-display')).toBe('"Digiworld HarmonyOS Sans SC", sans-serif')
     expect(properties.get('--dw-font-brand')).toBe('"Digiworld Smiley Sans", sans-serif')
     expect(properties.get('--dw-weight-regular')).toBe('500')
     expect(properties.get('--dw-weight-semibold')).toBe('600')

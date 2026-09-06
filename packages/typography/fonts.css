@@ -31,17 +31,33 @@
 }
 
 @font-face {
-  font-family: "Digiworld LXGW WenKai";
-  src: url("./fonts/LXGWWenKaiLite-Regular.woff2") format("woff2");
+  font-family: "Digiworld HarmonyOS Sans SC";
+  src: url("./fonts/HarmonyOSSansSC-Regular.woff2") format("woff2");
   font-style: normal;
-  font-weight: 400;
+  font-weight: 400 500;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Digiworld LXGW WenKai";
-  src: url("./fonts/LXGWWenKaiLite-Medium.woff2") format("woff2");
+  font-family: "Digiworld HarmonyOS Sans SC";
+  src: url("./fonts/HarmonyOSSansSC-Bold.woff2") format("woff2");
   font-style: normal;
-  font-weight: 500 800;
+  font-weight: 600 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Digiworld Sarasa Gothic SC";
+  src: url("./fonts/SarasaGothicSC-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Digiworld Sarasa Gothic SC";
+  src: url("./fonts/SarasaGothicSC-Bold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600 800;
   font-display: swap;
 }

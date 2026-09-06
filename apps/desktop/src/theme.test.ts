@@ -28,7 +28,7 @@ describe('accent themes', () => {
   })
 
   it('resolves complete palette and typography for plugins', () => {
-    const theme = pluginTheme(getAccentTheme('rose-pine-dawn'), getFontTheme('wenkai'))
+    const theme = pluginTheme(getAccentTheme('rose-pine-dawn'), getFontTheme('harmony'))
     expect(theme).toMatchObject({
       'color-scheme': 'light',
       'bg': '#faf4ed',
@@ -36,8 +36,8 @@ describe('accent themes', () => {
       'accent': '#79569b',
       'accent-strong': expect.stringContaining('color-mix'),
       'accent-soft': expect.stringContaining('color-mix'),
-      'font-sans': expect.stringContaining('LXGW WenKai'),
-      'font-display': expect.stringContaining('LXGW WenKai'),
+      'font-sans': expect.stringContaining('HarmonyOS Sans SC'),
+      'font-display': expect.stringContaining('HarmonyOS Sans SC'),
       'font-brand': expect.stringContaining('Digiworld Smiley Sans'),
       success: '#436b58',
       warning: '#916000',
@@ -69,14 +69,17 @@ describe('accent themes', () => {
 
 describe('font themes', () => {
   it('loads a stored font and falls back for unknown values', () => {
-    expect(loadFontThemeId({ getItem: () => 'wenkai' })).toBe('wenkai')
+    expect(loadFontThemeId({ getItem: () => 'harmony' })).toBe('harmony')
+    expect(loadFontThemeId({ getItem: () => 'sarasa' })).toBe('sarasa')
+    expect(loadFontThemeId({ getItem: () => 'wenkai' })).toBe(DEFAULT_FONT_THEME_ID)
+    expect(loadFontThemeId({ getItem: () => 'system' })).toBe(DEFAULT_FONT_THEME_ID)
     expect(loadFontThemeId({ getItem: () => 'comic-sans' })).toBe(DEFAULT_FONT_THEME_ID)
   })
 
   it('persists the selected font', () => {
     const setItem = vi.fn()
-    saveFontThemeId('system', { setItem })
-    expect(setItem).toHaveBeenCalledWith(FONT_THEME_STORAGE_KEY, 'system')
+    saveFontThemeId('sarasa', { setItem })
+    expect(setItem).toHaveBeenCalledWith(FONT_THEME_STORAGE_KEY, 'sarasa')
   })
 
   it('uses Inter for Latin UI text, Plex for Chinese fallback, and Smiley only for brand text', () => {
@@ -87,6 +90,18 @@ describe('font themes', () => {
     expect(plex.fontDisplay).toContain('Digiworld Plex Sans SC')
     expect(plex.fontDisplay).not.toContain('Smiley Sans')
     expect(plex.fontBrand).toContain('Digiworld Smiley Sans')
+  })
+
+  it('configures HarmonyOS Sans SC and Sarasa Gothic correctly', () => {
+    const harmony = getFontTheme('harmony')
+    expect(harmony.fontSans).toContain('Digiworld HarmonyOS Sans SC')
+    expect(harmony.fontDisplay).toContain('Digiworld HarmonyOS Sans SC')
+    expect(harmony.fontBrand).toContain('Digiworld Smiley Sans')
+
+    const sarasa = getFontTheme('sarasa')
+    expect(sarasa.fontSans).toContain('Digiworld Sarasa Gothic SC')
+    expect(sarasa.fontDisplay).toContain('Digiworld Sarasa Gothic SC')
+    expect(sarasa.fontBrand).toContain('Digiworld Smiley Sans')
   })
 
   it('persists a validated font weight and sends its hierarchy to plugins', () => {

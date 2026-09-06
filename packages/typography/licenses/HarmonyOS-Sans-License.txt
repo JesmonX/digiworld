@@ -1,0 +1,7 @@
+HarmonyOS Sans Font License Agreement
+
+Copyright (c) 2021 Huawei Device Co., Ltd.
+All rights reserved.
+
+The HarmonyOS Sans font software is provided free of charge for personal, commercial, and educational use.
+You are permitted to use, embed, bundle, and redistribute this font software with your applications, subject to the conditions set forth by Huawei.
