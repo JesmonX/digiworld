@@ -1,4 +1,4 @@
-import { Button, Card, Menu, Status } from '@digiworld/design-system/react'
+import { Button, Card, Menu, Status, Metric } from '@digiworld/design-system/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronDown, Flame, Keyboard, Pause, Play } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
@@ -155,6 +155,12 @@ export default function App() {
           </div>
         </div>
       </section>
+
+      <div className="keyboard-metric-strip">
+        <Metric label="总按键次数" value={(snapshot?.total ?? 0).toLocaleString()} hint="所选统计范围" />
+        <Metric label="最高频按键" value={snapshot?.topKey ? formatKeyLabel(snapshot.topKey) : '—'} hint="最活跃键位" />
+        <Metric label="触发按键种类" value={`${snapshot?.uniqueKeys ?? 0} 种`} hint="有效键位覆盖" />
+      </div>
 
       <section className="lower-grid">
         <Card className="dw-card ranking-card">
