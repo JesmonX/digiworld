@@ -2,10 +2,10 @@ import type { CSSProperties } from 'react'
 import type { PluginTheme } from '@digiworld/plugin-sdk'
 
 import {
-  THEMES, getTheme, resolveColors, type ThemeId, type ThemePreset, type TextScale,
+  THEMES, getTheme, resolveColors, type ThemeId, type ThemePreset,
   type ColorSchemeId, COLOR_SCHEMES, DEFAULT_COLOR_SCHEME_ID, getColorSchemePreview,
 } from '@digiworld/design-system/themes'
-export type { TextScale, ColorSchemeId }
+export type { ColorSchemeId }
 export { COLOR_SCHEMES, DEFAULT_COLOR_SCHEME_ID, getColorSchemePreview }
 export type AccentThemeId = ThemeId
 export type FontThemeId = 'plex' | 'harmony' | 'sarasa'
@@ -58,13 +58,6 @@ export const DEFAULT_FONT_WEIGHT: FontWeight = 400
 export const THEME_STORAGE_KEY = 'digiworld.theme.v2'
 export const FONT_THEME_STORAGE_KEY = 'digiworld.font-theme.v1'
 export const FONT_WEIGHT_STORAGE_KEY = 'digiworld.font-weight.v1'
-export const TEXT_SCALE_STORAGE_KEY = 'digiworld.text-scale.v1'
-export function loadTextScale(storage?: Pick<Storage, 'getItem'>): TextScale {
-  try { const value = Number((storage ?? window.localStorage).getItem(TEXT_SCALE_STORAGE_KEY)); return value === 110 || value === 125 ? value : 100 } catch { return 100 }
-}
-export function saveTextScale(value: TextScale, storage?: Pick<Storage, 'setItem'>): void {
-  try { (storage ?? window.localStorage).setItem(TEXT_SCALE_STORAGE_KEY, String(value)) } catch { /* presentation only */ }
-}
 export const GLASS_STORAGE_KEY = 'digiworld.glass.v1'
 export const COLOR_SCHEME_STORAGE_KEY = 'digiworld.color-scheme.v1'
 export function loadColorSchemeId(storage?: Pick<Storage, 'getItem'>): ColorSchemeId {
@@ -180,7 +173,7 @@ export function fontWeightStyle(weight: FontWeight): CSSProperties {
   } as CSSProperties
 }
 
-export function pluginTheme(theme: AccentTheme, font: FontTheme = getFontTheme(DEFAULT_FONT_THEME_ID), weight: FontWeight = DEFAULT_FONT_WEIGHT, glass: GlassMode = 'disabled', scale: TextScale = 100): PluginTheme {
+export function pluginTheme(theme: AccentTheme, font: FontTheme = getFontTheme(DEFAULT_FONT_THEME_ID), weight: FontWeight = DEFAULT_FONT_WEIGHT, glass: GlassMode = 'disabled'): PluginTheme {
   const weights = fontWeightStyle(weight) as Record<string, number>
   return {
     ...resolveColors(theme),
@@ -221,6 +214,5 @@ export function pluginTheme(theme: AccentTheme, font: FontTheme = getFontTheme(D
     'weight-semibold': String(weights['--weight-semibold']),
     'weight-bold': String(weights['--weight-bold']),
     glass,
-    'text-scale': String(scale / 100),
   }
 }

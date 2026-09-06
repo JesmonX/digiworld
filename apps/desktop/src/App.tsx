@@ -15,8 +15,8 @@ import {
   type ProxySettings, type UpdateProgress,
 } from './lib/api'
 import {
-  ACCENT_THEMES, FONT_THEMES, COLOR_SCHEMES, getColorSchemePreview, themeStyle, loadTextScale, saveTextScale,
-  type TextScale, type ColorSchemeId, getAccentTheme, getFontTheme, loadAccentThemeId, loadColorSchemeId,
+  ACCENT_THEMES, FONT_THEMES, COLOR_SCHEMES, getColorSchemePreview, themeStyle,
+  type ColorSchemeId, getAccentTheme, getFontTheme, loadAccentThemeId, loadColorSchemeId,
   loadFontThemeId, loadFontWeight, pluginTheme, saveAccentThemeId, saveColorSchemeId, saveFontThemeId,
   saveFontWeight, loadGlassMode, saveGlassMode, type AccentThemeId, type FontThemeId, type FontWeight, type GlassMode,
 } from './theme'
@@ -136,12 +136,10 @@ function App() {
   const [fontThemeId, setFontThemeId] = useState<FontThemeId>(loadFontThemeId)
   const [fontWeight, setFontWeight] = useState<FontWeight>(loadFontWeight)
   const [glassMode, setGlassMode] = useState<GlassMode>(loadGlassMode)
-  const [textScale, setTextScale] = useState<TextScale>(loadTextScale)
   const [pluginMenuOpen, setPluginMenuOpen] = useState(false)
-  useEffect(() => saveTextScale(textScale), [textScale])
   const accentTheme = getAccentTheme(accentThemeId, colorSchemeId)
   const fontTheme = getFontTheme(fontThemeId)
-  const activeTheme = useMemo(() => pluginTheme(accentTheme, fontTheme, fontWeight, glassMode, textScale), [accentTheme, fontTheme, fontWeight, glassMode, textScale])
+  const activeTheme = useMemo(() => pluginTheme(accentTheme, fontTheme, fontWeight, glassMode), [accentTheme, fontTheme, fontWeight, glassMode])
 
   useEffect(() => {
     for (const [key, value] of Object.entries(activeTheme)) if (value !== undefined) document.documentElement.style.setProperty('--dw-' + key, value)
@@ -316,7 +314,7 @@ function App() {
                 >
                   {page === 'home' && <Home plugins={state?.plugins ?? []} version={state?.version} onCatalog={() => setPage('catalog')} onOpen={id => setPage({ pluginId: id })} onRefresh={() => { void refreshState().catch(reason => setError(errorMessage(reason))) }} reducedMotion={Boolean(reduceMotion)} />}
                   {page === 'catalog' && <Catalog catalog={catalog} installed={installed} busy={busy} onInstall={setConfirmInstall} onRefresh={() => refreshCatalog(true)} onOpen={id => setPage({ pluginId: id })} currentTarget={state?.target} />}
-                  {page === 'settings' && state && <SettingsPage state={state} progress={updateProgress} onProgressReset={() => setUpdateProgress(null)} onPluginsUpdated={refreshState} textScale={textScale} onTextScaleChange={setTextScale} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} colorSchemeId={colorSchemeId} onColorSchemeChange={setColorSchemeId} fontThemeId={fontThemeId} onFontThemeChange={setFontThemeId} fontWeight={fontWeight} onFontWeightChange={setFontWeight} glassMode={glassMode} onGlassModeChange={setGlassMode} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
+                  {page === 'settings' && state && <SettingsPage state={state} progress={updateProgress} onProgressReset={() => setUpdateProgress(null)} onPluginsUpdated={refreshState} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} colorSchemeId={colorSchemeId} onColorSchemeChange={setColorSchemeId} fontThemeId={fontThemeId} onFontThemeChange={setFontThemeId} fontWeight={fontWeight} onFontWeightChange={setFontWeight} glassMode={glassMode} onGlassModeChange={setGlassMode} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
                 </motion.div>
               </AnimatePresence>
             )}
@@ -341,7 +339,7 @@ function App() {
                       pluginId={id}
                       html={html}
                       active={isCurrent}
-                      theme={plugin?.uiDesignVersion === 1 ? activeTheme : pluginTheme(getAccentTheme('catppuccin-latte'), fontTheme, fontWeight, glassMode, textScale)}
+                      theme={plugin?.uiDesignVersion === 1 ? activeTheme : pluginTheme(getAccentTheme('catppuccin-latte'), fontTheme, fontWeight, glassMode)}
                     />
                   ) : (
                     <Loading label="载入界面" />
@@ -457,13 +455,11 @@ type UpdateDialog =
   | { kind: 'plugins'; updates: PluginUpdateInfo[] }
   | { kind: 'core'; update: CoreUpdateInfo }
 
-function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, textScale, onTextScaleChange, accentThemeId, onAccentThemeChange, colorSchemeId, onColorSchemeChange, fontThemeId, onFontThemeChange, fontWeight, onFontWeightChange, glassMode, onGlassModeChange, onChange }: {
+function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, accentThemeId, onAccentThemeChange, colorSchemeId, onColorSchemeChange, fontThemeId, onFontThemeChange, fontWeight, onFontWeightChange, glassMode, onGlassModeChange, onChange }: {
   state: AppState
   progress: UpdateProgress | null
   onProgressReset(): void
   onPluginsUpdated(): Promise<void>
-  textScale: TextScale
-  onTextScaleChange(scale: TextScale): void
   accentThemeId: AccentThemeId
   onAccentThemeChange(id: AccentThemeId): void
   colorSchemeId: ColorSchemeId
@@ -680,12 +676,6 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, text
             </Button>
           ))}
         </RadioGroup>
-      </Card>
-      <Card className="settings-card">
-        <h3>文字大小</h3>
-        <div className="dw-segmented" role="group" aria-label="文字大小">
-          {([100, 110, 125] as TextScale[]).map(scale => <Button key={scale} className={textScale === scale ? 'active' : ''} aria-pressed={textScale === scale} onClick={() => onTextScaleChange(scale)}>{scale}%</Button>)}
-        </div>
       </Card>
       <Card className="settings-card weight-card">
         <div className="theme-copy">

@@ -18,7 +18,7 @@ Digiworld is a lightweight, local-first desktop shell built with Tauri 2, Rust, 
 
 - **Local-first & Privacy-first**: No telemetry, no crash reporting, and zero third-party analytics. Sensitive credentials stay in the OS credential store (Keyring), and usage metrics are computed locally.
 - **Sandboxed Plugin Architecture**: Plugin UIs run inside sandboxed iframes communicating via a secure `postMessage` bridge. Plugin backends run as isolated subprocesses over anonymous pipes with newline-delimited JSON-RPC 2.0 (enforcing a 4 MiB payload cap and 15s timeout).
-- **Unified Design System**: Host and plugins share `@digiworld/design-system` with semantic tokens (`--dw-*`), built-in Catppuccin and Rosé Pine themes, glass morphism effects, and proportional typography scaling (100%, 110%, 125%). Host-managed Inter Variable and Plex Sans SC fonts are shared across plugin frames without duplicating font assets.
+- **Unified Design System**: Host and plugins share `@digiworld/design-system` with semantic tokens (`--dw-*`), built-in Catppuccin and Rosé Pine themes, glass morphism effects, and standardized typography roles. Host-managed Inter Variable and Plex Sans SC fonts are shared across plugin frames without duplicating font assets.
 - **Network & Proxy Engine**: Configure system proxy, custom proxy (HTTP, HTTPS, SOCKS5, SOCKS5H), or direct connection. Individual mail accounts can independently opt in or out of the shared proxy policy.
 
 ---

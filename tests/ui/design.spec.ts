@@ -2,22 +2,21 @@ import { test, expect } from '@playwright/test'
 import { THEMES } from '../../packages/design-system/themes'
 import { gotoWithRetry } from './nav'
 
-for (const theme of THEMES) for (const scale of [100, 110, 125]) for (const [width, height] of [[900, 600], [1280, 800], [1600, 1000]]) {
-  test(`${theme.id} ${scale}% ${width}x${height}`, async ({ page }, info) => {
+for (const theme of THEMES) for (const [width, height] of [[900, 600], [1280, 800], [1600, 1000]]) {
+  test(`${theme.id} ${width}x${height}`, async ({ page }, info) => {
     const errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
     await page.setViewportSize({ width, height })
-    await page.addInitScript(({ id, scale }) => {
+    await page.addInitScript(({ id }) => {
       if (window !== window.top) return
       localStorage.setItem('digiworld.theme.v2', id)
-      localStorage.setItem('digiworld.text-scale.v1', String(scale))
-    }, { id: theme.id, scale })
+    }, { id: theme.id })
     await gotoWithRetry(page, '/design.html')
     await expect(page.locator('.home-dashboard')).toBeVisible()
     await page.evaluate(() => document.fonts.ready)
     await page.screenshot({ path: info.outputPath('home.png') })
     await page.getByRole('button', { name: '设置', exact: true }).click()
-    await expect(page.getByRole('button', { name: `${scale}%`, exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('heading', { name: '界面字体', exact: true })).toBeVisible()
     await page.screenshot({ path: info.outputPath('settings.png') })
     const hostFont = await page.locator('.dw-button.primary').first().evaluate(el => getComputedStyle(el).fontSize).catch(() => '')
     for (const [label, selector] of [['键盘热力图', '.keyboard-card'], ['Agent Overview', '.weekly-card'], ['邮件助手', '.message-list'], ['Git Actions', '.runs'], ['Servers', '.devices'], ['日历与 Todo', '.agenda']]) {
@@ -26,7 +25,7 @@ for (const theme of THEMES) for (const scale of [100, 110, 125]) for (const [wid
       await expect(frame.locator(selector)).toBeVisible()
       await frame.locator('body').evaluate(() => document.fonts.ready)
       expect(await frame.locator('html').evaluate(el => getComputedStyle(el).colorScheme)).toBe(theme.scheme)
-      expect(await frame.locator('html').evaluate(el => getComputedStyle(el).fontSize)).toBe(`${14 * scale / 100}px`)
+      expect(await frame.locator('html').evaluate(el => getComputedStyle(el).fontSize)).toBe('14px')
       if (label === '邮件助手') await frame.locator('.mail-row').first().click()
       expect(await frame.locator('body').evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
       await page.screenshot({ path: info.outputPath(`${label}.png`) })
@@ -43,11 +42,11 @@ test('live theme and typography update preserves plugin document and UI state', 
   await frame.locator('.mail-row').first().click()
   await frame.locator('body').evaluate(el => el.dataset.testState = 'preserved')
   await page.locator('iframe').evaluate((el: HTMLIFrameElement) => {
-    el.contentWindow!.postMessage({ source: 'digiworld-host', pluginId: 'io.github.jesmonx.digiworld.mail-assistant', kind: 'theme', payload: { 'color-scheme': 'dark', 'text-scale': '1.25' } }, '*')
+    el.contentWindow!.postMessage({ source: 'digiworld-host', pluginId: 'io.github.jesmonx.digiworld.mail-assistant', kind: 'theme', payload: { 'color-scheme': 'dark' } }, '*')
   })
   await expect(frame.locator('body')).toHaveAttribute('data-test-state', 'preserved')
   await expect(frame.locator('.detail-head')).toBeVisible()
-  expect(await frame.locator('html').evaluate(el => getComputedStyle(el).fontSize)).toBe('17.5px')
+  expect(await frame.locator('html').evaluate(el => getComputedStyle(el).colorScheme)).toBe('dark')
 })
 
 for (const state of ['empty', 'error']) test(`plugin ${state} states`, async ({ page }) => {

@@ -19,7 +19,7 @@
 
 - 🛡️ **本地优先与绝对隐私 (Zero Telemetry)**：无任何用户行为上报，不收集崩溃日志，零第三方分析追踪打点。统计数据本地聚合，敏感凭据全量托管至操作系统安全凭据库。
 - 🧩 **严密沙箱隔离架构 (Sandboxed Architecture)**：UI 视图运行在隔离的 iframe 沙箱中（基于安全 `postMessage` 桥通信）；原生后端作为独立低特权子进程运行，通过系统管道以换行符分隔的 JSON-RPC 2.0 交互（限制 4 MiB 载荷上限与 15s 响应超时）；权限按需显式声明，用户完全掌控数据边界。
-- 🎨 **高度一致的现代美学 (Design System)**：宿主与插件完全共享 `@digiworld/design-system` 规范与语义化 Token（`--dw-*`）。原生内置 Catppuccin（Latte / Mocha）与 Rosé Pine（Dawn / Moon）精选主题，支持亚克力毛玻璃视觉效果（Glass Effect）与多级字阶缩放（100%、110%、125%）。
+- 🎨 **高度一致的现代美学 (Design System)**：宿主与插件完全共享 `@digiworld/design-system` 规范与语义化 Token（`--dw-*`）。原生内置 Catppuccin（Latte / Mocha）与 Rosé Pine（Dawn / Moon）精选主题，支持亚克力毛玻璃视觉效果（Glass Effect）与标准排版字阶体系。
 - 🌐 **完备的网络与全局代理引擎**：支持跟随系统代理、自定义代理（HTTP/HTTPS/SOCKS5/SOCKS5H）及全局直连，内置代理可用性检测；支持插件及单个邮箱账号独立定制代理绕过策略。
 
 ---

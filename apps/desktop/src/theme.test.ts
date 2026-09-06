@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_ACCENT_THEME_ID, DEFAULT_FONT_THEME_ID, DEFAULT_FONT_WEIGHT, FONT_THEME_STORAGE_KEY,
-  FONT_WEIGHT_STORAGE_KEY, loadTextScale, saveTextScale, TEXT_SCALE_STORAGE_KEY,
+  FONT_WEIGHT_STORAGE_KEY,
   THEME_STORAGE_KEY, getAccentTheme, getFontTheme, loadAccentThemeId,
   loadFontThemeId, loadFontWeight, loadGlassMode, pluginTheme, saveAccentThemeId, saveFontThemeId,
   saveFontWeight, saveGlassMode, GLASS_STORAGE_KEY, COLOR_SCHEME_STORAGE_KEY,
@@ -140,10 +140,6 @@ describe('complete theme preferences', () => {
     saveAccentThemeId('catppuccin-mocha', storage)
     expect(loadAccentThemeId(storage)).toBe('catppuccin-mocha')
     expect(pluginTheme(getAccentTheme('catppuccin-mocha'))['color-scheme']).toBe('dark')
-    saveTextScale(125, storage)
-    expect(values.get(TEXT_SCALE_STORAGE_KEY)).toBe('125')
-    expect(loadTextScale(storage)).toBe(125)
-    expect(pluginTheme(getAccentTheme('catppuccin-latte'), getFontTheme('plex'), 400, 'disabled', 125)['text-scale']).toBe('1.25')
   })
 
   it('loads, saves and applies color scheme preferences', () => {

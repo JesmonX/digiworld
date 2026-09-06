@@ -10,7 +10,6 @@ export type ThemeId =
   | 'github-light'
   | 'dracula'
 export type ColorSchemeId = 'classic' | 'ocean' | 'pine' | 'amber' | 'rose'
-export type TextScale = 100 | 110 | 125
 
 export interface ColorSchemeOption {
   id: ColorSchemeId
