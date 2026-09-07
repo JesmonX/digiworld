@@ -1,6 +1,6 @@
 {
   "name": "@digiworld/design-system",
-  "version": "0.2.51",
+  "version": "0.2.52",
   "private": true,
   "type": "module",
   "exports": {
