@@ -162,11 +162,11 @@ button { font: inherit; }
 .board-toolbar h2 svg { width: 16px; color: var(--dw-accent); }
 .legend { display: flex; align-items: center; gap: 4px; color: var(--dw-text-muted); font-size: var(--dw-type-caption); }
 .legend i { width: 16px; height: 6px; border-radius: var(--dw-radius-full); }
-.legend i.level-1 { background: color-mix(in srgb, var(--dw-accent) 18%, var(--dw-material-inset)); }
-.legend i.level-2 { background: color-mix(in srgb, var(--dw-accent) 36%, var(--dw-material-inset)); }
-.legend i.level-3 { background: color-mix(in srgb, var(--dw-accent) 58%, var(--dw-material-inset)); }
-.legend i.level-4 { background: color-mix(in srgb, var(--dw-accent) 80%, var(--dw-material-inset)); }
-.legend i.level-5 { background: var(--dw-accent-strong); }
+.legend i.level-1 { background: color-mix(in srgb, var(--dw-accent-secondary) 18%, var(--dw-material-inset)); }
+.legend i.level-2 { background: color-mix(in srgb, var(--dw-accent-secondary) 36%, var(--dw-material-inset)); }
+.legend i.level-3 { background: color-mix(in srgb, var(--dw-accent-secondary) 58%, var(--dw-material-inset)); }
+.legend i.level-4 { background: color-mix(in srgb, var(--dw-accent-secondary) 80%, var(--dw-material-inset)); }
+.legend i.level-5 { background: var(--dw-accent-secondary); }
 
 .keyboard-board {
   min-width: var(--board-min-width);
@@ -208,11 +208,11 @@ button { font: inherit; }
   transform: translateY(-1px);
 }
 .key.level-0 { background: var(--dw-material-card); color: var(--dw-text-muted); }
-.key.level-1 { background: color-mix(in srgb, var(--dw-accent) 16%, var(--dw-material-card)); border-color: color-mix(in srgb, var(--dw-accent) 30%, var(--dw-material-border)); color: var(--dw-text); }
-.key.level-2 { background: color-mix(in srgb, var(--dw-accent) 34%, var(--dw-material-card)); border-color: color-mix(in srgb, var(--dw-accent) 45%, var(--dw-material-border)); color: var(--dw-text); }
-.key.level-3 { background: color-mix(in srgb, var(--dw-accent) 56%, var(--dw-material-card)); border-color: color-mix(in srgb, var(--dw-accent) 65%, var(--dw-material-border)); color: var(--dw-accent-contrast); }
-.key.level-4 { background: color-mix(in srgb, var(--dw-accent) 78%, var(--dw-material-card)); border-color: color-mix(in srgb, var(--dw-accent) 85%, var(--dw-material-border)); color: var(--dw-accent-contrast); }
-.key.level-5 { background: var(--dw-accent-strong); border-color: var(--dw-accent-strong); color: var(--dw-accent-contrast); }
+.key.level-1 { background: color-mix(in srgb, var(--dw-accent-secondary) 16%, var(--dw-material-card)); border-color: color-mix(in srgb, var(--dw-accent-secondary) 30%, var(--dw-material-border)); color: var(--dw-text); }
+.key.level-2 { background: color-mix(in srgb, var(--dw-accent-secondary) 34%, var(--dw-material-card)); border-color: color-mix(in srgb, var(--dw-accent-secondary) 45%, var(--dw-material-border)); color: var(--dw-text); }
+.key.level-3 { background: color-mix(in srgb, var(--dw-accent-secondary) 56%, var(--dw-material-card)); border-color: color-mix(in srgb, var(--dw-accent-secondary) 65%, var(--dw-material-border)); color: var(--dw-accent-contrast); }
+.key.level-4 { background: color-mix(in srgb, var(--dw-accent-secondary) 78%, var(--dw-material-card)); border-color: color-mix(in srgb, var(--dw-accent-secondary) 85%, var(--dw-material-border)); color: var(--dw-accent-contrast); }
+.key.level-5 { background: var(--dw-accent-secondary); border-color: var(--dw-accent-secondary); color: var(--dw-accent-contrast); }
 .key.strong-heat { color: var(--dw-accent-contrast); }
 
 .key span {

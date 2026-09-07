@@ -37,11 +37,10 @@ button svg { width: 14px; height: 14px; }
 .chart-legend .legend-item { min-height: 23px; padding: 3px 7px; border: 1px solid var(--dw-border); border-radius: var(--dw-radius-sm); background: var(--dw-surface); }
 .chart-legend .legend-item b { color: var(--dw-text); font-size: var(--type-caption); font-weight: var(--weight-semibold); }
 .chart-legend .legend-item small { color: var(--dw-text-muted); font-size: var(--type-caption); font-variant-numeric: tabular-nums; }
-.chart-legend i { display: block; width: 13px; height: 8px; border-radius: var(--dw-radius-sm); }
-.chart-legend .bar-key { background: var(--dw-chart-1); }
+.chart-legend .bar-key { background: var(--dw-accent-secondary); }
 .chart-legend .cache-key { width: 12px; height: 3px; border-radius: 999px; background: var(--dw-chart-cache-rate); }
 .chart-legend .model-key { width: 10px; height: 10px; border-radius: var(--dw-radius-sm); }
-.model-key-0, .token-segment.model-0 { background: var(--dw-chart-1); fill: var(--dw-chart-1); }
+.model-key-0, .token-segment.model-0 { background: var(--dw-accent-secondary); fill: var(--dw-accent-secondary); }
 .model-key-1, .token-segment.model-1 { background: var(--dw-chart-2); fill: var(--dw-chart-2); }
 .model-key-2, .token-segment.model-2 { background: var(--dw-chart-3); fill: var(--dw-chart-3); }
 .model-key-3, .token-segment.model-3 { background: var(--dw-chart-4); fill: var(--dw-chart-4); }
@@ -54,7 +53,9 @@ button svg { width: 14px; height: 14px; }
 .chart-axis-line { stroke: var(--dw-surface-subtle); stroke-width: 1.2; }
 .chart-axis-label, .chart-day-label { fill: var(--dw-text-muted); font-family: inherit; font-size: var(--type-caption); font-weight: var(--weight-medium); font-variant-numeric: tabular-nums; }
 .chart-day-label { fill: var(--dw-text-muted); }
-.token-segment { stroke: none; }
+.chart-bar-track { fill: var(--dw-surface-subtle); opacity: 0.5; }
+.token-segment { stroke: none; transition: opacity var(--dw-motion-fast) var(--dw-ease-out); }
+.token-segment:hover { opacity: 0.82; cursor: pointer; }
 .cache-line { fill: none; stroke: var(--dw-chart-cache-rate); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .cache-point { fill: var(--dw-surface); stroke: var(--dw-chart-cache-rate); stroke-width: 3; }
 .cache-point-label { fill: var(--dw-chart-cache-rate); stroke: var(--dw-surface); stroke-width: 4px; paint-order: stroke; font-family: inherit; font-size: var(--type-caption); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; pointer-events: none; }
@@ -87,19 +88,31 @@ button svg { width: 14px; height: 14px; }
 .quota-empty button { height: 30px; padding: 0 9px; border: 1px solid var(--dw-border); border-radius: var(--dw-radius-sm); color: var(--dw-accent-strong); background: var(--dw-surface); font-size: var(--type-body-sm); }
 .quota-empty.error > svg, .quota-empty.error { color: var(--dw-danger); }
 .heatmap-card { padding: 14px 15px 12px; }
+.heatmap-card .dw-metric-grid { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.heatmap-card .dw-metric { padding: 10px 14px; border: 1px solid var(--dw-material-border); border-radius: var(--dw-radius-md); background: var(--dw-material-card); box-shadow: var(--dw-shadow-xs); transition: border-color var(--dw-motion-fast) var(--dw-ease-out), transform var(--dw-motion-fast) var(--dw-ease-out); }
+.heatmap-card .dw-metric:hover { border-color: var(--dw-accent-border); transform: translateY(-1px); }
+.heatmap-card .dw-metric-label { color: var(--dw-text-muted); font-size: var(--type-caption); font-weight: var(--weight-medium); }
+.heatmap-card .dw-metric-value { font-size: var(--type-title-sm); line-height: 1.3; font-weight: var(--weight-semibold); color: var(--dw-text); }
 .card-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
 .card-title h2, .breakdown-card h2, .daily-ranking-card h2 { margin: 0 0 3px; font-size: var(--type-title-sm); font-weight: var(--weight-semibold); }
 .heatmap-controls { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 .card-title select { min-height: 32px; height: 32px; padding: 0 27px 0 9px; border: 1px solid var(--dw-border); border-radius: var(--dw-radius-sm); color: var(--dw-text); background: var(--dw-surface); font-size: var(--type-body-sm); }
-.calendar-wrap { position: relative; min-height: 135px; overflow-x: auto; padding: 6px 4px 23px 24px; }
-.calendar-grid { height: 112px; display: grid; grid-template-rows: repeat(7, 12px); grid-auto-flow: column; grid-auto-columns: 12px; gap: 4px; width: max-content; min-width: 100%; }
-.calendar-grid i, .legend i { display: block; width: 12px; height: 12px; border-radius: var(--dw-radius-sm); background: var(--dw-surface-subtle); }
-.calendar-grid i:not(.blank) { border: 1px solid color-mix(in srgb, var(--dw-accent-strong) 8%, transparent); }
+.calendar-wrap { position: relative; min-height: 152px; overflow-x: auto; padding: 8px 6px 26px 26px; }
+.calendar-grid { height: 128px; display: grid; grid-template-rows: repeat(7, 14px); grid-auto-flow: column; grid-auto-columns: 14px; gap: 5px; width: max-content; min-width: 100%; }
+.calendar-grid i, .legend i { display: block; width: 14px; height: 14px; border-radius: var(--dw-radius-sm); background: var(--dw-surface-subtle); }
+.calendar-grid i:not(.blank) { border: 1px solid color-mix(in srgb, var(--dw-accent-secondary) 15%, transparent); cursor: pointer; }
 i.blank { visibility: hidden; }
-i.level-1 { background: color-mix(in srgb, var(--dw-accent) 14%, var(--dw-surface)); } i.level-2 { background: color-mix(in srgb, var(--dw-accent) 32%, var(--dw-surface)); } i.level-3 { background: color-mix(in srgb, var(--dw-accent) 55%, var(--dw-surface)); } i.level-4 { background: color-mix(in srgb, var(--dw-accent) 77%, var(--dw-surface)); } i.level-5 { background: var(--dw-accent-strong); }
-.weekday-labels { position: absolute; left: 0; top: 6px; height: 108px; display: flex; flex-direction: column; justify-content: space-between; color: var(--dw-text-muted); font-size: var(--type-caption); font-weight: var(--weight-medium); }
+i.level-1 { background: color-mix(in srgb, var(--dw-accent-secondary) 18%, var(--dw-surface)); }
+i.level-2 { background: color-mix(in srgb, var(--dw-accent-secondary) 38%, var(--dw-surface)); }
+i.level-3 { background: color-mix(in srgb, var(--dw-accent-secondary) 58%, var(--dw-surface)); }
+i.level-4 { background: color-mix(in srgb, var(--dw-accent-secondary) 78%, var(--dw-surface)); }
+i.level-5 { background: var(--dw-accent-secondary); }
+.weekday-labels { position: absolute; left: 2px; top: 8px; height: 128px; display: flex; flex-direction: column; justify-content: space-between; color: var(--dw-text-muted); font-size: var(--type-caption); font-weight: var(--weight-medium); }
 .legend { position: absolute; right: 2px; bottom: 0; display: flex; align-items: center; gap: 4px; color: var(--dw-text-muted); font-size: var(--type-caption); font-weight: var(--weight-medium); }
 .legend i { width: 10px; height: 10px; }
+.calendar-tooltip { position: absolute; z-index: 20; pointer-events: none; transform: translate(-50%, -100%); margin-top: -8px; padding: 5px 10px; border-radius: var(--dw-radius-sm); background: var(--dw-material-raised); border: 1px solid var(--dw-material-border-strong); box-shadow: var(--dw-shadow-md); white-space: nowrap; display: flex; align-items: center; gap: 6px; font-size: var(--type-caption); }
+.calendar-tooltip strong { color: var(--dw-text); font-weight: var(--weight-semibold); }
+.calendar-tooltip span { color: var(--dw-accent-secondary); font-weight: var(--weight-semibold); }
 .lower-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(250px, .65fr); gap: 10px; margin-top: 10px; }
 .breakdown-card, .daily-ranking-card { min-height: 150px; padding: 14px 15px; }
 .breakdown-table { margin-top: 7px; }
@@ -193,9 +206,9 @@ button.icon.danger { color: var(--dw-danger); }
 .filter-bar { padding: 11px 13px; border-radius: var(--dw-radius-md); box-shadow: var(--dw-shadow-sm); }
 .filter-chip { border-radius: var(--dw-radius-sm); }
 .heatmap-card, .breakdown-card, .daily-ranking-card, .model-card, .weekly-card, .quota-card { border-radius: var(--dw-radius-md); box-shadow: var(--dw-shadow-xs); transition: transform var(--dw-motion-normal) var(--dw-ease-out), border-color var(--dw-motion-normal) var(--dw-ease-out), box-shadow var(--dw-motion-normal) var(--dw-ease-out); }
-.calendar-grid i { transition: transform var(--dw-motion-fast) var(--dw-ease-out), border-color var(--dw-motion-fast) var(--dw-ease-out); }
-.calendar-grid i:not(.blank):hover { transform: scale(1.18); border-color: var(--dw-accent); position: relative; z-index: 2; }
-.calendar-grid i:not(.blank):focus-visible { outline: 2px solid var(--dw-focus); outline-offset: 2px; transform: scale(1.18); position: relative; z-index: 2; }
+.calendar-grid i { transition: transform var(--dw-motion-fast) var(--dw-ease-out), border-color var(--dw-motion-fast) var(--dw-ease-out), box-shadow var(--dw-motion-fast) var(--dw-ease-out); }
+.calendar-grid i:not(.blank):hover { transform: scale(1.32) translateY(-2px); border-color: var(--dw-accent-secondary); box-shadow: 0 4px 10px color-mix(in srgb, var(--dw-accent-secondary) 25%, transparent); position: relative; z-index: 5; }
+.calendar-grid i:not(.blank):focus-visible { outline: 2px solid var(--dw-focus); outline-offset: 2px; transform: scale(1.32) translateY(-2px); border-color: var(--dw-accent-secondary); box-shadow: 0 4px 10px color-mix(in srgb, var(--dw-accent-secondary) 25%, transparent); position: relative; z-index: 5; }
 .lower-grid { gap: 12px; margin-top: 12px; }
 .model-card { margin-top: 12px; }
 html[data-dw-glass="enabled"] .summary-item { background: color-mix(in srgb, var(--dw-surface) 88%, transparent); backdrop-filter: var(--dw-glass-filter); }

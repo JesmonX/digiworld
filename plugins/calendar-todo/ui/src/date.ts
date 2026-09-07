@@ -2,7 +2,18 @@ export type DateKey = string // YYYY-MM-DD
 
 export function dateKey(value: string | Date): DateKey {
   if (typeof value === 'string') {
-    if (/^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10)
+    if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+      if (value.includes('T') && (value.endsWith('Z') || /[+-]\d{2}(?::?\d{2})?$/.test(value))) {
+        const d = new Date(value)
+        if (!Number.isNaN(+d)) {
+          const y = d.getFullYear()
+          const m = String(d.getMonth() + 1).padStart(2, '0')
+          const day = String(d.getDate()).padStart(2, '0')
+          return `${y}-${m}-${day}`
+        }
+      }
+      return value.slice(0, 10)
+    }
     if (/^\d{8}/.test(value)) {
       if (/^\d{8}T\d{6}Z$/.test(value)) {
         const utc = new Date(Date.UTC(Number(value.slice(0, 4)), Number(value.slice(4, 6)) - 1, Number(value.slice(6, 8)), Number(value.slice(9, 11)), Number(value.slice(11, 13)), Number(value.slice(13, 15))))
@@ -83,7 +94,7 @@ export function monthDays(year: number, month: number): MonthDayCell[] {
   // Leading days from previous month
   for (let i = leadCount - 1; i >= 0; i--) {
     const d = daysInPrevMonth - i
-    const prevDate = new Date(year, month - 2, d)
+    const prevDate = new Date(year, month - 2, d, 12)
     const key = dateKey(prevDate)
     cells.push({
       key,
@@ -95,7 +106,7 @@ export function monthDays(year: number, month: number): MonthDayCell[] {
 
   // Current month days
   for (let d = 1; d <= daysInMonth; d++) {
-    const curDate = new Date(year, month - 1, d)
+    const curDate = new Date(year, month - 1, d, 12)
     const key = dateKey(curDate)
     cells.push({
       key,
@@ -109,7 +120,7 @@ export function monthDays(year: number, month: number): MonthDayCell[] {
   const totalGrid = Math.ceil(cells.length / 7) * 7
   const trailingCount = totalGrid - cells.length
   for (let d = 1; d <= trailingCount; d++) {
-    const nextDate = new Date(year, month, d)
+    const nextDate = new Date(year, month, d, 12)
     const key = dateKey(nextDate)
     cells.push({
       key,

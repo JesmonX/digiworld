@@ -2,6 +2,7 @@ use crate::model::{
     Account, AccountInput, AttachmentInfo, MessageDetail, MessagePage, MessageSummary,
     ParsedMessage, Settings,
 };
+use crate::parser;
 use anyhow::{Context, Result};
 use rusqlite::{Connection, OptionalExtension, params};
 use std::collections::HashSet;
@@ -289,7 +290,7 @@ impl Database {
         parsed: &ParsedMessage,
         has_body: bool,
     ) -> Result<()> {
-        let snippet: String = parsed.body.chars().take(180).collect();
+        let snippet: String = parser::strip_html(&parsed.body).chars().take(180).collect();
         self.connection.lock().expect("database lock poisoned").execute(
             "INSERT INTO messages(account_id, uid_validity, uid, subject, sender, recipients,
                 received_at, snippet, body, body_truncated, attachments_json, size, server_seen, has_body)
@@ -335,7 +336,7 @@ impl Database {
         body_truncated: bool,
         attachments: &[AttachmentInfo],
     ) -> Result<bool> {
-        let snippet: String = body.chars().take(180).collect();
+        let snippet: String = parser::strip_html(body).chars().take(180).collect();
         let changed = self
             .connection
             .lock()

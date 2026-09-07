@@ -61,6 +61,7 @@ export default function App() {
   const [messages, setMessages] = useState<MailSummary[]>([])
   const [nextCursor, setNextCursor] = useState<number | undefined>()
   const [selected, setSelected] = useState<MailDetail | null>(null)
+  const [viewMode, setViewMode] = useState<'html' | 'text'>('html')
   const [pollMinutes, setPollMinutes] = useState(10)
   const [draft, setDraft] = useState<AccountDraft | null>(null)
   const [busy, setBusy] = useState('')
@@ -145,6 +146,7 @@ export default function App() {
   const openMessage = async (message: MailSummary) => {
     const request = ++detailRequest.current
     setDetailBusy(message.id)
+    setViewMode('html')
     setError('')
     try {
       const detail = await bridge.request<MailDetail>('mail.messages.get', { id: message.id })
@@ -224,10 +226,10 @@ export default function App() {
   return <PluginPage scroll="panes" className="mail-app">
     <PageToolbar className=" toolbar">
       <div className="search"><Search size={15} /><Input aria-label={t('searchAria', locale)} placeholder={t('searchPlaceholder', locale)} value={query} onChange={event => setQuery(event.target.value)} /></div>
+      {currentAccount && <Button className="secondary mark-all" onClick={() => void markAllRead()} disabled={!!busy || syncing.includes(currentAccount.id)}><MailCheck size={15} />{busy === 'mark-all-read' ? t('marking', locale) : t('markAllRead', locale)}</Button>}
       <label className="poll"><Settings size={15} /><span>{t('pollEvery', locale)}</span><Select value={pollMinutes} onChange={event => void changePoll(Number(event.target.value))}>
         {[5, 10, 15, 30].map(value => <option key={value} value={value}>{t('pollMinutes', locale).replace('{minutes}', String(value))}</option>)}
       </Select></label>
-      {currentAccount && <Button className="secondary mark-all" onClick={() => void markAllRead()} disabled={!!busy || syncing.includes(currentAccount.id)}><MailCheck size={15} />{busy === 'mark-all-read' ? t('marking', locale) : t('markAllRead', locale)}</Button>}
       <Button className="secondary" onClick={() => void syncNow()} disabled={busy === 'sync'}>{busy === 'sync' ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}{t('sync', locale)}</Button>
       <Button className="primary" onClick={() => editAccount()}><Plus size={16} />{t('addAccount', locale)}</Button>
     </PageToolbar>
@@ -255,15 +257,38 @@ export default function App() {
           {nextCursor !== undefined && <Button className="load-more" onClick={() => void loadMessages(true, nextCursor)}>{t('loadMore', locale)}<ChevronDown size={15} /></Button>}
         </>}
       </section>} detail={<Card className="dw-card detail">
-        {!selected ? <Empty icon={<Mail />} title={t('selectEmail', locale)} text={t('plainTextNotice', locale)} /> : <>
-          <div className="detail-head">
-            <h2>{selected.subject || t('noSubject', locale)}</h2>
-            <div><strong>{selected.sender || t('unknownSender', locale)}</strong><time>{fmtDate(selected.receivedAt, locale)}</time></div>
-            <p>{t('to', locale).replace('{recipients}', selected.recipients || t('notProvided', locale))}</p>
-          </div>
-          {selected.attachments.length > 0 && <div className="attachments">{selected.attachments.map((attachment, index) => <span key={`${attachment.filename}-${index}`}><Paperclip size={13} />{attachment.filename}<small>{fmtSize(attachment.size)}</small></span>)}</div>}
-          <pre>{selected.body || (selected.hasBody ? t('noPlainText', locale) : t('bodySyncing', locale))}{selected.bodyTruncated ? t('bodyTruncated', locale) : ''}</pre>
-        </>}
+        {!selected ? <Empty icon={<Mail />} title={t('selectEmail', locale)} text={t('plainTextNotice', locale)} /> : (() => {
+          const hasHtml = isHtmlContent(selected.body)
+          return <>
+            <div className="detail-head">
+              <div className="detail-title-row">
+                <h2>{selected.subject || t('noSubject', locale)}</h2>
+                {hasHtml && (
+                  <div className="dw-segmented view-toggle">
+                    <Button className={viewMode === 'html' ? 'active' : ''} onClick={() => setViewMode('html')}>{t('viewHtml', locale)}</Button>
+                    <Button className={viewMode === 'text' ? 'active' : ''} onClick={() => setViewMode('text')}>{t('viewText', locale)}</Button>
+                  </div>
+                )}
+              </div>
+              <div><strong>{selected.sender || t('unknownSender', locale)}</strong><time>{fmtDate(selected.receivedAt, locale)}</time></div>
+              <p>{t('to', locale).replace('{recipients}', selected.recipients || t('notProvided', locale))}</p>
+            </div>
+            {selected.attachments.length > 0 && <div className="attachments">{selected.attachments.map((attachment, index) => <span key={`${attachment.filename}-${index}`}><Paperclip size={13} />{attachment.filename}<small>{fmtSize(attachment.size)}</small></span>)}</div>}
+            {hasHtml && viewMode === 'html' ? (
+              <iframe
+                className="mail-html-frame"
+                sandbox="allow-popups allow-popups-to-escape-sandbox"
+                srcDoc={buildEmailHtmlDoc(selected.body)}
+                title={selected.subject || t('noSubject', locale)}
+              />
+            ) : (
+              <pre className="mail-body-plain">
+                {(hasHtml ? stripHtml(selected.body) : selected.body) || (selected.hasBody ? t('noPlainText', locale) : t('bodySyncing', locale))}
+              </pre>
+            )}
+            {selected.bodyTruncated && <div className="mail-truncated-notice">{t('bodyTruncated', locale)}</div>}
+          </>
+        })()}
       </Card>} />
     </section>
 
@@ -289,3 +314,36 @@ export default function App() {
 function Empty({ icon, title, text, action, actionLabel }: { icon: React.ReactNode; title: string; text: string; action?: () => void; actionLabel?: string }) {
   return <EmptyState icon={icon} title={title} description={text} action={action && <Button className="primary" onClick={action}><Plus size={15} />{actionLabel || 'Add Account'}</Button>} />
 }
+
+function isHtmlContent(content?: string): boolean {
+  if (!content) return false
+  return /<(?:!DOCTYPE|html|head|body|div|p|span|table|tr|td|ul|ol|li|br|h[1-6]|b|i|strong|em|a|section|article)\b/i.test(content)
+}
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function buildEmailHtmlDoc(html: string): string {
+  const baseTag = '<base target="_blank" rel="noopener noreferrer">'
+  const defaultStyle = '<style>:root{color-scheme:light dark;}body{margin:0;padding:16px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.6;word-break:break-word;}img{max-width:100%;height:auto;}pre,code{white-space:pre-wrap;word-break:break-word;}</style>'
+  if (/<head[^>]*>/i.test(html)) {
+    return html.replace(/<head[^>]*>/i, `$&${baseTag}${defaultStyle}`)
+  }
+  if (/<html[^>]*>/i.test(html)) {
+    return html.replace(/<html[^>]*>/i, `$&<head>${baseTag}${defaultStyle}</head>`)
+  }
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">${baseTag}${defaultStyle}</head><body>${html}</body></html>`
+}
+

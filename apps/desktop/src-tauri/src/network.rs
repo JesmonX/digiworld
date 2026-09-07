@@ -70,7 +70,14 @@ pub fn normalized(settings: ProxySettings) -> Result<ProxySettings> {
     }
 }
 
+pub fn ensure_crypto_provider() {
+    if rustls::crypto::CryptoProvider::get_default().is_none() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    }
+}
+
 pub fn http_client(settings: &ProxySettings, user_agent: &str) -> Result<Client> {
+    ensure_crypto_provider();
     let mut builder = ClientBuilder::new()
         .user_agent(user_agent)
         .https_only(true)
@@ -243,5 +250,15 @@ mod tests {
             Some("direct")
         );
         assert_eq!(direct_envs.get("HTTP_PROXY"), Some(&None));
+    }
+
+    #[test]
+    fn builds_http_client_with_initialized_crypto_provider() {
+        let settings = ProxySettings {
+            mode: ProxyMode::Direct,
+            url: None,
+        };
+        let client = http_client(&settings, "test");
+        assert!(client.is_ok());
     }
 }

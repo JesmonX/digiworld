@@ -28,8 +28,8 @@ pub fn parse(raw: &[u8]) -> ParsedMessage {
     let mut html = Vec::new();
     let mut attachments = Vec::new();
     collect_parts(&mail, &mut plain, &mut html, &mut attachments);
-    let body = if plain.is_empty() {
-        strip_html(&html.join("\n\n"))
+    let body = if !html.is_empty() {
+        html.join("\n\n")
     } else {
         plain.join("\n\n")
     };
@@ -103,7 +103,7 @@ fn collect_parts(
     }
 }
 
-fn strip_html(value: &str) -> String {
+pub fn strip_html(value: &str) -> String {
     let mut result = String::with_capacity(value.len());
     let mut inside = false;
     for ch in value.chars() {
@@ -138,5 +138,13 @@ mod tests {
         assert_eq!(parsed.subject, "邮件助手");
         assert!(parsed.body.contains("hello"));
         assert_eq!(parsed.attachments[0].filename, "a.pdf");
+    }
+
+    #[test]
+    fn preserves_html_body_when_present() {
+        let raw = b"From: Team <team@example.com>\r\nTo: Me <me@example.com>\r\nSubject: HTML Mail\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<p>Hello <b>World</b>!</p>";
+        let parsed = parse(raw);
+        assert_eq!(parsed.body, "<p>Hello <b>World</b>!</p>");
+        assert_eq!(strip_html(&parsed.body), "Hello World !");
     }
 }

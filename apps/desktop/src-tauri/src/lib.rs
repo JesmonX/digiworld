@@ -430,6 +430,7 @@ fn create_tray(app: &tauri::App) -> anyhow::Result<()> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    network::ensure_crypto_provider();
     let log_directory = std::env::temp_dir().join("digiworld-logs");
     let _ = std::fs::create_dir_all(&log_directory);
     let appender = tracing_appender::rolling::daily(log_directory, "digiworld.log");

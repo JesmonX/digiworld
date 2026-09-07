@@ -122,7 +122,7 @@ describe('token usage layout', () => {
     expect(filterBar.querySelector('.range-group')).toBeNull()
     expect(insights.compareDocumentPosition(heatmap) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
     expect(heatmap.querySelector('.range-group')).not.toBeNull()
-    expect(heatmap.querySelector('[aria-label="所选范围用量汇总"]')?.children).toHaveLength(6)
+    expect(heatmap.querySelector('[aria-label="所选范围用量汇总"]')?.children).toHaveLength(5)
     expect(mocks.request).toHaveBeenCalledWith('usage.getCodexQuota', { force: false })
 
     const cacheAxisLabels = Array.from(container.querySelectorAll('.weekly-chart .chart-axis-label')).filter((_, index) => index % 2 === 1).map(label => label.textContent)
@@ -144,7 +144,7 @@ describe('token usage layout', () => {
     expect(container.querySelector('.weekly-chart')?.getAttribute('viewBox')).toBe('0 0 820 300')
     expect(container.querySelectorAll('.token-segment')).toHaveLength(2)
     expect(container.querySelector('.token-segment')?.textContent).toContain('Token')
-    expect(container.querySelector('.token-segment')?.getAttribute('rx')).toBeNull()
+    expect(container.querySelector('.token-segment')?.getAttribute('rx')).toBe('5')
     expect(container.querySelector('.model-key-0')).not.toBeNull()
     expect(container.querySelector('.token-segment.model-0')).not.toBeNull()
 

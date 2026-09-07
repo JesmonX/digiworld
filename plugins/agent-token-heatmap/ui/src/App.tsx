@@ -151,6 +151,7 @@ export default function App() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const [agents, setAgents] = useState<Agent[]>([...AGENTS])
   const [sources, setSources] = useState<string[]>(['local'])
+  const [hoveredCell, setHoveredCell] = useState<{ day: string; value: number; x: number; y: number } | null>(null)
   const [range, setRange] = useState<Range>('365')
   const [metric, setMetric] = useState<Metric>('totalTokens')
   const [refresh, setRefresh] = useState<RefreshStatus>({ running: false, completed: 0, total: 0, errors: [] })
@@ -370,7 +371,7 @@ export default function App() {
 
       <section className="dw-card heatmap-card">
         <div className="card-title">
-          <div><h2>{t('dailyHeatmap', locale)}</h2><p>{snapshot?.startDay ?? snapshot?.days[0]?.day ?? '—'} {t('to', locale)} {snapshot?.endDay ?? '—'}</p></div>
+          <div><h2>{t('dailyHeatmap', locale)}</h2></div>
           <div className="heatmap-controls">
             <div className="dw-segmented range-group" aria-label={t('rangeAria', locale)}>{(['30', '90', '365', 'all'] as Range[]).map(value => <Button key={value} className={range === value ? 'active' : ''} onClick={() => setRange(value)}>{value === 'all' ? t('all', locale) : locale === 'zh' ? `${value} 天` : `${value}d`}</Button>)}</div>
             <Select aria-label={t('metricAria', locale)} value={metric} onChange={event => setMetric(event.target.value as Metric)}><option value="totalTokens">{t('totalTokens', locale)}</option><option value="inputTokens">{t('inputTokens', locale)}</option><option value="outputTokens">{t('outputTokens', locale)}</option><option value="cacheReadTokens">{t('cacheReadTokens', locale)}</option></Select>
@@ -381,10 +382,9 @@ export default function App() {
           <Summary label={t('inputTokens', locale)} value={snapshot?.totals.inputTokens} />
           <Summary label={t('outputTokens', locale)} value={snapshot?.totals.outputTokens} />
           <Summary label={t('cacheReadTokens', locale)} value={snapshot?.totals.cacheReadTokens} />
-          <Summary label={t('cacheWriteTokens', locale)} value={snapshot?.totals.cacheWriteTokens} />
           <Summary label={t('cacheRate', locale)} text={snapshot?.totals.cacheRate == null ? '—' : `${(snapshot.totals.cacheRate * 100).toFixed(1)}%`} />
         </MetricGrid>
-        {snapshot && cells.length ? <div className="calendar-wrap"><div className="weekday-labels">{locale === 'zh' ? <><span>一</span><span>三</span><span>五</span><span>日</span></> : <><span>M</span><span>W</span><span>F</span><span>S</span></>}</div><div className="calendar-grid">{cells.map((cell, index) => <i key={cell.day ?? `blank-${index}`} tabIndex={cell.day ? 0 : undefined} aria-label={cell.day ? `${cell.day}，${formatTokens(cell.value)}` : undefined} className={`level-${heatLevel(cell.value, max)} ${cell.day ? '' : 'blank'}`} title={cell.day ? `${cell.day} · ${formatTokens(cell.value)}` : undefined} />)}</div><div className="legend"><span>{t('low', locale)}</span>{[0, 1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>{t('high', locale)}</span></div></div> : <Empty locale={locale} />}
+        {snapshot && cells.length ? <div className="calendar-wrap"><div className="weekday-labels">{locale === 'zh' ? <><span>一</span><span>三</span><span>五</span><span>日</span></> : <><span>M</span><span>W</span><span>F</span><span>S</span></>}</div><div className="calendar-grid">{cells.map((cell, index) => <i key={cell.day ?? `blank-${index}`} tabIndex={cell.day ? 0 : undefined} aria-label={cell.day ? `${cell.day}，${formatTokens(cell.value)}` : undefined} className={`level-${heatLevel(cell.value, max)} ${cell.day ? '' : 'blank'}`} title={cell.day ? `${cell.day} · ${formatTokens(cell.value)}` : undefined} onMouseEnter={e => { if (cell.day) { const target = e.currentTarget; setHoveredCell({ day: cell.day, value: cell.value, x: target.offsetLeft + target.offsetWidth / 2, y: target.offsetTop }) } }} onMouseLeave={() => setHoveredCell(null)} onFocus={e => { if (cell.day) { const target = e.currentTarget; setHoveredCell({ day: cell.day, value: cell.value, x: target.offsetLeft + target.offsetWidth / 2, y: target.offsetTop }) } }} onBlur={() => setHoveredCell(null)} />)}</div>{hoveredCell && <div className="calendar-tooltip" style={{ left: `${hoveredCell.x}px`, top: `${hoveredCell.y}px` }}><strong>{hoveredCell.day}</strong><span>{formatTokens(hoveredCell.value)} Tokens</span></div>}<div className="legend"><span>{t('low', locale)}</span>{[0, 1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>{t('high', locale)}</span></div></div> : <Empty locale={locale} />}
       </section>
 
       <section className="lower-grid">
@@ -465,13 +465,13 @@ function WeeklyChart({ points, locale = 'en' }: { points: WeeklyUsagePoint[]; lo
           })
           .filter(Boolean)
           .join('、')
-        return <g key={point.day}><title>{`${point.day} · ${formatTokens(point.totalTokens)} Token${modelSummary ? ` · ${modelSummary}` : ''} · ${t('cacheRate', locale)} ${cache}`}</title><g className="token-bar">{modelCategories.map((category, categoryIndex) => {
+        return <g key={point.day}><title>{`${point.day} · ${formatTokens(point.totalTokens)} Token${modelSummary ? ` · ${modelSummary}` : ''} · ${t('cacheRate', locale)} ${cache}`}</title><rect x={x - barWidth / 2} y={top} width={barWidth} height={plotHeight} rx="5" className="chart-bar-track" /><g className="token-bar">{modelCategories.map((category, categoryIndex) => {
           const value = category.values[index] ?? 0
           if (value <= 0) return null
           const segmentHeight = value * scale
           const y = top + plotHeight - offset - segmentHeight
           offset += segmentHeight
-          return <rect key={`${point.day}-${category.key}`} x={x - barWidth / 2} y={y} width={barWidth} height={segmentHeight} className={`token-segment model-${categoryIndex % 8}`}><title>{`${point.day} · ${category.label} · ${formatTokens(value)} Token (${point.totalTokens > 0 ? (value / point.totalTokens * 100).toFixed(1) : '0.0'}%)`}</title></rect>
+          return <rect key={`${point.day}-${category.key}`} x={x - barWidth / 2} y={y} width={barWidth} height={segmentHeight} rx="5" className={`token-segment model-${categoryIndex % 8}`}><title>{`${point.day} · ${category.label} · ${formatTokens(value)} Token (${point.totalTokens > 0 ? (value / point.totalTokens * 100).toFixed(1) : '0.0'}%)`}</title></rect>
         })}</g><text x={x} y={height - 18} textAnchor="middle" className="chart-day-label">{point.day.slice(5).replace('-', '/')}</text></g>
       })}
       {segments.map((segment, index) => segment.length > 1 && <polyline key={index} points={segment.map(point => `${xFor(point)},${yForRate(point.cacheRate!)}`).join(' ')} className="cache-line" />)}

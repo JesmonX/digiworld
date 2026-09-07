@@ -276,22 +276,24 @@ export default function App() {
   return (
     <PluginPage>
       <PageToolbar className="">
-        <div>
+        <div className="toolbar-title">
           <Server size={18} />
           <strong>{t('title', locale)}</strong>
         </div>
-        <div className="layout-select">
-          <Select aria-label={t('layoutAria', locale)} value={layout} onChange={e => changeLayout(e.target.value as LayoutMode)}>
-            <option value="auto">{t('layoutAuto', locale)}</option>
-            <option value="compact">{t('layoutCompact', locale)}</option>
-            <option value="double">{t('layoutDouble', locale)}</option>
-            <option value="single">{t('layoutSingle', locale)}</option>
-          </Select>
+        <div className="toolbar-actions">
+          <div className="layout-select">
+            <Select aria-label={t('layoutAria', locale)} value={layout} onChange={e => changeLayout(e.target.value as LayoutMode)}>
+              <option value="auto">{t('layoutAuto', locale)}</option>
+              <option value="compact">{t('layoutCompact', locale)}</option>
+              <option value="double">{t('layoutDouble', locale)}</option>
+              <option value="single">{t('layoutSingle', locale)}</option>
+            </Select>
+          </div>
+          <Button onClick={() => edit()}><Plus size={15} />{t('addServer', locale)}</Button>
+          <Button onClick={() => void loadSettings()} disabled={busy}>
+            <RefreshCw className={busy ? 'spin' : ''} size={15} />{t('refresh', locale)}
+          </Button>
         </div>
-        <Button onClick={() => edit()}><Plus size={15} />{t('addServer', locale)}</Button>
-        <Button onClick={() => void loadSettings()} disabled={busy}>
-          <RefreshCw className={busy ? 'spin' : ''} size={15} />{t('refresh', locale)}
-        </Button>
       </PageToolbar>
 
       {error && <Status tone="error">{error}</Status>}

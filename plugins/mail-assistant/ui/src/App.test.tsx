@@ -195,6 +195,71 @@ describe('mail assistant status and search', () => {
     expect(container.querySelectorAll('.mail-row.new')).toHaveLength(0)
     expect(container.textContent).toContain('1 封缓存邮件标为已读')
 
+    // Verify mark-all button is positioned before the poll element in the toolbar
+    const toolbar = container.querySelector('.toolbar')
+    const markAllButton = toolbar?.querySelector('.mark-all')
+    const pollElement = toolbar?.querySelector('.poll')
+    expect(markAllButton).not.toBeNull()
+    expect(pollElement).not.toBeNull()
+    expect(Boolean(markAllButton!.compareDocumentPosition(pollElement!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+
+    await act(async () => root.unmount())
+  })
+
+  it('renders HTML emails inside sandboxed iframe and supports toggling to plain text', async () => {
+    const root = createRoot(container)
+    mocks.request.mockImplementation(async (method: string) => {
+      if (method === 'mail.sync.status') return { accounts: [account], syncingAccountIds: [] }
+      if (method === 'mail.settings.get') return { pollMinutes: 10 }
+      if (method === 'mail.messages.list') return {
+        items: [{
+          id: 10, accountId: 'mail-1', accountLabel: '工作邮箱',
+          subject: 'HTML 邮件标题', sender: 'sender@example.com', receivedAt: '2026-09-04T12:00:00Z',
+          snippet: 'HTML 测试内容', serverSeen: false, locallyViewed: false, size: 100, hasBody: true,
+        }],
+      }
+      if (method === 'mail.messages.get') return {
+        id: 10, accountId: 'mail-1', accountLabel: '工作邮箱',
+        subject: 'HTML 邮件标题', sender: 'sender@example.com', receivedAt: '2026-09-04T12:00:00Z',
+        snippet: 'HTML 测试内容', serverSeen: false, locallyViewed: true, size: 100, hasBody: true,
+        recipients: 'me@example.com', body: '<p>欢迎使用 <strong>Digiworld</strong> 邮件助手！</p>',
+        bodyTruncated: false, attachments: [],
+      }
+      throw new Error(`unexpected method: ${method}`)
+    })
+
+    vi.useFakeTimers()
+    await act(async () => { root.render(<App />) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(300) })
+
+    const row = container.querySelector<HTMLButtonElement>('.mail-row')
+    expect(row).not.toBeNull()
+    await act(async () => {
+      row?.click()
+      await vi.advanceTimersByTimeAsync(100)
+    })
+
+    // Expect iframe to be rendered
+    const iframe = container.querySelector<HTMLIFrameElement>('iframe.mail-html-frame')
+    expect(iframe).not.toBeNull()
+    expect(iframe?.getAttribute('sandbox')).toBe('allow-popups allow-popups-to-escape-sandbox')
+    expect(iframe?.getAttribute('srcdoc')).toContain('<strong>Digiworld</strong>')
+
+    // Expect view toggle buttons
+    const toggleButtons = container.querySelectorAll<HTMLButtonElement>('.view-toggle button')
+    expect(toggleButtons.length).toBe(2)
+    expect(toggleButtons[0]!.textContent).toBe('网页视图')
+    expect(toggleButtons[1]!.textContent).toBe('纯文本')
+
+    // Switch to plain text mode
+    await act(async () => {
+      toggleButtons[1]!.click()
+    })
+    expect(container.querySelector('iframe.mail-html-frame')).toBeNull()
+    const pre = container.querySelector<HTMLPreElement>('.mail-body-plain')
+    expect(pre).not.toBeNull()
+    expect(pre?.textContent).toContain('欢迎使用 Digiworld 邮件助手！')
+
     await act(async () => root.unmount())
   })
 })

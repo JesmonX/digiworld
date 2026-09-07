@@ -126,6 +126,7 @@ label {
 .calendar-weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
   text-align: center;
   color: var(--dw-text-muted);
   font-size: var(--dw-type-caption);
@@ -301,6 +302,7 @@ label {
   min-width: 0;
 }
 
+.dw-button.event,
 .event {
   display: flex;
   justify-content: space-between;
@@ -315,17 +317,20 @@ label {
   transition: transform var(--dw-motion-fast), box-shadow var(--dw-motion-fast);
 }
 
+.dw-button.event:hover,
 .event:hover {
   background: var(--dw-material-raised);
   transform: translateY(-1px);
   box-shadow: var(--dw-shadow-xs);
 }
 
+.dw-button.event > span,
 .event span {
   display: grid;
   text-align: left;
   min-width: 0;
   gap: 2px;
+  flex: 1;
 }
 
 .event strong {

@@ -38,6 +38,8 @@ export const DICTIONARY = {
   to: { en: 'To: {recipients}', zh: '收件人：{recipients}' },
   notProvided: { en: 'Not provided', zh: '未提供' },
   noPlainText: { en: 'This email has no plain text content.', zh: '这封邮件没有纯文本正文。' },
+  viewHtml: { en: 'HTML', zh: '网页视图' },
+  viewText: { en: 'Plain Text', zh: '纯文本' },
   bodyTruncated: { en: '\n\n[Body truncated]', zh: '\n\n[正文已截断]' },
   dialogAria: { en: 'Email Account Settings', zh: '邮箱账号设置' },
   dialogTitleEdit: { en: 'Account Settings', zh: '账号设置' },

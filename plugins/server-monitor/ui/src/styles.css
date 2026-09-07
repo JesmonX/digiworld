@@ -2,9 +2,11 @@
 html, body, #root { width: 100%; height: 100%; margin: 0; }
 body { background: transparent; color: var(--dw-text); font-family: var(--dw-font-sans); }
 
-.dw-toolbar > div { display: flex; align-items: center; gap: var(--dw-space-2); min-width: 0; margin-right: auto; }
-.dw-toolbar strong { font-size: var(--dw-type-title); font-weight: var(--dw-weight-semibold); letter-spacing: -0.02em; }
-.layout-select { margin-left: auto; display: flex; align-items: center; }
+.toolbar-title { display: flex; align-items: center; gap: var(--dw-space-2); min-width: 0; }
+.toolbar-title strong { font-size: var(--dw-type-title); font-weight: var(--dw-weight-semibold); letter-spacing: -0.02em; }
+.toolbar-actions { margin-left: auto; display: flex; align-items: center; gap: var(--dw-space-2); flex-wrap: wrap; }
+.layout-select { display: flex; align-items: center; }
+.layout-select select { min-height: 36px; }
 
 .devices { display: grid; gap: var(--dw-space-4); align-items: start; }
 .devices.layout-auto { grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); }
@@ -202,8 +204,6 @@ body { background: transparent; color: var(--dw-text); font-family: var(--dw-fon
 @media (max-width: 760px) {
   .devices.layout-double { grid-template-columns: 1fr; }
   .devices.layout-single { grid-template-columns: 1fr; }
-  .dw-toolbar > div { margin-right: 0; }
-  .layout-select { margin-left: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {
