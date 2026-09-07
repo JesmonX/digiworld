@@ -29,12 +29,14 @@ function RailButton({ item, collapsed, locale }: { item: NavigationRailItem; col
   }
   const status = localizedState(item.status, locale)
   const accessibleLabel = status ? `${item.label}, ${status}` : item.label
+  const statusId = status ? `nav-status-${item.id}` : undefined
 
   return (
     <>
     <Button
       title={collapsed ? accessibleLabel : undefined}
-      aria-label={accessibleLabel}
+      aria-label={item.label}
+      aria-describedby={statusId}
       aria-current={item.active ? 'page' : undefined}
       className={`nav-item ${item.active ? 'active' : ''} ${collapsed ? 'collapsed' : ''}`}
       onClick={item.onClick}
@@ -47,6 +49,7 @@ function RailButton({ item, collapsed, locale }: { item: NavigationRailItem; col
       <span className="nav-icon">{item.icon}</span>
       {!collapsed && <span className="nav-label">{item.label}</span>}
       {item.status && <i className={`state-dot ${item.status}`} aria-hidden="true" />}
+      {status && <span id={statusId} className="dw-sr-only">{status}</span>}
     </Button>
     {tooltip && createPortal(<span role="tooltip" className="rail-tooltip" style={tooltip}>{accessibleLabel}</span>, document.body)}
     </>

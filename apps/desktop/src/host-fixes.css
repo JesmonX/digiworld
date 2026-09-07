@@ -41,3 +41,15 @@
 .state-dot.starting { background: var(--dw-accent); }
 .state-dot.paused { background: var(--dw-warning); }
 .state-dot.disabled { background: var(--dw-text-muted); }
+
+.dw-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}

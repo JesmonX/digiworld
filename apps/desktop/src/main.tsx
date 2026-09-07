@@ -4,6 +4,5 @@ import '@digiworld/design-system/tokens.css'
 import '@digiworld/design-system/base.css'
 import '@digiworld/typography/fonts.css'
 import App from './App'
-import './host-fixes.css'
 
 createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>)

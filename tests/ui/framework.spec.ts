@@ -52,3 +52,11 @@ test('glass and font preferences reach plugin first paint and live updates prese
     await expect(frame.locator('.detail-head')).toBeVisible()
   }
 })
+
+test('navigation buttons expose stable accessible name and localized status description', async ({ page }) => {
+  await gotoWithRetry(page, '/design.html')
+  const mailBtn = page.getByRole('button', { name: '邮件助手', exact: true })
+  await expect(mailBtn).toBeVisible()
+  await expect(mailBtn).toHaveAccessibleName('邮件助手')
+  await expect(mailBtn).toHaveAccessibleDescription('运行中')
+})

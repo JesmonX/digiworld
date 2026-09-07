@@ -24,6 +24,7 @@ import {
   saveFontWeight, loadGlassMode, saveGlassMode, type AccentThemeId, type FontThemeId, type FontWeight, type GlassMode,
 } from './theme'
 import './styles.css'
+import './host-fixes.css'
 
 type Page = 'home' | 'catalog' | 'settings' | { pluginId: string }
 

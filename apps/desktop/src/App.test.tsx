@@ -116,6 +116,24 @@ describe('workspace redesign', () => {
 
     await act(async () => root.unmount())
   })
+
+  it('preserves stable accessible name on plugin navigation and provides localized status via aria-describedby', async () => {
+    const root = createRoot(container)
+    await act(async () => { root.render(<App />); await flush() })
+
+    const pluginBtn = container.querySelector<HTMLButtonElement>('.rail-plugins button')
+    expect(pluginBtn).not.toBeNull()
+    expect(pluginBtn?.getAttribute('aria-label')).toBe('示例插件')
+
+    const statusId = pluginBtn?.getAttribute('aria-describedby')
+    expect(statusId).toBe('nav-status-example.plugin')
+    const statusEl = container.querySelector(`[id="${statusId}"]`)
+    expect(statusEl).not.toBeNull()
+    expect(statusEl?.classList.contains('dw-sr-only')).toBe(true)
+    expect(statusEl?.textContent).toBe('Running')
+
+    await act(async () => root.unmount())
+  })
 })
 
 describe('explicit update consent', () => {
