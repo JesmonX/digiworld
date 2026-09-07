@@ -12,18 +12,29 @@ export interface NavigationRailItem {
   onClick(): void
 }
 
-function RailButton({ item, collapsed }: { item: NavigationRailItem; collapsed?: boolean }) {
+const LOCALIZED_STATES = new Set(['running', 'starting', 'paused', 'failed', 'disabled', 'installed'])
+
+function localizedState(status: string | undefined, locale: Locale): string | undefined {
+  if (!status) return undefined
+  if (!LOCALIZED_STATES.has(status)) return status
+  return t(status as 'running' | 'starting' | 'paused' | 'failed' | 'disabled' | 'installed', locale)
+}
+
+function RailButton({ item, collapsed, locale }: { item: NavigationRailItem; collapsed?: boolean; locale: Locale }) {
   const [tooltip, setTooltip] = useState<{ top: number; left: number } | null>(null)
   const show = (event: SyntheticEvent<HTMLButtonElement>) => {
     if (!collapsed) return
     const rect = event.currentTarget.getBoundingClientRect()
     setTooltip({ top: rect.top + rect.height / 2, left: rect.right + 12 })
   }
+  const status = localizedState(item.status, locale)
+  const accessibleLabel = status ? `${item.label}, ${status}` : item.label
+
   return (
     <>
     <Button
-      title={collapsed ? item.label : undefined}
-      aria-label={item.label}
+      title={collapsed ? accessibleLabel : undefined}
+      aria-label={accessibleLabel}
       aria-current={item.active ? 'page' : undefined}
       className={`nav-item ${item.active ? 'active' : ''} ${collapsed ? 'collapsed' : ''}`}
       onClick={item.onClick}
@@ -35,9 +46,9 @@ function RailButton({ item, collapsed }: { item: NavigationRailItem; collapsed?:
     >
       <span className="nav-icon">{item.icon}</span>
       {!collapsed && <span className="nav-label">{item.label}</span>}
-      {item.status && <i className={`state-dot ${item.status}`} aria-label={item.status} />}
+      {item.status && <i className={`state-dot ${item.status}`} aria-hidden="true" />}
     </Button>
-    {tooltip && createPortal(<span role="tooltip" className="rail-tooltip" style={tooltip}>{item.label}</span>, document.body)}
+    {tooltip && createPortal(<span role="tooltip" className="rail-tooltip" style={tooltip}>{accessibleLabel}</span>, document.body)}
     </>
   )
 }
@@ -81,8 +92,8 @@ export function NavigationRail({
       <div className="sidebar-scroll">
         <div className="sidebar-section">
           {!collapsed && <div className="sidebar-section-header"><span>{t('menu', locale)}</span></div>}
-          <nav className="rail-primary" aria-label="工作台">
-            {primary.map(item => <RailButton key={item.id} item={item} collapsed={collapsed} />)}
+          <nav className="rail-primary" aria-label={t('workspaceNavLabel', locale)}>
+            {primary.map(item => <RailButton key={item.id} item={item} collapsed={collapsed} locale={locale} />)}
           </nav>
         </div>
 
@@ -91,8 +102,8 @@ export function NavigationRail({
             <div className="rail-divider" aria-hidden="true" />
             <div className="sidebar-section">
               {!collapsed && <div className="sidebar-section-header"><span>{t('installedSection', locale)}</span></div>}
-              <nav className="rail-plugins" aria-label="已安装插件">
-                {plugins.map(item => <RailButton key={item.id} item={item} collapsed={collapsed} />)}
+              <nav className="rail-plugins" aria-label={t('installedPluginsNavLabel', locale)}>
+                {plugins.map(item => <RailButton key={item.id} item={item} collapsed={collapsed} locale={locale} />)}
               </nav>
             </div>
           </>
@@ -102,8 +113,8 @@ export function NavigationRail({
       <div className="rail-divider" aria-hidden="true" />
       <div className="sidebar-bottom-section">
         {!collapsed && <div className="sidebar-section-header"><span>{t('systemSection', locale)}</span></div>}
-        <nav className="sidebar-bottom" aria-label="系统">
-          <RailButton item={settings} collapsed={collapsed} />
+        <nav className="sidebar-bottom" aria-label={t('systemNavLabel', locale)}>
+          <RailButton item={settings} collapsed={collapsed} locale={locale} />
         </nav>
       </div>
     </aside>
