@@ -14,6 +14,9 @@ export const DICTIONARY = {
   workspace: { en: 'Workspace', zh: '工作台' },
   collapseSidebar: { en: 'Collapse sidebar', zh: '收起侧栏' },
   expandSidebar: { en: 'Expand sidebar', zh: '展开侧栏' },
+  workspaceNavLabel: { en: 'Workspace navigation', zh: '工作台导航' },
+  installedPluginsNavLabel: { en: 'Installed plugins', zh: '已安装插件导航' },
+  systemNavLabel: { en: 'System navigation', zh: '系统导航' },
 
   // Header & Greetings
   goodMorning: { en: 'Good Morning', zh: '早上好' },
@@ -25,12 +28,15 @@ export const DICTIONARY = {
   summaryTitle: { en: 'Digiworld Status Summary', zh: 'Digiworld 状态摘要' },
   installedCount: { en: 'Installed', zh: '已安装' },
   installedUnit: { en: 'tools', zh: '个功能' },
+  activeUnit: { en: 'active', zh: '运行中' },
   runningCount: { en: 'Active Workers', zh: '运行中' },
   allRunning: { en: 'All plugins operational', zh: '所有功能正在运行' },
   someRunning: { en: 'Status details below', zh: '其余功能状态见下方' },
   needsAttention: { en: 'Attention', zh: '需关注' },
   issuesFound: { en: 'Check failed plugins', zh: '请查看异常功能' },
   noIssues: { en: 'All systems normal', zh: '暂无异常' },
+  needsCheck: { en: 'Needs Check', zh: '需要检查' },
+  operational: { en: 'Operational', zh: '运行正常' },
   installedTools: { en: 'Installed Tools', zh: '已安装功能' },
   installedToolsDesc: { en: 'Select a tool to start working.', zh: '选择工具，继续你的工作。' },
   refresh: { en: 'Refresh', zh: '刷新' },
@@ -86,6 +92,13 @@ export const DICTIONARY = {
   openBtn: { en: 'Open', zh: '打开' },
   installBtn: { en: 'Install', zh: '安装' },
   unsupportedBtn: { en: 'Not supported on current system', zh: '暂未适配当前系统' },
+  unsupportedArchitecture: { en: 'Plugin not yet supported on architecture', zh: '插件暂未适配当前架构' },
+
+  // Window controls
+  minimizeWindow: { en: 'Minimize', zh: '最小化' },
+  maximizeWindow: { en: 'Maximize', zh: '最大化' },
+  restoreWindow: { en: 'Restore', zh: '还原' },
+  closeWindow: { en: 'Close window', zh: '关闭窗口' },
 
   // Plugin Management
   enable: { en: 'Enable', zh: '启用' },
