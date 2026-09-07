@@ -150,3 +150,21 @@ html[data-dw-glass="disabled"] .keyboard-card, html[data-dw-glass="disabled"] .r
 .summary-line strong { font-size: var(--dw-type-metric); font-variant-numeric: tabular-nums; }
 .keyboard-board, .board-toolbar { min-width: calc(var(--board-min-width) * var(--dw-text-scale)); }
 .layout-picker-trigger { height: auto; }
+
+/* The keyboard is the domain surface; surrounding chrome stays quiet. */
+body { background: transparent; }
+.heatmap-app { max-width: 1180px; margin-inline: auto; padding: 0 0 var(--dw-space-5); }
+.plugin-header { min-height: 62px; margin-bottom: var(--dw-space-3); }
+.summary-line { gap: var(--dw-space-4); }
+.summary-line > div + div { border-color: var(--dw-material-border); }
+.keyboard-card { padding: var(--dw-space-4); border-color: var(--dw-material-border); border-radius: var(--dw-radius-lg); background: var(--dw-material-panel); box-shadow: var(--dw-shadow-xs); }
+.ranking-card { padding: var(--dw-space-4); border-color: var(--dw-material-border); border-radius: var(--dw-radius-lg); background: var(--dw-material-card); box-shadow: var(--dw-shadow-xs); }
+.layout-picker-trigger { border-color: var(--dw-material-border-strong); border-radius: var(--dw-radius-md); background: var(--dw-material-inset); box-shadow: none; }
+.layout-menu { border-color: var(--dw-material-border-strong); border-radius: var(--dw-radius-md); background: var(--dw-material-raised); box-shadow: var(--dw-shadow-lg); }
+.keyboard-board { border: 1px solid var(--dw-material-border); border-radius: var(--dw-radius-lg); background: var(--dw-material-inset); }
+.key { box-shadow: none; border-radius: var(--dw-radius-sm); }
+.key:hover { transform: none; box-shadow: var(--dw-shadow-xs); }
+.lower-grid { margin-top: var(--dw-space-3); }
+html[data-dw-glass="enabled"] .keyboard-card, html[data-dw-glass="enabled"] .ranking-card { background: var(--dw-material-panel); backdrop-filter: none; }
+html[data-dw-glass="disabled"] .keyboard-card, html[data-dw-glass="disabled"] .ranking-card { background: var(--dw-material-panel); backdrop-filter: none; }
+@media (max-width: 620px) { .plugin-header { align-items: flex-start; flex-direction: column; gap: 10px; }.header-actions { width: 100%; }.scope-toggle { flex: 1; }.scope-toggle button { flex: 1; }.pause-button { flex: 0 0 auto; } }

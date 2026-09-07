@@ -47,7 +47,11 @@ vi.mock('./lib/api', () => ({
 }))
 
 function button(container: HTMLElement, label: string) {
-  return Array.from(container.querySelectorAll('button')).find(item => item.textContent?.includes(label))
+  return Array.from(container.querySelectorAll('button')).find(item => (
+    item.textContent?.includes(label) ||
+    item.getAttribute('aria-label') === label ||
+    item.getAttribute('title') === label
+  ))
 }
 
 async function flush() {
@@ -80,7 +84,10 @@ describe('workspace redesign', () => {
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
 
-    expect(Array.from(container.querySelectorAll('.sidebar-section-label')).map(item => item.textContent)).toEqual(['工作台', '已安装', '系统'])
+    expect(container.querySelector('[aria-label="工作台"]')).not.toBeNull()
+    expect(container.querySelector('[aria-label="已安装插件"]')).not.toBeNull()
+    expect(container.querySelector('[aria-label="系统"]')).not.toBeNull()
+    expect(container.querySelector('.rail-divider')).not.toBeNull()
     expect(container.textContent).toContain('数字工作台')
     expect(container.textContent).toContain('已安装功能')
     expect(container.textContent).toContain('快捷操作')

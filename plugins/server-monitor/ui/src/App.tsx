@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Button, Input, Card, Status, Select } from '@digiworld/design-system/react'
+import { Button, Input, Card, Progress, Status, Select } from '@digiworld/design-system/react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import { Server, Plus, RefreshCw, HardDrive, MemoryStick, Cpu, Gauge, Network, Settings, X, LoaderCircle, AlertCircle } from 'lucide-react'
 
@@ -567,7 +567,7 @@ function Metric({ icon, title, value, percent }: { icon: React.ReactNode; title:
           <strong>{value}</strong>
         </span>
       </div>
-      <progress value={percent} max="100" />
+      <Progress value={percent} max={100} emphasized />
     </div>
   )
 }

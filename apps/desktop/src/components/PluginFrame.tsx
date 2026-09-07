@@ -56,7 +56,7 @@ export function withInitialTheme(html: string, theme: PluginTheme): string {
     .filter(([key, value]) => /^[a-z][a-z0-9-]*$/.test(key) && value !== undefined)
     .map(([key, value]) => `--dw-${key}:${String(value).replace(/[<>;{}]/g, '')}`)
     .join(';')
-  const style = `<style data-digiworld-host-design>${designTokensCss}\n${designBaseCss}\n:root{${declarations};color-scheme:${theme['color-scheme']}}</style>`
+  const style = `<style data-digiworld-host-design>${designTokensCss}\n${designBaseCss}\nhtml,body,#root{background:transparent}\n:root{${declarations};color-scheme:${theme['color-scheme']}}</style>`
 
   let themed: string
   if (/<\/head>/i.test(html)) {
@@ -142,5 +142,5 @@ export function PluginFrame({ pluginId, html, theme, active = true }: PluginFram
     frame.current?.contentWindow?.postMessage(visibilityMessage, '*')
   }, [pluginId, active])
 
-  return <iframe ref={frame} className="plugin-frame" title={pluginId} sandbox="allow-scripts allow-downloads" style={{ backgroundColor: theme.bg }} srcDoc={source} />
+  return <iframe ref={frame} className="plugin-frame" title={pluginId} sandbox="allow-scripts allow-downloads" style={{ backgroundColor: 'transparent' }} srcDoc={source} />
 }

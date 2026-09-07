@@ -1,15 +1,17 @@
-import { Button, Input, Card, Dialog, Switch, Status, RadioGroup } from '@digiworld/design-system/react'
+import { Button, Input, Card, Panel, Dialog, Switch, Status, RadioGroup } from '@digiworld/design-system/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import {
-  Activity, AlertTriangle, BarChart3, Boxes, Check, ChevronRight, CircleAlert, Download, Gauge, MoreHorizontal,
-  CalendarDays, GitBranch, Keyboard, Library, LoaderCircle, Mail, Network, Palette, Pause, RefreshCw, Server, Settings,
-  ShieldCheck, Type, type LucideIcon,
-} from 'lucide-react'
+import { Check, CircleAlert, Download, Gauge, MoreHorizontal, Library, LoaderCircle, Network, Palette, Pause, Settings, ShieldCheck, Type } from 'lucide-react'
 import { suppressContextMenu, type CatalogIndex, type CatalogPlugin, type PluginSummary } from '@digiworld/plugin-sdk'
 import { PluginFrame } from './components/PluginFrame'
 import { WindowChrome } from './components/WindowChrome'
 import { ThemeDropdown } from './components/ThemeDropdown'
+import { AppShell } from './layout/AppShell'
+import { PluginIcon } from './components/PluginIcon'
+import { stateLabel } from './components/PluginStatus'
+import { Loading } from './components/Loading'
+import { HomePage } from './pages/HomePage'
+import { CatalogPage } from './pages/CatalogPage'
 import {
   api, type AppState, type CoreUpdateInfo, type PluginUpdateInfo, type ProxyMode,
   type ProxySettings, type UpdateProgress,
@@ -61,62 +63,6 @@ function permissionLabel(id: string): string {
   return labels[id] ?? id
 }
 
-function stateLabel(plugin: PluginSummary): string {
-  if (!plugin.enabled || plugin.state === 'disabled') return '已停用'
-  const labels: Partial<Record<PluginSummary['state'], string>> = {
-    installed: '已安装',
-    starting: '启动中',
-    running: '运行中',
-    paused: '已暂停',
-    failed: '异常',
-  }
-  return labels[plugin.state] ?? plugin.state
-}
-
-function ChatGptIcon({ className, 'aria-hidden': ariaHidden, 'data-plugin-icon': dataPluginIcon }: { className?: string; 'aria-hidden'?: boolean | 'true' | 'false'; 'data-plugin-icon'?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      width="24"
-      height="24"
-      fill="currentColor"
-      className={className}
-      aria-hidden={ariaHidden}
-      data-plugin-icon={dataPluginIcon}
-    >
-      <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.6069 1.4997-2.602-1.4997z" />
-    </svg>
-  )
-}
-
-type PluginIconType = LucideIcon | React.ComponentType<{ className?: string; 'aria-hidden'?: boolean | 'true' | 'false'; 'data-plugin-icon'?: string }>
-
-const pluginIconMap: Record<string, PluginIconType> = {
-  keyboard: Keyboard,
-  tokens: BarChart3,
-  chatgpt: ChatGptIcon,
-  mail: Mail,
-  'git-branch': GitBranch,
-  server: Server,
-  'calendar-days': CalendarDays,
-  default: Boxes,
-}
-
-function pluginIconKey(plugin: { id: string; icon?: string }): string {
-  if (plugin.icon && pluginIconMap[plugin.icon]) return plugin.icon
-  if (plugin.id.includes('keyboard')) return 'keyboard'
-  if (plugin.id.includes('agent-token')) return 'chatgpt'
-  if (plugin.id.includes('mail')) return 'mail'
-  return 'default'
-}
-
-function PluginIcon({ plugin }: { plugin: { id: string; icon?: string } }) {
-  const key = pluginIconKey(plugin)
-  const Icon = pluginIconMap[key] ?? Boxes
-  return <Icon aria-hidden="true" data-plugin-icon={key} />
-}
-
 function App() {
   const reduceMotion = useReducedMotion()
   const [state, setState] = useState<AppState | null>(null)
@@ -145,6 +91,7 @@ function App() {
     for (const [key, value] of Object.entries(activeTheme)) if (value !== undefined) document.documentElement.style.setProperty('--dw-' + key, value)
     document.documentElement.style.colorScheme = activeTheme['color-scheme']
     document.documentElement.dataset.dwGlass = glassMode
+    document.documentElement.dataset.dwScheme = activeTheme['color-scheme']
   }, [activeTheme, glassMode])
 
   useEffect(() => saveAccentThemeId(accentThemeId), [accentThemeId])
@@ -248,42 +195,37 @@ function App() {
   }
 
   const pageTitle = typeof page === 'string'
-    ? { home: '概览', catalog: '功能库', settings: '设置' }[page]
+    ? { home: 'Dashboard', catalog: '功能库', settings: '设置' }[page]
     : selectedPlugin?.name ?? '插件'
   const pluginOpen = typeof page !== 'string'
+  const pageSubtitle = page === 'home' ? '你的本地数字工作台' : undefined
+
+  const primaryNavigation = [
+    { id: 'home', label: '概览', icon: <Gauge />, active: page === 'home', onClick: () => setPage('home') },
+    { id: 'catalog', label: '功能库', icon: <Library />, active: page === 'catalog', onClick: () => setPage('catalog') },
+  ]
+  const pluginNavigation = (state?.plugins ?? []).map(plugin => ({
+    id: plugin.id,
+    label: plugin.name,
+    icon: <PluginIcon plugin={plugin} />,
+    status: plugin.state,
+    active: pluginOpen && page.pluginId === plugin.id,
+    onClick: () => setPage({ pluginId: plugin.id }),
+  }))
+  const settingsNavigation = { id: 'settings', label: '设置', icon: <Settings />, active: page === 'settings', onClick: () => setPage('settings') }
 
   useEffect(() => setPluginMenuOpen(false), [page])
 
   return (
     <div className={`app-window glass-${glassMode} ${pluginOpen ? 'plugin-open' : ''}`} data-dw-glass={glassMode} style={themeStyle(activeTheme)}>
       <WindowChrome />
-      <div className="app-shell">
-        <aside className="sidebar">
-          <div className="sidebar-scroll">
-            <SidebarGroup label="工作台">
-              <NavButton active={page === 'home'} icon={<Gauge />} label="概览" onClick={() => setPage('home')} />
-              <NavButton active={page === 'catalog'} icon={<Library />} label="功能库" onClick={() => setPage('catalog')} />
-            </SidebarGroup>
-            {state?.plugins.length ? (
-              <SidebarGroup label="已安装">
-                {state.plugins.map(plugin => (
-                  <NavButton key={plugin.id} active={pluginOpen && page.pluginId === plugin.id}
-                    icon={<PluginIcon plugin={plugin} />} label={plugin.name} status={plugin.state} onClick={() => setPage({ pluginId: plugin.id })} />
-                ))}
-              </SidebarGroup>
-            ) : null}
-          </div>
-          <div className="sidebar-bottom">
-            <SidebarGroup label="系统">
-              <NavButton active={page === 'settings'} icon={<Settings />} label="设置" onClick={() => setPage('settings')} />
-            </SidebarGroup>
-          </div>
-        </aside>
-
-        <main className="main">
-          <header className="topbar">
-            <h1>{pageTitle}</h1>
-            {selectedPlugin && (
+      <AppShell
+        primary={primaryNavigation}
+        plugins={pluginNavigation}
+        settings={settingsNavigation}
+        title={pageTitle}
+        subtitle={pageSubtitle}
+        actions={selectedPlugin && (
               <div className="plugin-management">
                 <span className={`compact-status ${selectedPlugin.state}`}>{stateLabel(selectedPlugin)}</span>
                 <Button className="secondary compact" disabled={busy === selectedPlugin.id} onClick={() => void manageEnabled(selectedPlugin, !selectedPlugin.enabled)}>
@@ -297,8 +239,7 @@ function App() {
                 </div>
               </div>
             )}
-          </header>
-
+      >
           {error && <Status tone="error" className="error-banner"><CircleAlert /><span>{error}</span><Button onClick={() => setError(null)}>关闭</Button></Status>}
 
           <section className="content">
@@ -312,8 +253,8 @@ function App() {
                   exit={reduceMotion ? { opacity: 1, x: 0, scale: 1 } : { opacity: 0, x: -6, scale: .995 }}
                   transition={reduceMotion ? { duration: 0 } : { duration: .18, ease: [.2, .8, .2, 1] }}
                 >
-                  {page === 'home' && <Home plugins={state?.plugins ?? []} version={state?.version} onCatalog={() => setPage('catalog')} onOpen={id => setPage({ pluginId: id })} onRefresh={() => { void refreshState().catch(reason => setError(errorMessage(reason))) }} reducedMotion={Boolean(reduceMotion)} />}
-                  {page === 'catalog' && <Catalog catalog={catalog} installed={installed} busy={busy} onInstall={setConfirmInstall} onRefresh={() => refreshCatalog(true)} onOpen={id => setPage({ pluginId: id })} currentTarget={state?.target} />}
+                  {page === 'home' && <HomePage plugins={state?.plugins ?? []} version={state?.version} onCatalog={() => setPage('catalog')} onOpen={id => setPage({ pluginId: id })} onRefresh={() => { void refreshState().catch(reason => setError(errorMessage(reason))) }} reducedMotion={Boolean(reduceMotion)} />}
+                  {page === 'catalog' && <CatalogPage catalog={catalog} installed={installed} busy={busy} onInstall={setConfirmInstall} onRefresh={() => refreshCatalog(true)} onOpen={id => setPage({ pluginId: id })} currentTarget={state?.target} />}
                   {page === 'settings' && state && <SettingsPage state={state} progress={updateProgress} onProgressReset={() => setUpdateProgress(null)} onPluginsUpdated={refreshState} accentThemeId={accentThemeId} onAccentThemeChange={setAccentThemeId} colorSchemeId={colorSchemeId} onColorSchemeChange={setColorSchemeId} fontThemeId={fontThemeId} onFontThemeChange={setFontThemeId} fontWeight={fontWeight} onFontWeightChange={setFontWeight} glassMode={glassMode} onGlassModeChange={setGlassMode} onChange={async enabled => { await api.setLaunchAtStartup(enabled); await refreshState() }} />}
                 </motion.div>
               </AnimatePresence>
@@ -348,105 +289,9 @@ function App() {
               )
             })}
           </section>
-        </main>
-      </div>
+      </AppShell>
 
       {confirmInstall && <InstallDialog plugin={confirmInstall} busy={busy === confirmInstall.id} progress={updateProgress?.operation === 'plugin-install' && updateProgress.itemId === confirmInstall.id ? updateProgress : null} onCancel={() => setConfirmInstall(null)} onConfirm={() => { setUpdateProgress(null); void install(confirmInstall) }} />}
-    </div>
-  )
-}
-
-function SidebarGroup({ label, children }: { label: string; children: React.ReactNode }) {
-  return <section className="sidebar-section"><h2 className="sidebar-section-label">{label}</h2><nav>{children}</nav></section>
-}
-
-function NavButton({ active, icon, label, status, onClick }: { active: boolean; icon: React.ReactNode; label: string; status?: string; onClick(): void }) {
-  return <Button title={label} className={`nav-item ${active ? 'active' : ''}`} onClick={onClick}><span>{icon}</span><b>{label}</b>{status && <i className={`state-dot ${status}`} />}</Button>
-}
-
-function Home({ plugins, version, onCatalog, onOpen, onRefresh, reducedMotion }: { plugins: PluginSummary[]; version: string | undefined; onCatalog(): void; onOpen(id: string): void; onRefresh(): void; reducedMotion: boolean }) {
-  if (plugins.length === 0) return (
-    <div className="empty-state">
-      <div className="empty-icon"><Boxes /></div>
-      <h2>还没有安装功能</h2>
-      <p>从功能库选择需要的工具。</p>
-      <Button className="primary" onClick={onCatalog}>浏览功能库 <ChevronRight /></Button>
-    </div>
-  )
-
-  const running = plugins.filter(plugin => plugin.state === 'running').length
-  const attention = plugins.filter(plugin => plugin.enabled && plugin.state === 'failed').length
-  const healthy = attention === 0
-  return (
-    <div className="home-dashboard">
-      <div className="home-intro">
-        <div>
-          <span className="eyebrow"><Activity />数字工作台</span>
-          <h2>你的功能，都在这里</h2>
-          <p>{healthy ? '当前没有停用或异常功能。' : `${attention} 个功能需要你的注意。`}</p>
-        </div>
-        <div className={`health-pill ${healthy ? 'healthy' : 'attention'}`}><span />{healthy ? '运行稳定' : '需要关注'}</div>
-      </div>
-      <div className="dashboard-summary" aria-label="Digiworld 状态摘要">
-        <SummaryCard label="已安装" value={plugins.length} detail="个功能" icon={<Boxes />} tone="accent" />
-        <SummaryCard label="运行中" value={running} detail={`共 ${plugins.length} 个`} icon={<Gauge />} tone="success" />
-        <SummaryCard label="需关注" value={attention} detail={attention ? '请查看状态' : '暂无异常'} icon={attention ? <AlertTriangle /> : <ShieldCheck />} tone={attention ? 'warning' : 'success'} />
-        <SummaryCard label="当前版本" value={version ?? '—'} detail="Digiworld" icon={<ShieldCheck />} tone="neutral" />
-      </div>
-      <div className="section-heading installed-heading">
-        <div><span className="section-kicker">你的工作台</span><h2>已安装功能</h2></div>
-        <Button className="secondary" onClick={onCatalog}><Library />添加功能</Button>
-      </div>
-      <div className="installed-list">
-        {plugins.map((plugin, index) => (
-          <motion.button key={plugin.id} className="plugin-row" onClick={() => onOpen(plugin.id)} initial={reducedMotion ? false : { opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={reducedMotion ? { duration: 0 } : { delay: index * .035, duration: .18 }}>
-            <span className="row-icon"><PluginIcon plugin={plugin} /></span>
-            <span className="plugin-row-copy"><span className="plugin-row-heading"><strong>{plugin.name}</strong><ChevronRight className="row-chevron" /></span><small>{plugin.description || '打开以查看功能'}</small></span>
-            <span className={`compact-status ${plugin.state}`}>{stateLabel(plugin)}</span>{plugin.uiDesignVersion !== 1 && <small className="legacy-design">浅色兼容 · 待适配新外观</small>}
-          </motion.button>
-        ))}
-      </div>
-      <div className="quick-actions" aria-label="快捷操作">
-        <span className="section-kicker">快捷操作</span>
-        <div>
-          <Button className="quick-action" onClick={onCatalog}><span><Library /></span><b>浏览功能库</b><ChevronRight /></Button>
-          <Button className="quick-action" onClick={onRefresh}><span><RefreshCw /></span><b>刷新状态</b><ChevronRight /></Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function SummaryCard({ label, value, detail, icon, tone = 'accent' }: { label: string; value: string | number; detail: string; icon: React.ReactNode; tone?: 'accent' | 'success' | 'warning' | 'neutral' }) {
-  return <Card className={`summary-card ${tone}`}><span className="summary-card-icon">{icon}</span><div><small>{label}</small><strong>{value}</strong><span>{detail}</span></div></Card>
-}
-
-function Catalog({ catalog, installed, busy, onInstall, onRefresh, onOpen, currentTarget }: { catalog: CatalogIndex | null; installed: Map<string, PluginSummary>; busy: string | null; onInstall(plugin: CatalogPlugin): void; onRefresh(): void; onOpen(id: string): void; currentTarget?: string | undefined }) {
-  if (!catalog) return <Loading label="载入功能库" />
-  return (
-    <div>
-      <div className="section-heading">
-        <h2>可用功能</h2>
-        <Button className="icon-button" aria-label="刷新功能库" title="刷新" onClick={onRefresh}><RefreshCw /></Button>
-      </div>
-      <div className="catalog-grid">
-        {catalog.plugins.map(plugin => {
-          const current = installed.get(plugin.id)
-          const supported = Boolean(currentTarget && plugin.artifacts.some(artifact => artifact.target === currentTarget))
-          return (
-            <Card className="catalog-card" key={plugin.id}>
-              <div className="catalog-title"><span className="catalog-icon"><PluginIcon plugin={plugin} /></span><div className="catalog-version"><span className={`availability-dot ${current ? 'installed' : supported ? 'available' : 'unavailable'}`} /> <small>{current ? '已安装' : supported ? '可安装' : '暂未适配'}</small><small>v{plugin.version}</small></div></div>
-              <h3>{plugin.name}</h3>
-              <p>{plugin.description}</p>
-              {current
-                ? <Button className="secondary full" onClick={() => onOpen(plugin.id)}>打开 <ChevronRight /></Button>
-                : !supported
-                  ? <Button className="secondary full" disabled title={`该插件暂未适配当前系统架构 (${currentTarget})`}>暂未适配当前系统</Button>
-                  : <Button className="primary full" disabled={busy === plugin.id} onClick={() => onInstall(plugin)}>{busy === plugin.id ? <LoaderCircle className="spin" /> : <Download />}安装</Button>}
-            </Card>
-          )
-        })}
-      </div>
     </div>
   )
 }
@@ -589,7 +434,12 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
 
   return (
     <div className="settings-stack">
-      <Card className={`settings-card theme-card ${themeDropdownOpen ? 'dropdown-open' : ''}`}>
+      <Panel className="settings-section appearance-section" padding="none">
+        <div className="settings-section-header">
+          <div><strong>外观与显示</strong><span>调整主题、字体和界面层次</span></div>
+        </div>
+        <div className="settings-section-body">
+        <Card className={`settings-card theme-card ${themeDropdownOpen ? 'dropdown-open' : ''}`}>
         <div className="theme-header-row">
           <div className="theme-copy">
             <h3><Palette />主题颜色</h3>
@@ -627,7 +477,7 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
             </div>
           </div>
         </div>
-      </Card>
+        </Card>
       <Card className="settings-card scheme-card">
         <div className="theme-copy">
           <h3><Palette />主题配色</h3>
@@ -653,7 +503,7 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
             </Button>
           ))}
         </RadioGroup>
-      </Card>
+        </Card>
       <Card className="settings-card font-card">
         <div className="theme-copy">
           <h3><Type />界面字体</h3>
@@ -676,7 +526,7 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
             </Button>
           ))}
         </RadioGroup>
-      </Card>
+        </Card>
       <Card className="settings-card weight-card">
         <div className="theme-copy">
           <h3><Type />字体粗细</h3>
@@ -686,7 +536,14 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
           <Input aria-label="字体粗细" type="range" min="400" max="600" step="100" value={fontWeight} onChange={event => onFontWeightChange(Number(event.target.value) as FontWeight)} />
           <output>{fontWeight}</output>
         </div>
-      </Card>
+        </Card>
+        </div>
+      </Panel>
+      <Panel className="settings-section behavior-section" padding="none">
+        <div className="settings-section-header">
+          <div><strong>使用体验</strong><span>控制启动和背景效果</span></div>
+        </div>
+        <div className="settings-section-body">
       <Card className="settings-card appearance-card">
         <h3>玻璃效果</h3>
         <Switch aria-label="切换玻璃效果" checked={glassMode === 'enabled'} onCheckedChange={enabled => onGlassModeChange(enabled ? 'enabled' : 'disabled')} />
@@ -695,6 +552,13 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
         <h3>开机启动</h3>
         <Switch aria-label="切换开机启动" checked={state.launchAtStartup} onCheckedChange={enabled => void onChange(enabled)} />
       </Card>
+        </div>
+      </Panel>
+      <Panel className="settings-section network-section" padding="none">
+        <div className="settings-section-header">
+          <div><strong>连接</strong><span>管理插件和更新所使用的网络</span></div>
+        </div>
+        <div className="settings-section-body">
       <Card className="settings-card proxy-card">
         <div className="proxy-copy">
           <h3><Network />网络代理</h3>
@@ -708,6 +572,13 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
         </div>
         <div className="proxy-actions"><Button className="secondary" disabled={proxyBusy !== null} onClick={() => void runProxyAction('test')}>{proxyBusy === 'test' ? '测试中…' : '测试连接'}</Button><Button className="primary" disabled={proxyBusy !== null} onClick={() => void runProxyAction('save')}>{proxyBusy === 'save' ? '保存中…' : '保存'}</Button></div>
       </Card>
+        </div>
+      </Panel>
+      <Panel className="settings-section updates-section" padding="none">
+        <div className="settings-section-header">
+          <div><strong>更新</strong><span>检查插件和 Digiworld 主程序的新版本</span></div>
+        </div>
+        <div className="settings-section-body">
       <Card className="settings-card update-card">
         <div><h3>插件更新</h3>{pluginMessage && <small className="update-message">{pluginMessage}</small>}</div>
         <Button className="secondary" disabled={updateBusy !== null} onClick={() => void checkPluginUpdates()}>{updateBusy === 'plugin-check' ? <><LoaderCircle className="spin" />检查中…</> : '检查全部插件'}</Button>
@@ -716,6 +587,8 @@ function SettingsPage({ state, progress, onProgressReset, onPluginsUpdated, acce
         <div><h3>主程序更新</h3>{coreMessage && <small className="update-message">{coreMessage}</small>}</div>
         <Button className="secondary" disabled={updateBusy !== null} onClick={() => void checkCoreUpdate()}>{updateBusy === 'core-check' ? <><LoaderCircle className="spin" />检查中…</> : '检查主程序'}</Button>
       </Card>
+        </div>
+      </Panel>
       <div className="version-line"><ShieldCheck /> Digiworld {state.version}</div>
       {updateDialog && (
         <UpdateDialogView
@@ -823,10 +696,6 @@ function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
-
-function Loading({ label }: { label: string }) {
-  return <div className="loading"><LoaderCircle className="spin" /><span>{label}</span></div>
 }
 
 export default App

@@ -1,6 +1,11 @@
 import { useEffect, useRef, type ComponentProps, type ReactNode } from 'react'
 import './components.css'
 
+export interface PanelProps extends ComponentProps<'section'> {
+  variant?: 'default' | 'raised' | 'inset'
+  padding?: 'none' | 'sm' | 'md' | 'lg'
+}
+
 export function Button({ className = '', variant, ...props }: ComponentProps<'button'> & { variant?: 'primary' | 'secondary' | 'danger' }) {
   return <button type="button" {...props} className={`dw-button ${variant ?? ''} ${className}`} />
 }
@@ -8,6 +13,16 @@ export function Input({ className = '', ...props }: ComponentProps<'input'>) { r
 export function Select({ className = '', ...props }: ComponentProps<'select'>) { return <select {...props} className={`dw-select ${className}`} /> }
 export function Textarea({ className = '', ...props }: ComponentProps<'textarea'>) { return <textarea {...props} className={`dw-textarea ${className}`} /> }
 export function Card({ className = '', ...props }: ComponentProps<'article'>) { return <article {...props} className={`dw-card ${className}`} /> }
+export function Panel({ className = '', variant = 'default', padding = 'md', ...props }: PanelProps) {
+  return <section {...props} className={`dw-panel dw-panel-${variant} dw-panel-padding-${padding} ${className}`} />
+}
+export function Metric({ label, value, unit, hint, className = '' }: { label: ReactNode; value: ReactNode; unit?: ReactNode; hint?: ReactNode; className?: string }) {
+  return <div className={`dw-metric ${className}`}><span className="dw-metric-label">{label}</span><strong className="dw-metric-value">{value}{unit && <span className="dw-metric-unit">{unit}</span>}</strong>{hint && <span className="dw-metric-hint">{hint}</span>}</div>
+}
+export function Progress({ value, max = 100, label, secondaryLabel, tone = 'accent', emphasized = false, className = '' }: { value: number; max?: number; label?: ReactNode; secondaryLabel?: ReactNode; tone?: 'accent' | 'success' | 'warning' | 'danger'; emphasized?: boolean; className?: string }) {
+  const percent = Math.max(0, Math.min(100, max > 0 ? value / max * 100 : 0))
+  return <div className={`dw-progress dw-progress-${tone} ${emphasized ? 'dw-progress-emphasized' : ''} ${className}`}><div className="dw-progress-header">{label && <span className="dw-progress-label">{label}</span>}<span className="dw-progress-value">{secondaryLabel ?? `${Math.round(percent)}%`}</span></div><div className="dw-progress-track" role="progressbar" aria-valuemin={0} aria-valuemax={max} aria-valuenow={Math.min(max, Math.max(0, value))} aria-label={typeof label === 'string' ? label : undefined}><span style={{ width: `${percent}%` }} /></div></div>
+}
 export function Toolbar({ className = '', ...props }: ComponentProps<'div'>) { return <div {...props} className={`dw-toolbar ${className}`} /> }
 export function Segmented({ className = '', ...props }: ComponentProps<'div'>) { return <div role="group" {...props} className={`dw-segmented ${className}`} /> }
 export function RadioGroup({ onKeyDown, ...props }: ComponentProps<'div'>) {

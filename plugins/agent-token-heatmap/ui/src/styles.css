@@ -221,3 +221,22 @@ html[data-dw-glass="disabled"] .summary-item { backdrop-filter: none; background
 
 .usage-header { justify-content: flex-end; }
 .chart-grid-line { stroke: var(--dw-chart-grid); }
+
+/* Dashboard panels carry hierarchy; the chart remains the visual anchor. */
+body { background: transparent; }
+.usage-app { max-width: 1180px; margin-inline: auto; padding: 0 0 var(--dw-space-5); }
+.usage-header { min-height: 62px; margin-bottom: var(--dw-space-3); }
+.filter-bar { padding: 11px 13px; border-color: var(--dw-material-border); border-radius: var(--dw-radius-lg); background: var(--dw-material-inset); box-shadow: none; }
+.summary-grid { grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; margin-bottom: var(--dw-space-4); border: 0; background: transparent; }
+.summary-item { min-height: 70px; border: 1px solid var(--dw-material-border); border-radius: var(--dw-radius-md); background: var(--dw-material-card); box-shadow: none; }
+.heatmap-card, .breakdown-card, .daily-ranking-card, .model-card, .weekly-card, .quota-card { border-color: var(--dw-material-border); border-radius: var(--dw-radius-lg); background: var(--dw-material-panel); box-shadow: var(--dw-shadow-xs); }
+.weekly-card, .quota-card { min-height: 324px; }
+.chart-grid-line { opacity: .62; }
+.chart-legend .legend-item { border-color: var(--dw-material-border); background: var(--dw-material-inset); }
+.calendar-grid i:not(.blank) { border-color: color-mix(in srgb, var(--dw-accent) 10%, transparent); }
+.calendar-grid i:not(.blank):hover { transform: none; }
+.lower-grid { gap: var(--dw-space-3); margin-top: var(--dw-space-3); }
+.model-card { margin-top: var(--dw-space-3); }
+html[data-dw-glass="enabled"] .heatmap-card, html[data-dw-glass="enabled"] .breakdown-card, html[data-dw-glass="enabled"] .daily-ranking-card, html[data-dw-glass="enabled"] .model-card, html[data-dw-glass="enabled"] .weekly-card, html[data-dw-glass="enabled"] .quota-card, html[data-dw-glass="enabled"] .filter-bar, html[data-dw-glass="enabled"] .summary-item { background: var(--dw-material-panel); backdrop-filter: none; }
+html[data-dw-glass="disabled"] .heatmap-card, html[data-dw-glass="disabled"] .breakdown-card, html[data-dw-glass="disabled"] .daily-ranking-card, html[data-dw-glass="disabled"] .model-card, html[data-dw-glass="disabled"] .weekly-card, html[data-dw-glass="disabled"] .quota-card, html[data-dw-glass="disabled"] .filter-bar, html[data-dw-glass="disabled"] .summary-item { backdrop-filter: none; }
+@media (max-width: 620px) { .usage-header { align-items: flex-start; flex-direction: column; gap: 10px; }.header-buttons { width: 100%; }.header-buttons button { flex: 1; }.model-pie-wrap { grid-template-columns: 1fr; justify-items: center; }.model-pie-legend { width: 100%; } }

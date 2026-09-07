@@ -334,3 +334,23 @@ html[data-dw-scheme="dark"] .calendar-meta-card {
   .todo-add { flex-wrap: wrap; }
   .todo-add .dw-input:first-child { flex-basis: 100%; }
 }
+
+/* Agenda-first calendar workspace: month navigation is supporting context. */
+body { background: transparent; }
+main { max-width: 1180px; margin-inline: auto; padding: 0 0 var(--dw-space-5); }
+.dw-toolbar { min-height: 54px; }
+.calendar-view { grid-template-columns: minmax(0, 1.8fr) minmax(260px, .8fr); gap: var(--dw-space-4); }
+.calendar-agenda-pane { grid-column: 1; grid-row: 1; }
+.calendar-sidebar { grid-column: 2; grid-row: 1; }
+.month-card { background: var(--dw-material-panel); border-color: var(--dw-material-border); box-shadow: var(--dw-shadow-xs); }
+.calendar-meta-card { background: var(--dw-material-inset); border: 1px solid var(--dw-material-border); border-radius: var(--dw-radius-md); }
+.agenda-day-card { padding: var(--dw-space-3) 0; border: 0; border-bottom: 1px solid var(--dw-material-border); border-radius: 0; background: transparent; box-shadow: none; }
+.agenda-day-card time { padding-top: 5px; }
+.agenda-day-events { position: relative; padding-left: var(--dw-space-3); border-left: 2px solid color-mix(in srgb, var(--dw-accent) 24%, transparent); }
+.event { min-height: 48px; padding: 8px 10px; border: 0; border-radius: var(--dw-radius-md); background: var(--dw-material-card); text-align: left; }
+.event:hover { background: var(--dw-material-raised); }
+.todo { max-width: 820px; }
+.todo-add { background: var(--dw-material-panel); border-color: var(--dw-material-border); }
+.todo > .dw-card:not(.todo-add) { border: 0; border-bottom: 1px solid var(--dw-material-border); border-radius: 0; background: transparent; box-shadow: none; }
+.editor { position: relative; inset: auto; width: min(620px, calc(100vw - 32px)); max-height: calc(100vh - 32px); margin: auto; background: var(--dw-material-raised); border-color: var(--dw-material-border-strong); box-shadow: var(--dw-shadow-lg); }
+@media (max-width: 720px) { .calendar-view { grid-template-columns: 1fr; }.calendar-agenda-pane, .calendar-sidebar { grid-column: auto; grid-row: auto; }.calendar-sidebar { order: -1; } }
