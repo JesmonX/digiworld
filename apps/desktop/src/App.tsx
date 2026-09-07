@@ -1,4 +1,4 @@
-import { Button, Input, Card, Panel, Dialog, Switch, Status, RadioGroup } from '@digiworld/design-system/react'
+import { Button, Input, Card, Panel, Dialog, Switch, Status, RadioGroup, Menu } from '@digiworld/design-system/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { Check, CircleAlert, Download, Gauge, MoreHorizontal, Library, LoaderCircle, Network, Palette, Pause, Settings, ShieldCheck, Type, Languages, Moon, Sun } from 'lucide-react'
@@ -243,7 +243,7 @@ function App() {
 
   return (
     <div className={`app-window glass-${glassMode} ${pluginOpen ? 'plugin-open' : ''}`} data-dw-glass={glassMode} style={themeStyle(activeTheme)}>
-      <WindowChrome />
+      <WindowChrome locale={locale} />
       <AppShell
         primary={primaryNavigation}
         plugins={pluginNavigation}
@@ -262,10 +262,20 @@ function App() {
                   {selectedPlugin.enabled ? t('disable', locale) : t('enable', locale)}
                 </Button>
                 <div className="plugin-more">
-                  <Button className="secondary compact icon-button" aria-label={t('moreActions', locale)} aria-expanded={pluginMenuOpen} onClick={() => setPluginMenuOpen(open => !open)}><MoreHorizontal /></Button>
-                  {pluginMenuOpen && <div className="plugin-more-menu" role="menu">
-                    <Button role="menuitem" className="danger-button" disabled={busy === selectedPlugin.id} onClick={() => { setPluginMenuOpen(false); void uninstall(selectedPlugin) }}>{t('removePlugin', locale)}</Button>
-                  </div>}
+                  <Button
+                    className="secondary compact icon-button"
+                    aria-label={t('moreActions', locale)}
+                    aria-haspopup="menu"
+                    aria-expanded={pluginMenuOpen}
+                    onClick={() => setPluginMenuOpen(open => !open)}
+                  >
+                    <MoreHorizontal />
+                  </Button>
+                  {pluginMenuOpen && (
+                    <Menu className="plugin-more-menu">
+                      <Button role="menuitem" className="danger-button" disabled={busy === selectedPlugin.id} onClick={() => { setPluginMenuOpen(false); void uninstall(selectedPlugin) }}>{t('removePlugin', locale)}</Button>
+                    </Menu>
+                  )}
                 </div>
               </div>
             )}
@@ -274,8 +284,8 @@ function App() {
                 type="button"
                 className="header-pill-toggle lang-pill"
                 onClick={() => setLocale(l => l === 'en' ? 'zh' : 'en')}
-                title={locale === 'en' ? '切换为中文' : 'Switch to English'}
-                aria-label="Toggle language"
+                title={locale === 'en' ? t('switchToChinese', locale) : t('switchToEnglish', locale)}
+                aria-label={t('toggleLanguage', locale)}
               >
                 <Languages size={13} />
                 <span>{locale === 'en' ? 'EN' : '中'}</span>
@@ -284,8 +294,8 @@ function App() {
                 type="button"
                 className="header-pill-toggle theme-pill"
                 onClick={() => setAccentThemeId(id => id === 'light' ? 'dark' : 'light')}
-                title={accentThemeId === 'light' ? 'Switch to Dark mode' : 'Switch to Light mode'}
-                aria-label="Toggle theme"
+                title={accentThemeId === 'light' ? t('switchToDarkMode', locale) : t('switchToLightMode', locale)}
+                aria-label={t('toggleTheme', locale)}
               >
                 {accentThemeId === 'light' ? <Moon size={13} /> : <Sun size={13} />}
               </button>
@@ -711,17 +721,17 @@ function SettingsPage({
 
       <Panel className="settings-section updates-section" padding="none">
         <div className="settings-section-header">
-          <div><strong>Digiworld Updates</strong><span>Check for newer versions of tools and the host application</span></div>
+          <div><strong>{t('updatesTitle', locale)}</strong><span>{t('updatesDesc', locale)}</span></div>
         </div>
         <div className="settings-section-body">
           <Card className="settings-card update-card">
-            <div><h3>Plugin Updates</h3>{pluginMessage && <small className="update-message">{pluginMessage}</small>}</div>
+            <div><h3>{t('pluginUpdates', locale)}</h3>{pluginMessage && <small className="update-message">{pluginMessage}</small>}</div>
             <Button className="secondary" disabled={updateBusy !== null} onClick={() => void checkPluginUpdates()}>
               {updateBusy === 'plugin-check' ? <><LoaderCircle className="spin" />{t('checking', locale)}</> : t('checkAllPlugins', locale)}
             </Button>
           </Card>
           <Card className="settings-card update-card">
-            <div><h3>Core Updates</h3>{coreMessage && <small className="update-message">{coreMessage}</small>}</div>
+            <div><h3>{t('coreUpdates', locale)}</h3>{coreMessage && <small className="update-message">{coreMessage}</small>}</div>
             <Button className="secondary" disabled={updateBusy !== null} onClick={() => void checkCoreUpdate()}>
               {updateBusy === 'core-check' ? <><LoaderCircle className="spin" />{t('checking', locale)}</> : t('checkCore', locale)}
             </Button>
@@ -761,7 +771,7 @@ function InstallDialog({ plugin, busy, progress, locale = 'en', onCancel, onConf
             </div>
           ))}
         </div>
-        {busy && <ProgressView progress={progress} fallbackName={plugin.name} />}
+        {busy && <ProgressView progress={progress} fallbackName={plugin.name} locale={locale} />}
         <div className="modal-actions">
           <Button className="secondary" disabled={busy} onClick={onCancel}>{t('cancel', locale)}</Button>
           <Button className="primary" disabled={busy} onClick={onConfirm}>{busy ? <LoaderCircle className="spin" /> : <Download />}{t('installBtn', locale)}</Button>
@@ -808,7 +818,7 @@ function UpdateDialogView({ dialog, busy, progress, error, locale = 'en', onCanc
           </div>
         )}
         {!busy && <p className="consent-copy">{locale === 'zh' ? '检查更新不会自动安装。点击下方按钮后才会通过当前代理下载并安装。' : 'Updates will only be downloaded and installed after your confirmation.'}</p>}
-        {busy && <ProgressView progress={matchingProgress} fallbackName={isPlugins ? (locale === 'zh' ? '插件更新' : 'Plugin Updates') : `Digiworld ${dialog.update.version}`} />}
+        {busy && <ProgressView progress={matchingProgress} fallbackName={isPlugins ? (locale === 'zh' ? '插件更新' : 'Plugin Updates') : `Digiworld ${dialog.update.version}`} locale={locale} />}
         {error && <Status tone="error" className="update-error"><CircleAlert />{error}</Status>}
         <div className="modal-actions">
           <Button className="secondary" disabled={busy} onClick={onCancel}>{t('cancel', locale)}</Button>
@@ -827,18 +837,26 @@ function stateVersionLabel(version: string, locale: Locale = 'en') {
     : `Will download and install version ${version}. Digiworld will restart once complete.`
 }
 
-function ProgressView({ progress, fallbackName }: { progress: UpdateProgress | null; fallbackName: string }) {
+function ProgressView({ progress, fallbackName, locale = 'en' }: { progress: UpdateProgress | null; fallbackName: string; locale?: Locale }) {
   const downloading = progress?.stage === 'downloading'
   const percent = downloading && progress.total
     ? Math.min(100, Math.round(progress.downloaded / progress.total * 100))
     : null
-  const stageLabel = !progress ? 'Preparing' : downloading ? 'Downloading' : progress.stage === 'completed' ? 'Completed' : progress.stage === 'failed' ? 'Failed' : 'Installing'
+  const stageLabel = !progress
+    ? t('progressPreparing', locale)
+    : downloading
+      ? t('progressDownloading', locale)
+      : progress.stage === 'completed'
+        ? t('progressCompleted', locale)
+        : progress.stage === 'failed'
+          ? t('progressFailed', locale)
+          : t('progressInstalling', locale)
   const currentItem = progress?.stage === 'completed' ? progress.completedItems : (progress?.completedItems ?? 0) + 1
   const itemCount = progress && progress.totalItems > 1 ? ` · ${Math.min(currentItem, progress.totalItems)}/${progress.totalItems}` : ''
   return (
     <div className="update-progress" aria-live="polite">
       <div><strong>{stageLabel}{itemCount}</strong><span>{progress?.itemName ?? fallbackName}</span></div>
-      <div className={`progress-track ${percent === null ? 'indeterminate' : ''}`} role="progressbar" aria-label={`${stageLabel} progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent ?? undefined}>
+      <div className={`progress-track ${percent === null ? 'indeterminate' : ''}`} role="progressbar" aria-label={`${t('updateProgress', locale)}: ${stageLabel}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent ?? undefined}>
         <span style={percent === null ? undefined : { width: `${percent}%` }} />
       </div>
       {downloading && <small>{formatBytes(progress.downloaded)}{progress.total ? ` / ${formatBytes(progress.total)} · ${percent}%` : ''}</small>}
