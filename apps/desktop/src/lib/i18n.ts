@@ -23,6 +23,12 @@ export const DICTIONARY = {
   goodAfternoon: { en: 'Good Afternoon', zh: '下午好' },
   goodEvening: { en: 'Good Evening', zh: '晚上好' },
   subtitle: { en: 'Personal Digital Workspace', zh: '你的本地数字工作台' },
+  toggleLanguage: { en: 'Toggle language', zh: '切换语言' },
+  switchToChinese: { en: 'Switch to Chinese', zh: '切换为中文' },
+  switchToEnglish: { en: 'Switch to English', zh: '切换为英文' },
+  toggleTheme: { en: 'Toggle theme', zh: '切换主题' },
+  switchToDarkMode: { en: 'Switch to Dark mode', zh: '切换为深色模式' },
+  switchToLightMode: { en: 'Switch to Light mode', zh: '切换为浅色模式' },
 
   // HomePage / Overview
   summaryTitle: { en: 'Digiworld Status Summary', zh: 'Digiworld 状态摘要' },
@@ -82,6 +88,10 @@ export const DICTIONARY = {
   launchAtStartup: { en: 'Launch Digiworld on system startup', zh: '开机时自动启动 Digiworld' },
   proxyTitle: { en: 'Network Proxy', zh: '网络代理' },
   proxyDesc: { en: 'Manage HTTP/SOCKS proxy for remote services and plugin updates.', zh: '配置插件更新与远端数据访问的网络代理。' },
+  updatesTitle: { en: 'Digiworld Updates', zh: 'Digiworld 更新' },
+  updatesDesc: { en: 'Check for newer versions of tools and the host application', zh: '检查插件与主程序的新版本' },
+  pluginUpdates: { en: 'Plugin Updates', zh: '插件更新' },
+  coreUpdates: { en: 'Core Updates', zh: '主程序更新' },
 
   // Catalog
   availableTools: { en: 'Available Tools', zh: '可用功能' },
@@ -125,6 +135,14 @@ export const DICTIONARY = {
   coreUpdateFound: { en: 'Digiworld Core Update Found', zh: '发现 Digiworld 主程序更新' },
   pluginUpdatesFound: { en: 'Plugin Updates Found', zh: '发现插件更新' },
   agreeAndUpdate: { en: 'Agree & Update', zh: '同意并更新' },
+
+  // Update progress
+  progressPreparing: { en: 'Preparing', zh: '准备中' },
+  progressDownloading: { en: 'Downloading', zh: '下载中' },
+  progressCompleted: { en: 'Completed', zh: '已完成' },
+  progressFailed: { en: 'Failed', zh: '失败' },
+  progressInstalling: { en: 'Installing', zh: '安装中' },
+  updateProgress: { en: 'Update progress', zh: '更新进度' },
 } as const
 
 export type TranslationKey = keyof typeof DICTIONARY
