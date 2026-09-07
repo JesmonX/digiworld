@@ -1,0 +1,43 @@
+/* Host-level contract corrections layered after the legacy shell stylesheet. */
+.sidebar-section-header {
+  font-size: var(--dw-type-caption);
+  line-height: var(--dw-leading-caption);
+  font-weight: var(--dw-weight-semibold);
+}
+
+/* Keep scrolling visually discoverable without turning the rail into a heavy scrollbar. */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.sidebar-scroll:hover,
+.sidebar-scroll:focus-within {
+  scrollbar-color: var(--dw-material-border) transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  display: block;
+  width: 4px;
+  height: 4px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  border-radius: var(--dw-radius-full);
+  background: transparent;
+}
+
+.sidebar-scroll:hover::-webkit-scrollbar-thumb,
+.sidebar-scroll:focus-within::-webkit-scrollbar-thumb {
+  background: var(--dw-material-border);
+}
+
+/* Every runtime state gets a distinct visual treatment; accessible text is on the nav button. */
+.state-dot.installed { background: var(--dw-accent-secondary); }
+.state-dot.starting { background: var(--dw-accent); }
+.state-dot.paused { background: var(--dw-warning); }
+.state-dot.disabled { background: var(--dw-text-muted); }
