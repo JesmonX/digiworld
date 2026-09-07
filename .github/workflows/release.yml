@@ -145,7 +145,7 @@ jobs:
         run: |
           $tag = '${{ steps.release.outputs.tag }}'
           git tag $tag
-          git push origin HEAD:main $tag
+          git push origin HEAD:${{ github.ref_name }} $tag
       - uses: actions/upload-artifact@v7
         with:
           name: windows-preview-release
