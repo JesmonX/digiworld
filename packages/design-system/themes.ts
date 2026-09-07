@@ -1,16 +1,21 @@
 /** Palette sources and adaptation policy: see PALETTES.md. */
 export type ThemeId = 'light' | 'dark'
-export type ColorSchemeId = 'classic'
+export type ColorSchemeId = 'classic' | 'ocean' | 'violet' | 'amber' | 'rose'
 
 export interface ColorSchemeOption {
   id: ColorSchemeId
   label: string
+  labelZh?: string
   description: string
   previewColor: string
 }
 
 export const COLOR_SCHEMES: ColorSchemeOption[] = [
-  { id: 'classic', label: 'Default', description: 'Standard modern palette', previewColor: '#059669' },
+  { id: 'classic', label: 'Emerald', labelZh: '翡翠绿', description: 'Fresh emerald and mint', previewColor: '#059669' },
+  { id: 'ocean', label: 'Ocean', labelZh: '海洋蓝', description: 'Deep azure and cyan', previewColor: '#2563eb' },
+  { id: 'violet', label: 'Violet', labelZh: '极光紫', description: 'Modern violet and lavender', previewColor: '#7c3aed' },
+  { id: 'amber', label: 'Amber', labelZh: '暖杏橙', description: 'Warm amber and golden sunset', previewColor: '#d97706' },
+  { id: 'rose', label: 'Rose', labelZh: '蔷薇红', description: 'Vibrant coral and rose pink', previewColor: '#e11d48' },
 ]
 
 export const DEFAULT_COLOR_SCHEME_ID: ColorSchemeId = 'classic'
@@ -146,13 +151,134 @@ export const THEMES: ThemePreset[] = [
 export const DEFAULT_THEME_ID: ThemeId = 'light'
 export const UI_DESIGN_VERSION = 1
 
-export function getColorSchemePreview(_themeId?: string, _schemeId?: ColorSchemeId): string {
-  return '#059669'
+interface SchemePalette {
+  preview: string
+  light: {
+    secondary: string
+    soft: string
+    border: string
+    chart1: string
+    chart2: string
+  }
+  dark: {
+    secondary: string
+    soft: string
+    border: string
+    chart1: string
+    chart2: string
+  }
 }
 
-export function getTheme(id: string, _schemeId: ColorSchemeId = DEFAULT_COLOR_SCHEME_ID): ThemePreset {
+const SCHEME_PALETTES: Record<ColorSchemeId, SchemePalette> = {
+  classic: {
+    preview: '#059669',
+    light: {
+      secondary: '#059669',
+      soft: '#dcfce7',
+      border: '#059669',
+      chart1: '#059669',
+      chart2: '#2563eb',
+    },
+    dark: {
+      secondary: '#34d399',
+      soft: '#132e27',
+      border: '#34d399',
+      chart1: '#34d399',
+      chart2: '#60a5fa',
+    },
+  },
+  ocean: {
+    preview: '#2563eb',
+    light: {
+      secondary: '#2563eb',
+      soft: '#dbeafe',
+      border: '#2563eb',
+      chart1: '#2563eb',
+      chart2: '#059669',
+    },
+    dark: {
+      secondary: '#60a5fa',
+      soft: '#172554',
+      border: '#60a5fa',
+      chart1: '#60a5fa',
+      chart2: '#34d399',
+    },
+  },
+  violet: {
+    preview: '#7c3aed',
+    light: {
+      secondary: '#7c3aed',
+      soft: '#ede9fe',
+      border: '#7c3aed',
+      chart1: '#7c3aed',
+      chart2: '#2563eb',
+    },
+    dark: {
+      secondary: '#a78bfa',
+      soft: '#2e1065',
+      border: '#a78bfa',
+      chart1: '#a78bfa',
+      chart2: '#60a5fa',
+    },
+  },
+  amber: {
+    preview: '#d97706',
+    light: {
+      secondary: '#d97706',
+      soft: '#fef3c7',
+      border: '#d97706',
+      chart1: '#d97706',
+      chart2: '#059669',
+    },
+    dark: {
+      secondary: '#fbbf24',
+      soft: '#261e0b',
+      border: '#fbbf24',
+      chart1: '#fbbf24',
+      chart2: '#34d399',
+    },
+  },
+  rose: {
+    preview: '#e11d48',
+    light: {
+      secondary: '#e11d48',
+      soft: '#ffe4e6',
+      border: '#e11d48',
+      chart1: '#e11d48',
+      chart2: '#2563eb',
+    },
+    dark: {
+      secondary: '#fb7185',
+      soft: '#2b1418',
+      border: '#fb7185',
+      chart1: '#fb7185',
+      chart2: '#60a5fa',
+    },
+  },
+}
+
+export function getColorSchemePreview(themeId?: string, schemeId?: ColorSchemeId): string {
+  const scheme = schemeId && schemeId in SCHEME_PALETTES ? SCHEME_PALETTES[schemeId] : SCHEME_PALETTES.classic
+  const isDark = themeId === 'dark' || themeId === 'catppuccin-mocha' || themeId === 'rose-pine-moon' || themeId === 'tokyo-night' || themeId === 'nord' || themeId === 'dracula'
+  return isDark ? scheme.dark.secondary : scheme.preview
+}
+
+export function getTheme(id: string, schemeId: ColorSchemeId = DEFAULT_COLOR_SCHEME_ID): ThemePreset {
   const isDark = id === 'dark' || id === 'catppuccin-mocha' || id === 'rose-pine-moon' || id === 'tokyo-night' || id === 'nord' || id === 'dracula'
-  return isDark ? THEMES[1]! : THEMES[0]!
+  const base = isDark ? THEMES[1]! : THEMES[0]!
+  const scheme = schemeId && schemeId in SCHEME_PALETTES ? SCHEME_PALETTES[schemeId] : SCHEME_PALETTES[DEFAULT_COLOR_SCHEME_ID]
+  const config = isDark ? scheme.dark : scheme.light
+  return {
+    ...base,
+    colors: {
+      ...base.colors,
+      'accent-secondary': config.secondary,
+      'accent-border': config.border,
+      'accent-soft': config.soft,
+      'chart-1': config.chart1,
+      'chart-2': config.chart2,
+    },
+  }
 }
 
 export function resolveColors(theme: ThemePreset): Record<string, string> {

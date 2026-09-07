@@ -1,7 +1,6 @@
 import { useState, type ReactNode, type SyntheticEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '@digiworld/design-system/react'
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { t, type Locale } from '../lib/i18n'
 
 export interface NavigationRailItem {
@@ -62,25 +61,21 @@ export function NavigationRail({
     <aside className={`sidebar ${collapsed ? 'collapsed' : 'expanded'}`}>
       <div className="sidebar-header">
         <div className="brand-container">
-          <div className="rail-logo" title="Digiworld" aria-label="Digiworld"><span aria-hidden="true" /></div>
-          {!collapsed && (
-            <div className="brand-text">
-              <span className="brand-title">Digiworld</span>
-              <span className="brand-sub">Digital Hub</span>
-            </div>
-          )}
-        </div>
-        {onToggleCollapse && (
           <button
             type="button"
-            className="collapse-toggle-btn"
+            className="rail-logo collapse-trigger"
             onClick={onToggleCollapse}
             aria-label={collapsed ? t('expandSidebar', locale) : t('collapseSidebar', locale)}
             title={collapsed ? t('expandSidebar', locale) : t('collapseSidebar', locale)}
           >
-            {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+            <span aria-hidden="true" />
           </button>
-        )}
+          {!collapsed && (
+            <div className="brand-text">
+              <span className="brand-title">Digiworld</span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="sidebar-scroll">

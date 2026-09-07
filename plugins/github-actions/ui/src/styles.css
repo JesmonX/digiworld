@@ -3,7 +3,7 @@ html, body, #root { width: 100%; height: 100%; margin: 0; }
 body { background: transparent; color: var(--dw-text); font-family: var(--dw-font-sans); }
 
 .dw-toolbar > div { display: flex; align-items: center; gap: var(--dw-space-2); min-width: 0; margin-right: auto; }
-.dw-toolbar strong { font-size: var(--dw-type-title); font-weight: var(--dw-weight-bold); letter-spacing: -0.02em; }
+.dw-toolbar strong { font-size: var(--dw-type-title); font-weight: var(--dw-weight-semibold); letter-spacing: -0.02em; }
 .dw-toolbar small, .run-head small, .repo-list small, .run-meta { color: var(--dw-text-muted); }
 
 .center { min-height: 80vh; display: grid; place-items: center; }
@@ -17,7 +17,7 @@ body { background: transparent; color: var(--dw-text); font-family: var(--dw-fon
   box-shadow: var(--dw-shadow-lg);
   background: var(--dw-material-card);
 }
-.center h1 { margin: 0; font-size: var(--dw-type-title); font-weight: var(--dw-weight-bold); }
+.center h1 { margin: 0; font-size: var(--dw-type-page); font-weight: var(--dw-weight-semibold); }
 .center p { margin: 0; color: var(--dw-text-muted); font-size: var(--dw-type-body-sm); }
 
 .runs { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--dw-space-3); align-items: start; }
@@ -130,7 +130,7 @@ a:hover {
 }
 .settings header { display: flex; align-items: flex-start; }
 .settings header > div { flex: 1; }
-.settings h2 { margin: 0; font-size: var(--dw-type-title); font-weight: var(--dw-weight-bold); }
+.settings h2 { margin: 0; font-size: var(--dw-type-title); font-weight: var(--dw-weight-semibold); }
 .settings p { margin: var(--dw-space-1) 0 0 0; color: var(--dw-text-muted); font-size: var(--dw-type-body-sm); }
 .repo-search {
   display: flex;

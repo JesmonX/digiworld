@@ -53,6 +53,11 @@ export const DICTIONARY = {
   installVnstat: { en: 'Install & Enable', zh: '安装并启用' },
   installing: { en: 'Installing...', zh: '安装中…' },
   selectPrompt: { en: 'Select mount points and network interfaces to monitor. Leave unselected to show all.', zh: '选择要并列显示的挂载点和网卡；空选择表示全部显示。' },
+  vnstatStatusReady: { en: 'vnStat Status: Ready', zh: 'vnStat 状态：正常就绪' },
+  vnstatStatusInstalled: { en: 'vnStat Status: Installed', zh: 'vnStat 状态：已安装' },
+  vnstatStatusOther: { en: 'vnStat Status: {status}', zh: 'vnStat 状态：{status}' },
+  packageManager: { en: 'Package Manager: {manager}', zh: '包管理器：{manager}' },
+  execCommand: { en: 'Executed Command: {command}', zh: '执行命令：{command}' },
 } as const
 
 export function t(key: keyof typeof DICTIONARY, locale: Locale): string {

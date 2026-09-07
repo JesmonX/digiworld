@@ -3,7 +3,7 @@ html, body, #root { width: 100%; height: 100%; margin: 0; }
 body { background: transparent; color: var(--dw-text); font-family: var(--dw-font-sans); }
 
 .dw-toolbar > div { display: flex; align-items: center; gap: var(--dw-space-2); min-width: 0; margin-right: auto; }
-.dw-toolbar strong { font-size: var(--dw-type-title); font-weight: var(--dw-weight-bold); letter-spacing: -0.02em; }
+.dw-toolbar strong { font-size: var(--dw-type-title); font-weight: var(--dw-weight-semibold); letter-spacing: -0.02em; }
 .layout-select { margin-left: auto; display: flex; align-items: center; }
 
 .devices { display: grid; gap: var(--dw-space-4); align-items: start; }
@@ -179,7 +179,7 @@ body { background: transparent; color: var(--dw-text); font-family: var(--dw-fon
 .editor label { display: grid; gap: var(--dw-space-1); font-size: var(--dw-type-body-sm); font-weight: var(--dw-weight-medium); }
 .toggles, .vnstat, .editor footer { display: flex; gap: var(--dw-space-2); align-items: center; }
 .sub-toggles { flex-wrap: wrap; }
-.toggles label { display: flex; align-items: center; gap: var(--dw-space-1); font-weight: var(--dw-weight-normal); cursor: pointer; }
+.toggles label { display: flex; align-items: center; gap: var(--dw-space-1); font-weight: var(--dw-weight-regular); cursor: pointer; }
 .editor footer { justify-content: flex-end; }
 .editor pre {
   max-height: 150px;
@@ -193,7 +193,7 @@ body { background: transparent; color: var(--dw-text); font-family: var(--dw-fon
 
 .selectors { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--dw-space-2); }
 .selectors fieldset { display: grid; gap: var(--dw-space-1); padding: var(--dw-space-2); border: 1px solid var(--dw-material-border); border-radius: var(--dw-radius-md); font-size: var(--dw-type-caption); }
-.selectors label { display: flex; align-items: center; gap: var(--dw-space-1); font-weight: var(--dw-weight-normal); cursor: pointer; }
+.selectors label { display: flex; align-items: center; gap: var(--dw-space-1); font-weight: var(--dw-weight-regular); cursor: pointer; }
 .device-error { font-size: var(--dw-type-caption); }
 
 .spin { animation: spin .9s linear infinite; }

@@ -57,6 +57,8 @@ export const DICTIONARY = {
   lightThemeDesc: { en: 'High contrast clean white canvas with subtle ambient blur', zh: '柔和微光底色与纯净白卡片，清晰护眼' },
   darkTheme: { en: 'Dark', zh: '深色模式' },
   darkThemeDesc: { en: 'Obsidian dark palette with glowing emerald indicators', zh: '曜石黑卡片与翡翠绿高亮，沉浸深邃' },
+  themeColorTitle: { en: 'Theme Color', zh: '主题颜色' },
+  themeColorDesc: { en: 'Select an accent color for highlights, badges, and charts.', zh: '设置应用的高亮色、状态角标与图表主色调。' },
   languageTitle: { en: 'Display Language', zh: '界面语言' },
   languageDesc: { en: 'Choose your default language across the app and plugins.', zh: '设置桌面主程序与插件的显示语言。' },
   langEn: { en: 'English (Default)', zh: 'English (默认)' },

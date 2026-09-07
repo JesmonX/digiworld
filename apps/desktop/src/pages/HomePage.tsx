@@ -101,7 +101,7 @@ export function HomePage({
                   <small>{plugin.description || t('openTool', locale)}</small>
                 </span>
                 <span className={`compact-status ${plugin.state}`}>
-                  {stateLabel(plugin)}
+                  {stateLabel(plugin, locale)}
                 </span>
                 {plugin.uiDesignVersion !== 1 && (
                   <small className="legacy-design">

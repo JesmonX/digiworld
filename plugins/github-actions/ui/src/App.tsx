@@ -85,8 +85,9 @@ export default function App() {
     void load()
     bridge.ready()
 
-    const unlistenLocale = bridge.on<{ locale: Locale }>('locale', ({ locale: nextLocale }) => {
-      if (nextLocale) {
+    const unlistenLocale = bridge.on('locale', (payload: unknown) => {
+      const nextLocale = typeof payload === 'string' ? payload : (payload as { locale?: Locale })?.locale
+      if (nextLocale === 'en' || nextLocale === 'zh') {
         setLocale(nextLocale)
       }
     })

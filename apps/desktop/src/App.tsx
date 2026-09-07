@@ -257,7 +257,7 @@ function App() {
           <div className="header-actions-wrap">
             {selectedPlugin && (
               <div className="plugin-management">
-                <span className={`compact-status ${selectedPlugin.state}`}>{stateLabel(selectedPlugin)}</span>
+                <span className={`compact-status ${selectedPlugin.state}`}>{stateLabel(selectedPlugin, locale)}</span>
                 <Button className="secondary compact" disabled={busy === selectedPlugin.id} onClick={() => void manageEnabled(selectedPlugin, !selectedPlugin.enabled)}>
                   {selectedPlugin.enabled ? t('disable', locale) : t('enable', locale)}
                 </Button>
@@ -554,64 +554,47 @@ function SettingsPage({
           <div><strong>{t('appearanceTitle', locale)}</strong><span>{t('appearanceDesc', locale)}</span></div>
         </div>
         <div className="settings-section-body">
-          {/* Theme card with Light and Dark selector */}
+          {/* Appearance & Theme card */}
           <Card className={`settings-card theme-card ${themeDropdownOpen ? 'dropdown-open' : ''}`}>
-            <div className="theme-header-row">
-              <div className="theme-copy">
-                <h3><Palette />{t('appearanceTitle', locale)}</h3>
-              </div>
-              <ThemeDropdown
-                value={accentThemeId}
-                onChange={onAccentThemeChange}
-                themes={ACCENT_THEMES}
-                onOpenChange={setThemeDropdownOpen}
-              />
+            <div className="theme-copy">
+              <h3><Palette />{t('appearanceTitle', locale)}</h3>
             </div>
-            <div className="theme-selection-grid" role="radiogroup" aria-label={t('appearanceTitle', locale)}>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={accentThemeId === 'light'}
-                className={`theme-mode-card ${accentThemeId === 'light' ? 'active' : ''}`}
-                onClick={() => onAccentThemeChange('light')}
-              >
-                <div className="theme-mode-preview light-mode">
-                  <div className="preview-decor">
-                    <span className="p-pill mint" />
-                    <span className="p-pill muted" />
-                  </div>
-                </div>
-                <div className="theme-mode-copy">
-                  <div className="theme-mode-header">
-                    <strong>{t('lightTheme', locale)}</strong>
-                    {accentThemeId === 'light' && <Check className="mode-check" />}
-                  </div>
-                  <small>{t('lightThemeDesc', locale)}</small>
-                </div>
-              </button>
+            <ThemeDropdown
+              value={accentThemeId}
+              onChange={onAccentThemeChange}
+              themes={ACCENT_THEMES}
+              onOpenChange={setThemeDropdownOpen}
+              locale={locale}
+            />
+          </Card>
 
-              <button
-                type="button"
-                role="radio"
-                aria-checked={accentThemeId === 'dark'}
-                className={`theme-mode-card ${accentThemeId === 'dark' ? 'active' : ''}`}
-                onClick={() => onAccentThemeChange('dark')}
-              >
-                <div className="theme-mode-preview dark-mode">
-                  <div className="preview-decor">
-                    <span className="p-pill emerald" />
-                    <span className="p-pill dark-muted" />
-                  </div>
-                </div>
-                <div className="theme-mode-copy">
-                  <div className="theme-mode-header">
-                    <strong>{t('darkTheme', locale)}</strong>
-                    {accentThemeId === 'dark' && <Check className="mode-check" />}
-                  </div>
-                  <small>{t('darkThemeDesc', locale)}</small>
-                </div>
-              </button>
+          {/* Theme Color card */}
+          <Card className="settings-card scheme-card">
+            <div className="theme-copy">
+              <h3><Palette />{t('themeColorTitle', locale)}</h3>
             </div>
+            <RadioGroup className="scheme-options" aria-label={t('themeColorTitle', locale)}>
+              {COLOR_SCHEMES.map(scheme => {
+                const label = locale === 'zh' ? (scheme.labelZh ?? scheme.label) : scheme.label
+                return (
+                  <Button
+                    key={scheme.id}
+                    type="button"
+                    className={colorSchemeId === scheme.id ? 'active' : ''}
+                    role="radio"
+                    aria-checked={colorSchemeId === scheme.id}
+                    tabIndex={colorSchemeId === scheme.id ? 0 : -1}
+                    aria-label={label}
+                    title={label}
+                    onClick={() => onColorSchemeChange(scheme.id)}
+                  >
+                    <span className="scheme-swatch" style={{ background: scheme.previewColor }} aria-hidden="true" />
+                    <span className="scheme-name">{label}</span>
+                    {colorSchemeId === scheme.id && <Check size={14} />}
+                  </Button>
+                )
+              })}
+            </RadioGroup>
           </Card>
 
           {/* Language card */}
@@ -666,26 +649,13 @@ function SettingsPage({
                   aria-checked={fontThemeId === theme.id}
                   tabIndex={fontThemeId === theme.id ? 0 : -1}
                   aria-label={theme.label}
-                  style={{ '--font-preview': theme.fontSans, '--font-preview-display': theme.fontDisplay } as React.CSSProperties}
                   onClick={() => onFontThemeChange(theme.id)}
                 >
-                  <span className="font-option-heading"><strong>{theme.label}</strong>{fontThemeId === theme.id && <Check />}</span>
-                  <span className="font-sample">Digiworld 2026</span>
+                  <span>{theme.label}</span>
+                  {fontThemeId === theme.id && <Check size={14} />}
                 </Button>
               ))}
             </RadioGroup>
-          </Card>
-
-          {/* Font weight card */}
-          <Card className="settings-card weight-card">
-            <div className="theme-copy">
-              <h3><Type />{t('fontWeightTitle', locale)}</h3>
-            </div>
-            <div className="weight-control">
-              <div><span>400</span><span>500</span><span>600</span></div>
-              <Input aria-label="字体粗细" type="range" min="400" max="600" step="100" value={fontWeight} onChange={event => onFontWeightChange(Number(event.target.value) as FontWeight)} />
-              <output>{fontWeight}</output>
-            </div>
           </Card>
         </div>
       </Panel>
@@ -700,13 +670,13 @@ function SettingsPage({
               <h3>{t('glassTitle', locale)}</h3>
               <p>{t('glassDesc', locale)}</p>
             </div>
-            <Switch aria-label="切换玻璃效果" checked={glassMode === 'enabled'} onCheckedChange={enabled => onGlassModeChange(enabled ? 'enabled' : 'disabled')} />
+            <Switch aria-label={t('glassTitle', locale)} checked={glassMode === 'enabled'} onCheckedChange={enabled => onGlassModeChange(enabled ? 'enabled' : 'disabled')} />
           </Card>
           <Card className="settings-card">
             <div>
               <h3>{t('launchAtStartup', locale)}</h3>
             </div>
-            <Switch aria-label="切换开机启动" checked={state.launchAtStartup} onCheckedChange={enabled => void onChange(enabled)} />
+            <Switch aria-label={t('launchAtStartup', locale)} checked={state.launchAtStartup} onCheckedChange={enabled => void onChange(enabled)} />
           </Card>
         </div>
       </Panel>
@@ -719,12 +689,12 @@ function SettingsPage({
           <Card className="settings-card proxy-card">
             <div className="proxy-copy">
               <h3><Network />{t('proxyTitle', locale)}</h3>
-              <div className="dw-segmented proxy-modes" role="group" aria-label="代理模式">
+              <div className="dw-segmented proxy-modes" role="group" aria-label={locale === 'zh' ? '代理模式' : 'Proxy Mode'}>
                 {([['system', locale === 'zh' ? '系统代理' : 'System'], ['custom', locale === 'zh' ? '自定义' : 'Custom'], ['direct', locale === 'zh' ? '直连' : 'Direct']] as const).map(([mode, label]) => (
                   <Button key={mode} className={proxy.mode === mode ? 'active' : ''} aria-pressed={proxy.mode === mode} onClick={() => updateMode(mode)}>{label}</Button>
                 ))}
               </div>
-              {proxy.mode === 'custom' && <Input aria-label="自定义代理地址" value={proxy.url ?? ''} onChange={event => setProxy({ mode: 'custom', url: event.target.value })} placeholder="http://127.0.0.1:7890 or socks5h://127.0.0.1:7890" />}
+              {proxy.mode === 'custom' && <Input aria-label={locale === 'zh' ? '自定义代理地址' : 'Custom Proxy URL'} value={proxy.url ?? ''} onChange={event => setProxy({ mode: 'custom', url: event.target.value })} placeholder="http://127.0.0.1:7890 or socks5h://127.0.0.1:7890" />}
               {proxyMessage && <small className="proxy-message">{proxyMessage}</small>}
             </div>
             <div className="proxy-actions">

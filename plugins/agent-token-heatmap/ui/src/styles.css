@@ -24,8 +24,8 @@ button svg { width: 14px; height: 14px; }
 .filter-chip.active { border-color: color-mix(in srgb, var(--dw-accent) 32%, var(--dw-border)); color: var(--dw-accent-strong); background: var(--dw-accent-soft); }
 .filter-chip svg { width: 11px; height: 11px; }
 .range-group { display: flex; padding: 3px; border-radius: var(--dw-radius-sm); background: var(--dw-surface-subtle); }
-.range-group button { min-height: 28px; height: 28px; padding: 0 9px; border: 0; border-radius: var(--dw-radius-sm); color: var(--dw-text-muted); background: transparent; font-size: var(--type-caption); font-weight: var(--weight-semibold); }
-.range-group button.active { color: var(--dw-accent-strong); background: var(--dw-surface); box-shadow: var(--dw-shadow-xs); }
+.range-group button { min-height: 28px; height: 28px; padding: 0 9px; border: 0; border-radius: var(--dw-radius-sm); color: var(--dw-text-muted); background: transparent; font-size: var(--dw-type-body-sm); font-weight: var(--dw-weight-medium); }
+.range-group button.active { color: var(--dw-accent-strong); background: var(--dw-surface); box-shadow: var(--dw-shadow-xs); font-weight: var(--dw-weight-semibold); }
 .heatmap-card, .breakdown-card, .daily-ranking-card, .model-card, .weekly-card, .quota-card { border: 1px solid color-mix(in srgb, var(--dw-border) 88%, transparent); border-radius: var(--dw-radius-lg); background: var(--dw-surface); box-shadow: var(--dw-shadow-xs); }
 .insights-grid { display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(300px, .8fr); gap: 10px; margin-bottom: 10px; }
 .weekly-card, .quota-card { min-height: 340px; padding: 16px 17px 13px; }
@@ -189,7 +189,7 @@ button.icon.danger { color: var(--dw-danger); }
 /* Shared Digiworld surface language: compact hierarchy with enough separation for scanning. */
 
 
-.usage-header h1 { font-size: var(--dw-type-metric); }
+.usage-header h1 { font-size: var(--dw-type-page); }
 .filter-bar { padding: 11px 13px; border-radius: var(--dw-radius-md); box-shadow: var(--dw-shadow-sm); }
 .filter-chip { border-radius: var(--dw-radius-sm); }
 .heatmap-card, .breakdown-card, .daily-ranking-card, .model-card, .weekly-card, .quota-card { border-radius: var(--dw-radius-md); box-shadow: var(--dw-shadow-xs); transition: transform var(--dw-motion-normal) var(--dw-ease-out), border-color var(--dw-motion-normal) var(--dw-ease-out), box-shadow var(--dw-motion-normal) var(--dw-ease-out); }

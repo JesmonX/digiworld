@@ -161,7 +161,7 @@ export default function App() {
 
   useEffect(() => {
     return bridge.on('locale', (payload: unknown) => {
-      const loc = (payload as { locale?: Locale })?.locale
+      const loc = typeof payload === 'string' ? payload : (payload as { locale?: Locale })?.locale
       if (loc === 'en' || loc === 'zh') setLocale(loc)
     })
   }, [])
@@ -345,7 +345,7 @@ export default function App() {
       .sort((a, b) => b.totalTokens - a.totalTokens || a.model.localeCompare(b.model))
   }, [snapshot])
   const weekly = useMemo(() => snapshot ? weeklyUsage(snapshot.endDay, snapshot.days) : [], [snapshot])
-  const sourceOptions = settings ? [{ id: 'local', label: locale === 'zh' ? '本机' : 'Local' }, ...settings.sshSources] : []
+  const sourceOptions = settings ? [{ id: 'local', label: t('localDevice', locale) }, ...settings.sshSources] : []
 
   return (
     <PluginPage className="usage-app">
@@ -364,7 +364,7 @@ export default function App() {
       </section>
 
       <section className="insights-grid">
-        <WeeklyChart points={weekly} />
+        <WeeklyChart points={weekly} locale={locale} />
         <QuotaCard quota={quota} loading={quotaLoading} configured={Boolean(settings?.codexQuota.sourceId)} locale={locale} onRefresh={() => void loadQuota(true)} onConfigure={() => setSettingsOpen(true)} />
       </section>
 
@@ -372,11 +372,11 @@ export default function App() {
         <div className="card-title">
           <div><h2>{t('dailyHeatmap', locale)}</h2><p>{snapshot?.startDay ?? snapshot?.days[0]?.day ?? '—'} {t('to', locale)} {snapshot?.endDay ?? '—'}</p></div>
           <div className="heatmap-controls">
-            <div className="dw-segmented range-group" aria-label="统计范围">{(['30', '90', '365', 'all'] as Range[]).map(value => <Button key={value} className={range === value ? 'active' : ''} onClick={() => setRange(value)}>{value === 'all' ? t('all', locale) : locale === 'zh' ? `${value} 天` : `${value}d`}</Button>)}</div>
-            <Select aria-label="热力图指标" value={metric} onChange={event => setMetric(event.target.value as Metric)}><option value="totalTokens">{t('totalTokens', locale)}</option><option value="inputTokens">{t('inputTokens', locale)}</option><option value="outputTokens">{t('outputTokens', locale)}</option><option value="cacheReadTokens">{t('cacheReadTokens', locale)}</option></Select>
+            <div className="dw-segmented range-group" aria-label={t('rangeAria', locale)}>{(['30', '90', '365', 'all'] as Range[]).map(value => <Button key={value} className={range === value ? 'active' : ''} onClick={() => setRange(value)}>{value === 'all' ? t('all', locale) : locale === 'zh' ? `${value} 天` : `${value}d`}</Button>)}</div>
+            <Select aria-label={t('metricAria', locale)} value={metric} onChange={event => setMetric(event.target.value as Metric)}><option value="totalTokens">{t('totalTokens', locale)}</option><option value="inputTokens">{t('inputTokens', locale)}</option><option value="outputTokens">{t('outputTokens', locale)}</option><option value="cacheReadTokens">{t('cacheReadTokens', locale)}</option></Select>
           </div>
         </div>
-        <MetricGrid aria-label="所选范围用量汇总">
+        <MetricGrid aria-label={t('summaryGridAria', locale)}>
           <Summary label={t('totalTokens', locale)} value={snapshot?.totals.totalTokens} />
           <Summary label={t('inputTokens', locale)} value={snapshot?.totals.inputTokens} />
           <Summary label={t('outputTokens', locale)} value={snapshot?.totals.outputTokens} />
@@ -384,20 +384,20 @@ export default function App() {
           <Summary label={t('cacheWriteTokens', locale)} value={snapshot?.totals.cacheWriteTokens} />
           <Summary label={t('cacheRate', locale)} text={snapshot?.totals.cacheRate == null ? '—' : `${(snapshot.totals.cacheRate * 100).toFixed(1)}%`} />
         </MetricGrid>
-        {snapshot && cells.length ? <div className="calendar-wrap"><div className="weekday-labels">{locale === 'zh' ? <><span>一</span><span>三</span><span>五</span><span>日</span></> : <><span>M</span><span>W</span><span>F</span><span>S</span></>}</div><div className="calendar-grid">{cells.map((cell, index) => <i key={cell.day ?? `blank-${index}`} tabIndex={cell.day ? 0 : undefined} aria-label={cell.day ? `${cell.day}，${formatTokens(cell.value)}` : undefined} className={`level-${heatLevel(cell.value, max)} ${cell.day ? '' : 'blank'}`} title={cell.day ? `${cell.day} · ${formatTokens(cell.value)}` : undefined} />)}</div><div className="legend"><span>{t('low', locale)}</span>{[0, 1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>{t('high', locale)}</span></div></div> : <Empty />}
+        {snapshot && cells.length ? <div className="calendar-wrap"><div className="weekday-labels">{locale === 'zh' ? <><span>一</span><span>三</span><span>五</span><span>日</span></> : <><span>M</span><span>W</span><span>F</span><span>S</span></>}</div><div className="calendar-grid">{cells.map((cell, index) => <i key={cell.day ?? `blank-${index}`} tabIndex={cell.day ? 0 : undefined} aria-label={cell.day ? `${cell.day}，${formatTokens(cell.value)}` : undefined} className={`level-${heatLevel(cell.value, max)} ${cell.day ? '' : 'blank'}`} title={cell.day ? `${cell.day} · ${formatTokens(cell.value)}` : undefined} />)}</div><div className="legend"><span>{t('low', locale)}</span>{[0, 1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>{t('high', locale)}</span></div></div> : <Empty locale={locale} />}
       </section>
 
       <section className="lower-grid">
-        <Card className="dw-card breakdown-card"><h2>{t('sourceBreakdown', locale)}</h2>{snapshot?.breakdown.length ? <div className="breakdown-table">{[...snapshot.breakdown].sort((a, b) => b.totalTokens - a.totalTokens).map(row => <div key={`${row.sourceId}-${row.agent}`}><AgentIcon agent={row.agent} className={`agent-breakdown-icon ${row.agent}`} /><strong>{agentLabel[row.agent]}</strong><span>{row.sourceLabel}</span><b>{formatTokens(row.totalTokens)}</b><small>{row.cacheRate == null ? `${formatTokens(row.cacheReadTokens)} cache` : `${(row.cacheRate * 100).toFixed(1)}% cache`}</small></div>)}</div> : <Empty />} </Card>
-        <Card className="dw-card daily-ranking-card"><h2>{t('dailyRanking', locale)}</h2>{dailyRanking.length ? <div className="daily-ranking">{dailyRanking.map((day, index) => <div key={day.day}><b>{index + 1}</b><span>{day.day}</span><i><em style={{ width: `${(day.totalTokens / dailyMax) * 100}%` }} /></i><strong>{formatTokens(day.totalTokens)}</strong></div>)}</div> : <Empty />}</Card>
+        <Card className="dw-card breakdown-card"><h2>{t('sourceBreakdown', locale)}</h2>{snapshot?.breakdown.length ? <div className="breakdown-table">{[...snapshot.breakdown].sort((a, b) => b.totalTokens - a.totalTokens).map(row => <div key={`${row.sourceId}-${row.agent}`}><AgentIcon agent={row.agent} className={`agent-breakdown-icon ${row.agent}`} /><strong>{agentLabel[row.agent]}</strong><span>{row.sourceLabel}</span><b>{formatTokens(row.totalTokens)}</b><small>{row.cacheRate == null ? `${formatTokens(row.cacheReadTokens)} cache` : `${(row.cacheRate * 100).toFixed(1)}% cache`}</small></div>)}</div> : <Empty locale={locale} />} </Card>
+        <Card className="dw-card daily-ranking-card"><h2>{t('dailyRanking', locale)}</h2>{dailyRanking.length ? <div className="daily-ranking">{dailyRanking.map((day, index) => <div key={day.day}><b>{index + 1}</b><span>{day.day}</span><i><em style={{ width: `${(day.totalTokens / dailyMax) * 100}%` }} /></i><strong>{formatTokens(day.totalTokens)}</strong></div>)}</div> : <Empty locale={locale} />}</Card>
       </section>
 
       <Card className="dw-card model-card">
         <div className="model-card-heading"><div><h2>{t('modelBreakdown', locale)}</h2><p>{t('modelAggregated', locale)}</p></div><PieChart /></div>
-        <ModelPieChart rows={modelTotals} />
+        <ModelPieChart rows={modelTotals} locale={locale} />
       </Card>
 
-      {settingsOpen && settings && <SourceDialog settings={settings} refreshRunning={refresh.running} onClose={() => setSettingsOpen(false)} onSave={async value => {
+      {settingsOpen && settings && <SourceDialog settings={settings} locale={locale} refreshRunning={refresh.running} onClose={() => setSettingsOpen(false)} onSave={async value => {
         const nextSources = sources.filter(id => id === 'local' || value.sshSources.some(source => source.id === id))
         const saved = await bridge.request<UsageSettings>('usage.saveSettings', {
           settings: {
@@ -417,7 +417,7 @@ export default function App() {
   )
 }
 
-function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
+function WeeklyChart({ points, locale = 'en' }: { points: WeeklyUsagePoint[]; locale?: Locale }) {
   const width = 820
   const height = 300
   const left = 68
@@ -429,7 +429,7 @@ function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
   const step = plotWidth / Math.max(points.length, 1)
   const barWidth = Math.min(56, step * .62)
   const maximum = Math.max(1, ...points.map(point => point.totalTokens))
-  const modelCategories = weeklyModelCategories(points)
+  const modelCategories = weeklyModelCategories(points, 6, locale)
   const { minimum: cacheAxisMinimum, maximum: cacheAxisMaximum } = cacheRateScale(points.map(point => point.cacheRate))
   const cacheAxisRange = Math.max(.05, cacheAxisMaximum - cacheAxisMinimum)
   const ticks = [0, .25, .5, .75, 1]
@@ -446,8 +446,8 @@ function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
   const yForRate = (rate: number) => top + (cacheAxisMaximum - Math.max(cacheAxisMinimum, Math.min(cacheAxisMaximum, rate))) / cacheAxisRange * plotHeight
 
   return <Card className="dw-card weekly-card">
-    <div className="panel-heading"><div><h2>Last 7 Days</h2></div><div className="chart-legend" aria-label="图例">{modelCategories.length ? modelCategories.map((category, index) => <span className="legend-item" key={category.key} title={`${category.label} · ${formatTokens(category.totalTokens)}`}><i className={`model-key model-key-${index % 8}`} /><b>{category.label}</b><small>{formatTokens(category.totalTokens)}</small></span>) : <span className="legend-item"><i className="bar-key" /><b>Token</b></span>}<span className="legend-item" title="缓存率折线"><i className="cache-key" /><b>缓存率</b></span></div></div>
-    {points.length ? <svg className="weekly-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="近七天按模型堆叠的 Token 用量柱形图和缓存率折线图">
+    <div className="panel-heading"><div><h2>{t('last7Days', locale)}</h2></div><div className="chart-legend" aria-label={t('chartLegendAria', locale)}>{modelCategories.length ? modelCategories.map((category, index) => <span className="legend-item" key={category.key} title={`${category.label} · ${formatTokens(category.totalTokens)}`}><i className={`model-key model-key-${index % 8}`} /><b>{category.label}</b><small>{formatTokens(category.totalTokens)}</small></span>) : <span className="legend-item"><i className="bar-key" /><b>Token</b></span>}<span className="legend-item" title={t('cacheRateLine', locale)}><i className="cache-key" /><b>{t('cacheRate', locale)}</b></span></div></div>
+    {points.length ? <svg className="weekly-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={t('chartAria', locale)}>
       {ticks.map(ratio => {
         const y = top + ratio * plotHeight
         return <g key={ratio}><line x1={left} x2={width - right} y1={y} y2={y} className="chart-grid-line" /><text x={left - 10} y={y + 4} textAnchor="end" className="chart-axis-label">{formatTokens(maximum * (1 - ratio))}</text><text x={width - right + 10} y={y + 4} className="chart-axis-label">{Math.round((cacheAxisMaximum - cacheAxisRange * ratio) * 100)}%</text></g>
@@ -465,7 +465,7 @@ function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
           })
           .filter(Boolean)
           .join('、')
-        return <g key={point.day}><title>{`${point.day} · ${formatTokens(point.totalTokens)} Token${modelSummary ? ` · ${modelSummary}` : ''} · 缓存率 ${cache}`}</title><g className="token-bar">{modelCategories.map((category, categoryIndex) => {
+        return <g key={point.day}><title>{`${point.day} · ${formatTokens(point.totalTokens)} Token${modelSummary ? ` · ${modelSummary}` : ''} · ${t('cacheRate', locale)} ${cache}`}</title><g className="token-bar">{modelCategories.map((category, categoryIndex) => {
           const value = category.values[index] ?? 0
           if (value <= 0) return null
           const segmentHeight = value * scale
@@ -480,9 +480,9 @@ function WeeklyChart({ points }: { points: WeeklyUsagePoint[] }) {
         const y = yForRate(point.cacheRate!)
         const label = `${(point.cacheRate! * 100).toFixed(1)}%`
         const labelBelow = y < top + 27 || (index % 2 === 1 && y < top + 52)
-        return <g key={point.day} className="cache-marker"><circle cx={x} cy={y} r="5" className="cache-point"><title>{`${point.day} 缓存率 ${label}`}</title></circle><text x={x} y={labelBelow ? y + 20 : y - 11} textAnchor="middle" className="cache-point-label">{label}</text></g>
+        return <g key={point.day} className="cache-marker"><circle cx={x} cy={y} r="5" className="cache-point"><title>{`${point.day} ${t('cacheRate', locale)} ${label}`}</title></circle><text x={x} y={labelBelow ? y + 20 : y - 11} textAnchor="middle" className="cache-point-label">{label}</text></g>
       })}
-    </svg> : <Empty />}
+    </svg> : <Empty locale={locale} />}
   </Card>
 }
 
@@ -497,8 +497,8 @@ const modelPieColors = [
   'var(--dw-chart-8)',
 ]
 
-function ModelPieChart({ rows }: { rows: ModelTotal[] }) {
-  if (!rows.length) return <Empty />
+function ModelPieChart({ rows, locale = 'en' }: { rows: ModelTotal[]; locale?: Locale }) {
+  if (!rows.length) return <Empty locale={locale} />
 
   const total = rows.reduce((sum, row) => sum + row.totalTokens, 0)
   const centerX = 108
@@ -512,14 +512,14 @@ function ModelPieChart({ rows }: { rows: ModelTotal[] }) {
   })
 
   return <div className="model-pie-wrap">
-    <svg className="model-pie" viewBox="0 0 216 216" role="img" aria-label="按模型聚合的 Token 用量饼状图">
-      <title>按模型聚合的 Token 用量</title>
+    <svg className="model-pie" viewBox="0 0 216 216" role="img" aria-label={t('modelPieAria', locale)}>
+      <title>{t('modelPieTitle', locale)}</title>
       {sectors.map(sector => <path key={sector.model} className="model-pie-slice" d={pieSectorPath(centerX, centerY, radius, sector.startAngle, sector.endAngle)} fill={modelPieColors[sector.index % modelPieColors.length]}>
-        <title>{`${modelDisplayName(sector.model)} · ${formatTokens(sector.totalTokens)} · ${(sector.totalTokens / total * 100).toFixed(1)}%`}</title>
+        <title>{`${modelDisplayName(sector.model, locale)} · ${formatTokens(sector.totalTokens)} · ${(sector.totalTokens / total * 100).toFixed(1)}%`}</title>
       </path>)}
     </svg>
-    <div className="model-pie-legend" aria-label="模型图例">
-      {sectors.map(sector => <div key={sector.model}><i style={{ background: modelPieColors[sector.index % modelPieColors.length] }} /><strong title={modelDisplayName(sector.model)}>{modelDisplayName(sector.model)}</strong><span>{formatTokens(sector.totalTokens)} · {(sector.totalTokens / total * 100).toFixed(1)}%</span></div>)}
+    <div className="model-pie-legend" aria-label={t('modelLegendAria', locale)}>
+      {sectors.map(sector => <div key={sector.model}><i style={{ background: modelPieColors[sector.index % modelPieColors.length] }} /><strong title={modelDisplayName(sector.model, locale)}>{modelDisplayName(sector.model, locale)}</strong><span>{formatTokens(sector.totalTokens)} · {(sector.totalTokens / total * 100).toFixed(1)}%</span></div>)}
     </div>
   </div>
 }
@@ -536,8 +536,8 @@ function pieSectorPath(centerX: number, centerY: number, radius: number, startAn
   return `M ${centerX} ${centerY} L ${startX} ${startY} A ${radius} ${radius} 0 ${largeArc} 1 ${endX} ${endY} Z`
 }
 
-function modelDisplayName(model: string): string {
-  return model === 'unknown' ? '未知模型' : model
+function modelDisplayName(model: string, locale: Locale = 'en'): string {
+  return model === 'unknown' ? t('unknownModel', locale) : model
 }
 
 function QuotaCard({ quota, loading, configured, locale = 'en', onRefresh, onConfigure }: { quota: CodexQuotaSnapshot | null; loading: boolean; configured: boolean; locale?: Locale; onRefresh(): void; onConfigure(): void }) {
@@ -552,13 +552,13 @@ function QuotaCard({ quota, loading, configured, locale = 'en', onRefresh, onCon
         : available ? <>
           <div className="quota-windows">{quota.windows.map((window, index) => {
             const remaining = 100 - Math.max(0, Math.min(100, window.usedPercent))
-            return <div key={`${window.windowDurationMins ?? index}-${window.resetsAt ?? index}`} className="quota-window"><div><strong>{formatDuration(window.windowDurationMins)}</strong><span>{locale === 'zh' ? `剩余 ${remaining}%` : `Remaining ${remaining}%`}</span></div><div className="quota-track"><i style={{ width: `${remaining}%` }} /></div><small><Clock3 />{formatReset(window.resetsAt, locale)}</small></div>
+            return <div key={`${window.windowDurationMins ?? index}-${window.resetsAt ?? index}`} className="quota-window"><div><strong>{formatDuration(window.windowDurationMins, locale)}</strong><span>{locale === 'zh' ? `剩余 ${remaining}%` : `Remaining ${remaining}%`}</span></div><div className="quota-track"><i style={{ width: `${remaining}%` }} /></div><small><Clock3 />{formatReset(window.resetsAt, locale)}</small></div>
           })}</div>
           <div className="quota-resets">
             <div className="quota-resets-header">
               <span className="quota-resets-title"><Ticket />{t('resetCards', locale)}</span>
               <span className={`quota-resets-badge ${availableResets > 0 ? 'active' : 'zero'}`}>
-                {locale === 'zh' ? (availableResets > 0 ? `${availableResets} 张可用` : '0 张可用') : (availableResets > 0 ? `${availableResets} available` : '0 available')}
+                {t('availableResets', locale).replace('{count}', String(availableResets))}
               </span>
             </div>
             {credits.length > 0 && (
@@ -577,13 +577,13 @@ function QuotaCard({ quota, loading, configured, locale = 'en', onRefresh, onCon
               </div>
             )}
           </div>
-          <div className={`quota-meta ${quota.status === 'stale' ? 'warning' : ''}`}>{quota.status === 'stale' ? (locale === 'zh' ? `刷新失败，显示上次结果：${quota.error ?? '未知错误'}` : `Failed to refresh, showing last result: ${quota.error ?? 'Unknown'}`) : (locale === 'zh' ? `更新于 ${formatFetchedAt(quota.fetchedAt)}` : `Updated at ${formatFetchedAt(quota.fetchedAt)}`)}</div>
+          <div className={`quota-meta ${quota.status === 'stale' ? 'warning' : ''}`}>{quota.status === 'stale' ? (locale === 'zh' ? `刷新失败，显示上次结果：${quota.error ?? '未知错误'}` : `Failed to refresh, showing last result: ${quota.error ?? 'Unknown'}`) : (locale === 'zh' ? `更新于 ${formatFetchedAt(quota.fetchedAt, locale)}` : `Updated at ${formatFetchedAt(quota.fetchedAt, locale)}`)}</div>
         </> : <div className="quota-empty error"><AlertTriangle /><span>{quota?.error ?? (locale === 'zh' ? '当前设备无法获取 Codex 限额' : 'Unable to query Codex quota from device')}</span><Button onClick={onConfigure}>{t('settings', locale)}</Button></div>}
   </Card>
 }
 
-function formatDuration(minutes: number | null): string {
-  if (minutes == null) return '限额窗口'
+function formatDuration(minutes: number | null, locale: Locale = 'en'): string {
+  if (minutes == null) return t('quotaWindow', locale)
   if (minutes % 10_080 === 0) return `${minutes / 10_080 * 7}d`
   if (minutes % 1_440 === 0) return `${minutes / 1_440}d`
   if (minutes % 60 === 0) return `${minutes / 60}h`
@@ -603,17 +603,17 @@ function formatCardDate(seconds: number | null | undefined, locale: Locale = 'en
   return new Date(ms).toLocaleString(locale === 'zh' ? 'zh-CN' : 'en-US', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
-function formatFetchedAt(value: string | null): string {
-  if (!value) return '刚刚'
-  return new Date(value).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+function formatFetchedAt(value: string | null, locale: Locale = 'en'): string {
+  if (!value) return t('justNow', locale)
+  return new Date(value).toLocaleTimeString(locale === 'zh' ? 'zh-CN' : 'en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
 function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) { return <div className="filter-group"><span>{label}</span>{children}</div> }
 function FilterChip({ active, label, icon, onClick }: { active: boolean; label: string; icon?: React.ReactNode; onClick(): void }) { return <Button className={`filter-chip ${active ? 'active' : ''}`} aria-pressed={active} onClick={onClick}>{active && <Check className="chip-check" />}{icon}<span>{label}</span></Button> }
 function Summary({ label, value, text }: { label: string; value?: number | undefined; text?: string }) { return <MetricValue label={label} value={text ?? (value == null ? '—' : formatTokens(value))} /> }
-function Empty() { return <EmptyState icon={<Database />} title="暂无数据" description="点击“手动刷新”开始扫描。" /> }
+function Empty({ locale = 'en' }: { locale?: Locale }) { return <EmptyState icon={<Database />} title={t('noData', locale)} description={t('noDataDesc', locale)} /> }
 
-function SourceDialog({ settings, refreshRunning, onClose, onSave, onScan, onQuotaTest }: { settings: UsageSettings; refreshRunning: boolean; onClose(): void; onSave(value: UsageSettings): Promise<void>; onScan(source: SshSource): Promise<void>; onQuotaTest(value: UsageSettings): Promise<CodexQuotaSnapshot> }) {
+function SourceDialog({ settings, refreshRunning, locale = 'en', onClose, onSave, onScan, onQuotaTest }: { settings: UsageSettings; refreshRunning: boolean; locale?: Locale; onClose(): void; onSave(value: UsageSettings): Promise<void>; onScan(source: SshSource): Promise<void>; onQuotaTest(value: UsageSettings): Promise<CodexQuotaSnapshot> }) {
   const [draft, setDraft] = useState<UsageSettings>(structuredClone(settings))
   const [adding, setAdding] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -623,24 +623,24 @@ function SourceDialog({ settings, refreshRunning, onClose, onSave, onScan, onQuo
   const [dialogError, setDialogError] = useState<string | null>(null)
   const updateSource = (index: number, source: SshSource) => setDraft(current => ({ ...current, sshSources: current.sshSources.map((value, item) => item === index ? source : value) }))
   const addSource = () => {
-    setDraft(current => ({ ...current, sshSources: [...current.sshSources, { id: `ssh-${Date.now()}`, label: '远端设备', host: '', enabledAgents: [...AGENTS], roots: {} }] }))
+    setDraft(current => ({ ...current, sshSources: [...current.sshSources, { id: `ssh-${Date.now()}`, label: t('remoteDevice', locale), host: '', enabledAgents: [...AGENTS], roots: {} }] }))
     setAdding(false)
   }
   const interval = draft.codexQuota.refreshIntervalSeconds
   const intervalMode = interval == null ? 'off' : [30, 60, 300, 900].includes(interval) ? String(interval) : 'custom'
-  const sourceOptions = [{ id: 'local', label: '本机' }, ...draft.sshSources]
-  return <Dialog open onClose={() => { if (!busy) onClose() }} className="source-modal" aria-label="设置"><header><div><h2>设置</h2><p>配置用量数据源；会话数据与 Codex 限额分别按各自周期刷新</p></div><Button className="close" onClick={onClose}><X /></Button></header>
+  const sourceOptions = [{ id: 'local', label: t('localDevice', locale) }, ...draft.sshSources]
+  return <Dialog open onClose={() => { if (!busy) onClose() }} className="source-modal" aria-label={t('settings', locale)}><header><div><h2>{t('settings', locale)}</h2><p>{t('settingsDialogSubtitle', locale)}</p></div><Button className="close" onClick={onClose}><X /></Button></header>
     {dialogError && <Status tone="error" className="dialog-error">{dialogError}</Status>}
-    <section className="source-block"><div className="source-heading"><div><HardDrive /><span><strong>本机</strong><small>默认 Agent 数据目录</small></span></div><div className="agent-checks">{AGENTS.map(agent => <label key={agent}><Input type="checkbox" checked={draft.localAgents.includes(agent)} onChange={() => setDraft(current => ({ ...current, localAgents: toggleRequired(current.localAgents, agent) }))} /><AgentIcon agent={agent} /><span>{agentLabel[agent]}</span></label>)}</div></div><div className="root-grid">{AGENTS.map(agent => <label key={agent}>{agentLabel[agent]}<Input value={draft.localRoots[agent] ?? ''} onChange={event => setDraft(current => ({ ...current, localRoots: { ...current.localRoots, [agent]: event.target.value } }))} placeholder={defaultRoot[agent]} /></label>)}</div></section>
-    {draft.sshSources.map((source, index) => <section className="source-block" key={source.id}><div className="source-heading"><div><Server /><span><strong>{source.label || 'SSH 设备'}</strong><small>{source.host || '尚未填写 Host'}</small></span></div><Button className="icon danger" title="移除设备" onClick={() => setDraft(current => ({ ...current, sshSources: current.sshSources.filter((_, item) => item !== index), codexQuota: current.codexQuota.sourceId === source.id ? { ...current.codexQuota, sourceId: null } : current.codexQuota }))}><Trash2 /></Button></div><div className="ssh-fields"><label>名称<Input value={source.label} onChange={event => updateSource(index, { ...source, label: event.target.value })} /></label><label>SSH Config Host<Input value={source.host} onChange={event => updateSource(index, { ...source, host: event.target.value })} placeholder="gpu-server" /></label></div><div className="agent-checks">{AGENTS.map(agent => <label key={agent}><Input type="checkbox" checked={source.enabledAgents.includes(agent)} onChange={() => updateSource(index, { ...source, enabledAgents: toggleRequired(source.enabledAgents, agent) })} /><AgentIcon agent={agent} /><span>{agentLabel[agent]}</span></label>)}</div><div className="root-grid">{AGENTS.map(agent => <label key={agent}>{agentLabel[agent]}<Input value={source.roots[agent] ?? ''} onChange={event => updateSource(index, { ...source, roots: { ...source.roots, [agent]: event.target.value } })} placeholder={defaultRoot[agent]} /></label>)}</div><Button className="secondary scan-source" disabled={refreshRunning || !source.host} onClick={async () => { setScanning(source.id); setScanMessage(null); setDialogError(null); try { await onScan(source); setScanMessage(`${source.label || source.host} 扫描成功`) } catch (reason) { setDialogError(String(reason)) } finally { setScanning(null) } }}><RefreshCw className={scanning === source.id ? 'spin' : ''} />{scanning === source.id ? '扫描中…' : '测试并扫描'}</Button></section>)}
+    <section className="source-block"><div className="source-heading"><div><HardDrive /><span><strong>{t('localDevice', locale)}</strong><small>{t('localDeviceDefault', locale)}</small></span></div><div className="agent-checks">{AGENTS.map(agent => <label key={agent}><Input type="checkbox" checked={draft.localAgents.includes(agent)} onChange={() => setDraft(current => ({ ...current, localAgents: toggleRequired(current.localAgents, agent) }))} /><AgentIcon agent={agent} /><span>{agentLabel[agent]}</span></label>)}</div></div><div className="root-grid">{AGENTS.map(agent => <label key={agent}>{agentLabel[agent]}<Input value={draft.localRoots[agent] ?? ''} onChange={event => setDraft(current => ({ ...current, localRoots: { ...current.localRoots, [agent]: event.target.value } }))} placeholder={defaultRoot[agent]} /></label>)}</div></section>
+    {draft.sshSources.map((source, index) => <section className="source-block" key={source.id}><div className="source-heading"><div><Server /><span><strong>{source.label || t('remoteDevice', locale)}</strong><small>{source.host || t('unspecifiedHost', locale)}</small></span></div><Button className="icon danger" title={t('removeDevice', locale)} onClick={() => setDraft(current => ({ ...current, sshSources: current.sshSources.filter((_, item) => item !== index), codexQuota: current.codexQuota.sourceId === source.id ? { ...current.codexQuota, sourceId: null } : current.codexQuota }))}><Trash2 /></Button></div><div className="ssh-fields"><label>{t('deviceName', locale)}<Input value={source.label} onChange={event => updateSource(index, { ...source, label: event.target.value })} /></label><label>{t('sshHost', locale)}<Input value={source.host} onChange={event => updateSource(index, { ...source, host: event.target.value })} placeholder="gpu-server" /></label></div><div className="agent-checks">{AGENTS.map(agent => <label key={agent}><Input type="checkbox" checked={source.enabledAgents.includes(agent)} onChange={() => updateSource(index, { ...source, enabledAgents: toggleRequired(source.enabledAgents, agent) })} /><AgentIcon agent={agent} /><span>{agentLabel[agent]}</span></label>)}</div><div className="root-grid">{AGENTS.map(agent => <label key={agent}>{agentLabel[agent]}<Input value={source.roots[agent] ?? ''} onChange={event => updateSource(index, { ...source, roots: { ...source.roots, [agent]: event.target.value } })} placeholder={defaultRoot[agent]} /></label>)}</div><Button className="secondary scan-source" disabled={refreshRunning || !source.host} onClick={async () => { setScanning(source.id); setScanMessage(null); setDialogError(null); try { await onScan(source); setScanMessage(t('scanSuccess', locale).replace('{label}', source.label || source.host)) } catch (reason) { setDialogError(String(reason)) } finally { setScanning(null) } }}><RefreshCw className={scanning === source.id ? 'spin' : ''} />{scanning === source.id ? t('scanning', locale) : t('testAndScan', locale)}</Button></section>)}
     {scanMessage && <Status tone="success" className="dialog-success">{scanMessage}</Status>}
-    {adding ? <div className="add-confirm"><span>将添加一个使用 SSH config 和密钥认证的 Unix 设备。</span><Button className="primary" onClick={addSource}>继续</Button><Button className="secondary" onClick={() => setAdding(false)}>取消</Button></div> : <Button className="add-source" onClick={() => setAdding(true)}><Plus />添加 SSH 设备</Button>}
+    {adding ? <div className="add-confirm"><span>{t('addSshConfirm', locale)}</span><Button className="primary" onClick={addSource}>{t('continueBtn', locale)}</Button><Button className="secondary" onClick={() => setAdding(false)}>{t('cancelBtn', locale)}</Button></div> : <Button className="add-source" onClick={() => setAdding(true)}><Plus />{t('addSshDevice', locale)}</Button>}
     <section className="source-block session-refresh-settings">
       <div className="source-heading">
-        <div><Clock3 /><span><strong>整体用量自动刷新</strong><small>处于插件页时按设定周期自动同步 Token 用量与限额</small></span></div>
+        <div><Clock3 /><span><strong>{t('autoRefreshTitle', locale)}</strong><small>{t('autoRefreshSubtitle', locale)}</small></span></div>
       </div>
       <div className="quota-setting-grid">
-        <label>刷新间隔
+        <label>{t('refreshInterval', locale)}
           <Select
             value={String(draft.autoRefreshIntervalSeconds ?? 0)}
             onChange={event => {
@@ -648,27 +648,27 @@ function SourceDialog({ settings, refreshRunning, onClose, onSave, onScan, onQuo
               setDraft(current => ({ ...current, autoRefreshIntervalSeconds: val <= 0 ? null : val }))
             }}
           >
-            <option value="0">关闭</option>
-            <option value="60">1 分钟</option>
-            <option value="300">5 分钟</option>
-            <option value="900">15 分钟</option>
-            <option value="1800">30 分钟</option>
-            <option value="3600">1 小时</option>
+            <option value="0">{t('off', locale)}</option>
+            <option value="60">{t('oneMin', locale)}</option>
+            <option value="300">{t('fiveMin', locale)}</option>
+            <option value="900">{t('fifteenMin', locale)}</option>
+            <option value="1800">{t('thirtyMin', locale)}</option>
+            <option value="3600">{t('oneHour', locale)}</option>
           </Select>
         </label>
       </div>
     </section>
-    <section className="source-block quota-settings"><div className="source-heading"><div><Gauge /><span><strong>Codex 限额查询</strong><small>仅显示所选设备登录的一个 Codex 账号</small></span></div></div>
+    <section className="source-block quota-settings"><div className="source-heading"><div><Gauge /><span><strong>{t('codexQuotaSettings', locale)}</strong><small>{t('codexQuotaSubtitle', locale)}</small></span></div></div>
       <div className="quota-setting-grid">
-        <label>查询设备<Select value={draft.codexQuota.sourceId ?? ''} onChange={event => setDraft(current => ({ ...current, codexQuota: { ...current.codexQuota, sourceId: event.target.value || null } }))}><option value="">不查询</option>{sourceOptions.map(source => <option key={source.id} value={source.id}>{source.label}</option>)}</Select></label>
-        <label>Shell<Select value={draft.codexQuota.shellPreset} onChange={event => setDraft(current => ({ ...current, codexQuota: { ...current.codexQuota, shellPreset: event.target.value as ShellPreset } }))}><option value="auto">自动</option><option value="powershell">PowerShell</option><option value="zsh">zsh</option><option value="bash">bash</option></Select></label>
-        <label>自动刷新<Select value={intervalMode} onChange={event => { const value = event.target.value; setDraft(current => ({ ...current, codexQuota: { ...current.codexQuota, refreshIntervalSeconds: value === 'off' ? null : value === 'custom' ? 120 : Number(value) } })) }}><option value="off">关闭</option><option value="30">30 秒</option><option value="60">60 秒</option><option value="300">5 分钟</option><option value="900">15 分钟</option><option value="custom">自定义</option></Select></label>
-        {intervalMode === 'custom' && <label>自定义秒数<Input type="number" min="30" max="3600" value={interval ?? 120} onChange={event => setDraft(current => ({ ...current, codexQuota: { ...current.codexQuota, refreshIntervalSeconds: Number(event.target.value) } }))} /></label>}
+        <label>{t('queryDevice', locale)}<Select value={draft.codexQuota.sourceId ?? ''} onChange={event => setDraft(current => ({ ...current, codexQuota: { ...current.codexQuota, sourceId: event.target.value || null } }))}><option value="">{t('noQuery', locale)}</option>{sourceOptions.map(source => <option key={source.id} value={source.id}>{source.label}</option>)}</Select></label>
+        <label>Shell<Select value={draft.codexQuota.shellPreset} onChange={event => setDraft(current => ({ ...current, codexQuota: { ...current.codexQuota, shellPreset: event.target.value as ShellPreset } }))}><option value="auto">{t('autoShell', locale)}</option><option value="powershell">PowerShell</option><option value="zsh">zsh</option><option value="bash">bash</option></Select></label>
+        <label>{t('autoRefreshMode', locale)}<Select value={intervalMode} onChange={event => { const value = event.target.value; setDraft(current => ({ ...current, codexQuota: { ...current.codexQuota, refreshIntervalSeconds: value === 'off' ? null : value === 'custom' ? 120 : Number(value) } })) }}><option value="off">{t('off', locale)}</option><option value="30">{t('thirtySec', locale)}</option><option value="60">{t('sixtySec', locale)}</option><option value="300">{t('fiveMin', locale)}</option><option value="900">{t('fifteenMin', locale)}</option><option value="custom">{t('customMode', locale)}</option></Select></label>
+        {intervalMode === 'custom' && <label>{t('customSeconds', locale)}<Input type="number" min="30" max="3600" value={interval ?? 120} onChange={event => setDraft(current => ({ ...current, codexQuota: { ...current.codexQuota, refreshIntervalSeconds: Number(event.target.value) } }))} /></label>}
       </div>
-      <label className="pre-command">前置命令<Textarea rows={3} value={draft.codexQuota.preCommand} onChange={event => setDraft(current => ({ ...current, codexQuota: { ...current.codexQuota, preCommand: event.target.value } }))} placeholder="例如：source ~/awsproxy" /><small>命令以明文保存在本机。建议引用脚本或环境变量，不要直接填写令牌和密码。</small></label>
-      <Button className="secondary scan-source" disabled={quotaTesting || !draft.codexQuota.sourceId} onClick={async () => { setQuotaTesting(true); setScanMessage(null); setDialogError(null); try { const result = await onQuotaTest(draft); if (result.status !== 'ready') throw new Error(result.error ?? '无法获取 Codex 限额'); setScanMessage(`${result.sourceLabel ?? '所选设备'} 限额查询成功`) } catch (reason) { setDialogError(String(reason)) } finally { setQuotaTesting(false) } }}><RefreshCw className={quotaTesting ? 'spin' : ''} />{quotaTesting ? '查询中…' : '测试限额查询'}</Button>
+      <label className="pre-command">{t('preCommand', locale)}<Textarea rows={3} value={draft.codexQuota.preCommand} onChange={event => setDraft(current => ({ ...current, codexQuota: { ...current.codexQuota, preCommand: event.target.value } }))} placeholder="例如：source ~/awsproxy" /><small>{t('preCommandDesc', locale)}</small></label>
+      <Button className="secondary scan-source" disabled={quotaTesting || !draft.codexQuota.sourceId} onClick={async () => { setQuotaTesting(true); setScanMessage(null); setDialogError(null); try { const result = await onQuotaTest(draft); if (result.status !== 'ready') throw new Error(result.error ?? t('quotaQueryFailed', locale)); setScanMessage(t('quotaQuerySuccess', locale).replace('{label}', result.sourceLabel ?? t('devices', locale))) } catch (reason) { setDialogError(String(reason)) } finally { setQuotaTesting(false) } }}><RefreshCw className={quotaTesting ? 'spin' : ''} />{quotaTesting ? t('querying', locale) : t('testQuota', locale)}</Button>
     </section>
-    <footer><Button className="secondary" onClick={onClose}>取消</Button><Button className="primary" disabled={busy} onClick={async () => { setBusy(true); setDialogError(null); try { await onSave(draft) } catch (reason) { setDialogError(String(reason)); setBusy(false) } }}>{busy ? '保存中…' : '保存设置'}</Button></footer>
+    <footer><Button className="secondary" onClick={onClose}>{t('cancelBtn', locale)}</Button><Button className="primary" disabled={busy} onClick={async () => { setBusy(true); setDialogError(null); try { await onSave(draft) } catch (reason) { setDialogError(String(reason)); setBusy(false) } }}>{busy ? t('savingSettings', locale) : t('saveSettings', locale)}</Button></footer>
   </Dialog>
 }
 

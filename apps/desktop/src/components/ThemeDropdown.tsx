@@ -1,15 +1,17 @@
 import { useState, useRef, useEffect, useCallback, type CSSProperties, type KeyboardEvent } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
 import type { AccentThemeId, AccentTheme } from '../theme'
+import type { Locale } from '../lib/i18n'
 
 export interface ThemeDropdownProps {
   value: AccentThemeId
   onChange(id: AccentThemeId): void
   themes: AccentTheme[]
   onOpenChange?(open: boolean): void
+  locale?: Locale
 }
 
-export function ThemeDropdown({ value, onChange, themes, onOpenChange }: ThemeDropdownProps) {
+export function ThemeDropdown({ value, onChange, themes, onOpenChange, locale = 'en' }: ThemeDropdownProps) {
   const [open, setOpen] = useState(false)
   const [highlightedId, setHighlightedId] = useState<AccentThemeId>(value)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -110,7 +112,7 @@ export function ThemeDropdown({ value, onChange, themes, onOpenChange }: ThemeDr
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls="theme-dropdown-listbox"
-        aria-label={`当前主题：${currentTheme.label}，点击展开主题下拉菜单`}
+        aria-label={locale === 'zh' ? `当前主题：${currentTheme.label}，点击展开主题下拉菜单` : `Current theme: ${currentTheme.label}, click to expand menu`}
         onClick={() => setOpen(prev => !prev)}
         style={{
           '--theme-swatch': currentTheme.colors.accent,
@@ -126,7 +128,7 @@ export function ThemeDropdown({ value, onChange, themes, onOpenChange }: ThemeDr
         </span>
         <span className="theme-trigger-text">
           <strong className="theme-trigger-label">{currentTheme.label}</strong>
-          <span className="theme-trigger-scheme">{currentTheme.scheme === 'light' ? '浅色' : '深色'}</span>
+          <span className="theme-trigger-scheme">{currentTheme.scheme === 'light' ? (locale === 'zh' ? '浅色' : 'Light') : (locale === 'zh' ? '深色' : 'Dark')}</span>
         </span>
         <ChevronDown className={`theme-trigger-chevron ${open ? 'rotated' : ''}`} aria-hidden="true" />
       </button>
@@ -137,11 +139,11 @@ export function ThemeDropdown({ value, onChange, themes, onOpenChange }: ThemeDr
           ref={listboxRef}
           className="theme-dropdown-menu"
           role="listbox"
-          aria-label="选择主题颜色"
+          aria-label={locale === 'zh' ? '选择主题' : 'Select theme'}
           tabIndex={-1}
         >
-          <div className="theme-dropdown-group" role="group" aria-label="浅色主题">
-            <div className="theme-dropdown-group-header">浅色主题 (Light)</div>
+          <div className="theme-dropdown-group" role="group" aria-label={locale === 'zh' ? '浅色主题' : 'Light themes'}>
+            <div className="theme-dropdown-group-header">{locale === 'zh' ? '浅色模式 (Light)' : 'Light Theme'}</div>
             {lightThemes.map(theme => (
               <button
                 key={theme.id}
@@ -171,8 +173,8 @@ export function ThemeDropdown({ value, onChange, themes, onOpenChange }: ThemeDr
             ))}
           </div>
 
-          <div className="theme-dropdown-group" role="group" aria-label="深色主题">
-            <div className="theme-dropdown-group-header">深色主题 (Dark)</div>
+          <div className="theme-dropdown-group" role="group" aria-label={locale === 'zh' ? '深色主题' : 'Dark themes'}>
+            <div className="theme-dropdown-group-header">{locale === 'zh' ? '深色模式 (Dark)' : 'Dark Theme'}</div>
             {darkThemes.map(theme => (
               <button
                 key={theme.id}

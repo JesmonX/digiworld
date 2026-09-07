@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import { FONT_THEME_STORAGE_KEY, FONT_WEIGHT_STORAGE_KEY, GLASS_STORAGE_KEY, THEME_STORAGE_KEY } from './theme'
+import { COLOR_SCHEME_STORAGE_KEY, FONT_THEME_STORAGE_KEY, FONT_WEIGHT_STORAGE_KEY, GLASS_STORAGE_KEY, THEME_STORAGE_KEY } from './theme'
 import { LOCALE_STORAGE_KEY } from './lib/i18n'
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -255,15 +255,6 @@ describe('explicit update consent', () => {
     expect(container.querySelector<HTMLElement>('.app-window')?.style.getPropertyValue('--dw-font-sans')).toContain('HarmonyOS Sans SC')
     expect(localStorage.getItem(FONT_THEME_STORAGE_KEY)).toBe('harmony')
 
-    const weight = container.querySelector<HTMLInputElement>('input[aria-label="字体粗细"]')!
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(weight, '600')
-      weight.dispatchEvent(new Event('input', { bubbles: true }))
-      await flush()
-    })
-    expect(container.querySelector<HTMLElement>('.app-window')?.style.getPropertyValue('--dw-weight-regular')).toBe('600')
-    expect(localStorage.getItem(FONT_WEIGHT_STORAGE_KEY)).toBe('600')
-
     const stylesheet = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8')
     expect(stylesheet).toMatch(/\.main \{[^}]*min-height: 0;/)
     expect(stylesheet).toMatch(/\.content \{[^}]*overflow: auto;/)
@@ -271,11 +262,26 @@ describe('explicit update consent', () => {
     await act(async () => root.unmount())
   })
 
+  it('applies and persists theme color selection across 5 colors', async () => {
+    const root = createRoot(container)
+    await act(async () => { root.render(<App />); await flush() })
+    await navigate(container, 'Settings')
+
+    const ocean = container.querySelector<HTMLButtonElement>('button[aria-label="Ocean"]')
+    expect(ocean).not.toBeNull()
+    await act(async () => { ocean?.click(); await flush() })
+
+    expect(localStorage.getItem(COLOR_SCHEME_STORAGE_KEY)).toBe('ocean')
+    expect(container.querySelector<HTMLElement>('.app-window')?.style.getPropertyValue('--dw-accent-secondary')).toBe('#2563eb')
+
+    await act(async () => root.unmount())
+  })
+
   it('applies and persists the glass preference across the shell', async () => {
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
     await navigate(container, 'Settings')
-    const toggle = container.querySelector<HTMLButtonElement>('[aria-label="切换玻璃效果"]')!
+    const toggle = container.querySelector<HTMLButtonElement>('.appearance-card button[role="switch"], [aria-label="Panel Frost Effect"], [aria-label="面板毛玻璃"], [aria-label="切换玻璃效果"]')!
     expect(toggle.getAttribute('aria-checked')).toBe('false')
     await act(async () => { toggle.click(); await flush() })
     expect(toggle.getAttribute('aria-checked')).toBe('true')

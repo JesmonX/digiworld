@@ -63,6 +63,7 @@ export const COLOR_SCHEME_STORAGE_KEY = 'digiworld.color-scheme.v1'
 export function loadColorSchemeId(storage?: Pick<Storage, 'getItem'>): ColorSchemeId {
   try {
     const value = (storage ?? window.localStorage).getItem(COLOR_SCHEME_STORAGE_KEY)
+    if (value === 'pine') return 'classic'
     return COLOR_SCHEMES.some(scheme => scheme.id === value) ? value as ColorSchemeId : DEFAULT_COLOR_SCHEME_ID
   } catch {
     return DEFAULT_COLOR_SCHEME_ID
@@ -163,6 +164,9 @@ export function fontThemeStyle(theme: FontTheme): CSSProperties {
     '--font-sans': theme.fontSans,
     '--font-display': theme.fontDisplay,
     '--font-brand': theme.fontBrand,
+    '--dw-font-sans': theme.fontSans,
+    '--dw-font-display': theme.fontDisplay,
+    '--dw-font-brand': theme.fontBrand,
   } as CSSProperties
 }
 
@@ -172,6 +176,10 @@ export function fontWeightStyle(weight: FontWeight): CSSProperties {
     '--weight-medium': weight === 400 ? 500 : weight,
     '--weight-semibold': weight === 600 ? 700 : 600,
     '--weight-bold': weight === 600 ? 800 : 700,
+    '--dw-weight-regular': weight,
+    '--dw-weight-medium': weight === 400 ? 500 : weight,
+    '--dw-weight-semibold': weight === 600 ? 700 : 600,
+    '--dw-weight-bold': weight === 600 ? 800 : 700,
   } as CSSProperties
 }
 

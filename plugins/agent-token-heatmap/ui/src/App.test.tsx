@@ -133,7 +133,7 @@ describe('token usage layout', () => {
     expect(container.querySelector('.chart-legend')?.textContent).not.toContain('模型')
     expect(container.querySelector('.chart-legend')?.textContent).toContain('缓存率')
     expect(filterBar.querySelectorAll('.agent-icon').length).toBe(5)
-    expect(container.querySelector('.weekly-card h2')?.textContent).toBe('Last 7 Days')
+    expect(container.querySelector('.weekly-card h2')?.textContent).toBe('最近 7 天')
     expect(container.querySelectorAll('.weekly-chart .chart-axis-title')).toHaveLength(0)
     expect(container.querySelectorAll('.model-pie-slice')).toHaveLength(2)
     expect(container.querySelector('.model-card .model-table')).toBeNull()

@@ -1,9 +1,11 @@
 import type { PluginSummary } from '@digiworld/plugin-sdk'
+import { t, type Locale } from '../lib/i18n'
 
-export function stateLabel(plugin: PluginSummary): string {
-  if (!plugin.enabled || plugin.state === 'disabled') return '已停用'
-  const labels: Partial<Record<PluginSummary['state'], string>> = {
-    installed: '已安装', starting: '启动中', running: '运行中', paused: '已暂停', failed: '异常',
+export function stateLabel(plugin: PluginSummary, locale: Locale = 'en'): string {
+  if (!plugin.enabled || plugin.state === 'disabled') return t('disabled', locale)
+  const map: Partial<Record<PluginSummary['state'], 'installed' | 'starting' | 'running' | 'paused' | 'failed'>> = {
+    installed: 'installed', starting: 'starting', running: 'running', paused: 'paused', failed: 'failed',
   }
-  return labels[plugin.state] ?? plugin.state
+  const key = map[plugin.state]
+  return key ? t(key, locale) : plugin.state
 }

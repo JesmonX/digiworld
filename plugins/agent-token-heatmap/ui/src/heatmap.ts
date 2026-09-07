@@ -99,7 +99,7 @@ export function weeklyUsage(endDay: string, days: UsageDay[]): WeeklyUsagePoint[
   return result
 }
 
-export function weeklyModelCategories(points: WeeklyUsagePoint[], limit = 6): WeeklyModelCategory[] {
+export function weeklyModelCategories(points: WeeklyUsagePoint[], limit = 6, locale: 'en' | 'zh' = 'zh'): WeeklyModelCategory[] {
   const dailyModels = points.map(modelTokensForDay)
   const totals = new Map<string, number>()
   for (const models of dailyModels) {
@@ -115,7 +115,7 @@ export function weeklyModelCategories(points: WeeklyUsagePoint[], limit = 6): We
   const topModelNames = new Set(topModels.map(([model]) => model))
   const categories = topModels.map(([model, totalTokens]) => ({
     key: `model:${model}`,
-    label: model === 'unknown' ? '未知模型' : model,
+    label: model === 'unknown' ? (locale === 'en' ? 'Unknown Model' : '未知模型') : model,
     totalTokens,
     values: dailyModels.map(models => models.find(row => row.model === model)?.totalTokens ?? 0),
   }))
@@ -124,7 +124,7 @@ export function weeklyModelCategories(points: WeeklyUsagePoint[], limit = 6): We
     .reduce((total, row) => total + row.totalTokens, 0))
   const otherTotal = otherValues.reduce((total, value) => total + value, 0)
   if (otherTotal > 0) {
-    categories.push({ key: 'other', label: '其他', totalTokens: otherTotal, values: otherValues })
+    categories.push({ key: 'other', label: locale === 'en' ? 'Other' : '其他', totalTokens: otherTotal, values: otherValues })
   }
   return categories
 }

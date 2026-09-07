@@ -25,8 +25,8 @@ button { font: inherit; }
   border: 0;
   border-radius: var(--dw-radius-full);
   color: var(--dw-text-muted);
-  font-size: var(--dw-type-caption);
-  font-weight: var(--dw-weight-semibold);
+  font-size: var(--dw-type-body-sm);
+  font-weight: var(--dw-weight-medium);
   background: transparent;
   cursor: pointer;
   transition: background var(--dw-motion-fast), color var(--dw-motion-fast);
@@ -102,7 +102,7 @@ button { font: inherit; }
 }
 .layout-picker-trigger > svg { width: 14px; margin-left: auto; color: var(--dw-accent-strong); transition: transform .14s ease; }
 .layout-picker-trigger[aria-expanded="true"] > svg { transform: rotate(180deg); }
-.layout-picker strong { font-size: var(--dw-type-body-sm); font-weight: var(--dw-weight-semibold); }
+.layout-picker strong { font-size: var(--dw-type-body); font-weight: var(--dw-weight-semibold); }
 .layout-preview {
   flex: 0 0 34px;
   width: 34px;
@@ -157,7 +157,7 @@ button { font: inherit; }
 
 .keyboard-scroll { overflow-x: auto; scrollbar-gutter: stable; }
 .board-toolbar { min-width: var(--board-min-width); display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.board-toolbar h2, .ranking-card h2 { margin: 0; color: var(--dw-text); font-size: var(--dw-type-body); font-weight: var(--dw-weight-bold); }
+.board-toolbar h2, .ranking-card h2 { margin: 0; color: var(--dw-text); font-size: var(--dw-type-title); font-weight: var(--dw-weight-semibold); }
 .board-toolbar h2 { display: flex; align-items: center; gap: 8px; }
 .board-toolbar h2 svg { width: 16px; color: var(--dw-accent); }
 .legend { display: flex; align-items: center; gap: 4px; color: var(--dw-text-muted); font-size: var(--dw-type-caption); }

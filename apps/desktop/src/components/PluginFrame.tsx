@@ -54,7 +54,7 @@ export function withHostTypography(
     : `${injection}${html}`
 }
 
-export function withInitialTheme(html: string, theme: PluginTheme): string {
+export function withInitialTheme(html: string, theme: PluginTheme, locale: string = 'en'): string {
   const declarations = Object.entries(theme)
     .filter(([key, value]) => /^[a-z][a-z0-9-]*$/.test(key) && value !== undefined)
     .map(([key, value]) => `--dw-${key}:${String(value).replace(/[<>;{}]/g, '')}`)
@@ -63,6 +63,8 @@ export function withInitialTheme(html: string, theme: PluginTheme): string {
   // Component defaults precede business CSS; resolved host tokens follow it.
   html = /<head(?:\s[^>]*)?>/i.test(html) ? html.replace(/<head(?:\s[^>]*)?>/i, match => `${match}${controls}`) : `${controls}${html}`
   const style = `<style data-digiworld-host-design>${designTokensCss}\n${designBaseCss}\nhtml,body,#root{background:transparent}\n:root{${declarations};color-scheme:${theme['color-scheme']}}</style>`
+
+  const htmlLang = locale === 'zh' ? 'zh-CN' : 'en'
 
   let themed: string
   if (/<\/head>/i.test(html)) {
@@ -73,13 +75,15 @@ export function withInitialTheme(html: string, theme: PluginTheme): string {
   } else if (/<html(?:\s[^>]*)?>/i.test(html)) {
     themed = `${html}${style}`
   } else {
-    themed = `<!doctype html><html lang="zh-CN" data-dw-scheme="${theme['color-scheme']}"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head><body>${html}${style}</body></html>`
+    themed = `<!doctype html><html lang="${htmlLang}" data-dw-scheme="${theme['color-scheme']}"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head><body>${html}${style}</body></html>`
   }
 
   return /<html(?:\s[^>]*)?>/i.test(themed)
     ? themed.replace(/<html(\s[^>]*)?>/i, (match, attrs) => {
-        const clean = (attrs ?? '').replace(/\sdata-dw-(?:scheme|glass)=(?:"[^"]*"|'[^']*')/g, '')
-        return `<html${clean} data-dw-scheme="${theme['color-scheme']}" data-dw-glass="${theme.glass === 'enabled' ? 'enabled' : 'disabled'}">`
+        const clean = (attrs ?? '')
+          .replace(/\sdata-dw-(?:scheme|glass)=(?:"[^"]*"|'[^']*')/g, '')
+          .replace(/\slang=(?:"[^"]*"|'[^']*')/g, '')
+        return `<html${clean} lang="${htmlLang}" data-dw-scheme="${theme['color-scheme']}" data-dw-glass="${theme.glass === 'enabled' ? 'enabled' : 'disabled'}">`
       })
     : themed
 }
@@ -90,7 +94,9 @@ export function PluginFrame({ pluginId, html, theme, active = true, locale = 'en
   // Theme changes travel over the bridge; changing srcDoc would destroy plugin state.
   const initialTheme = useRef(theme)
   initialTheme.current = theme
-  const source = useMemo(() => withInitialTheme(withHostTypography(html), initialTheme.current), [html, pluginId])
+  const initialLocale = useRef(locale)
+  initialLocale.current = locale
+  const source = useMemo(() => withInitialTheme(withHostTypography(html), initialTheme.current, initialLocale.current), [html, pluginId])
 
   useEffect(() => {
     ready.current = false

@@ -169,8 +169,9 @@ export default function App() {
       }
     })
 
-    const unlistenLocale = bridge.on<{ locale: Locale }>('locale', ({ locale: nextLocale }) => {
-      if (nextLocale) {
+    const unlistenLocale = bridge.on('locale', (payload: unknown) => {
+      const nextLocale = typeof payload === 'string' ? payload : (payload as { locale?: Locale })?.locale
+      if (nextLocale === 'en' || nextLocale === 'zh') {
         setLocale(nextLocale)
       }
     })
@@ -258,11 +259,11 @@ export default function App() {
         manager?: string
       }>('servers.vnstat.setup', { host: draft.host, install }, { timeoutMs: 120_000 })
       const parts = [
-        r.status === 'ready' ? 'vnStat 状态：正常就绪' : r.status === 'installed' ? 'vnStat 状态：已安装' : `vnStat 状态：${r.status}`,
-        r.manager ? `包管理器：${r.manager}` : '',
+        r.status === 'ready' ? t('vnstatStatusReady', locale) : r.status === 'installed' ? t('vnstatStatusInstalled', locale) : t('vnstatStatusOther', locale).replace('{status}', r.status),
+        r.manager ? t('packageManager', locale).replace('{manager}', r.manager) : '',
         r.verification,
         r.error,
-        r.command ? `执行命令：${r.command}` : '',
+        r.command ? t('execCommand', locale).replace('{command}', r.command) : '',
       ].filter(Boolean)
       setSetup(parts.join('\n'))
     } catch (e) {

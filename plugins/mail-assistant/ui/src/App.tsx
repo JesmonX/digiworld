@@ -30,14 +30,14 @@ interface AccountDraft {
   id?: string; provider: Provider; label: string; email: string; username: string; host: string; port: number; useProxy: boolean; secret: string
 }
 
-const providers: Record<Provider, { label: string; host: string; port: number }> = {
-  gmail: { label: 'Gmail', host: 'imap.gmail.com', port: 993 },
-  qq: { label: 'QQ 邮箱', host: 'imap.qq.com', port: 993 },
-  '163': { label: '163 邮箱', host: 'imap.163.com', port: 993 },
-  custom: { label: '自定义 IMAP', host: '', port: 993 },
+const providers: Record<Provider, { label: { en: string; zh: string }; host: string; port: number }> = {
+  gmail: { label: { en: 'Gmail', zh: 'Gmail' }, host: 'imap.gmail.com', port: 993 },
+  qq: { label: { en: 'QQ Mail', zh: 'QQ 邮箱' }, host: 'imap.qq.com', port: 993 },
+  '163': { label: { en: '163 Mail', zh: '163 邮箱' }, host: 'imap.163.com', port: 993 },
+  custom: { label: { en: 'Custom IMAP', zh: '自定义 IMAP' }, host: '', port: 993 },
 }
 
-const emptyDraft = (): AccountDraft => ({ provider: 'gmail', label: 'Gmail', email: '', username: '', host: 'imap.gmail.com', port: 993, useProxy: true, secret: '' })
+const emptyDraft = (locale: Locale = 'en'): AccountDraft => ({ provider: 'gmail', label: providers.gmail.label[locale], email: '', username: '', host: 'imap.gmail.com', port: 993, useProxy: true, secret: '' })
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error)
 const fmtDate = (value?: string, locale: Locale = 'en') =>
   value
@@ -100,8 +100,9 @@ export default function App() {
     ]).catch(reason => setError(errorText(reason)))
     bridge.ready()
 
-    const unlistenLocale = bridge.on<{ locale: Locale }>('locale', ({ locale: nextLocale }) => {
-      if (nextLocale) {
+    const unlistenLocale = bridge.on('locale', (payload: unknown) => {
+      const nextLocale = typeof payload === 'string' ? payload : (payload as { locale?: Locale })?.locale
+      if (nextLocale === 'en' || nextLocale === 'zh') {
         setLocale(nextLocale)
       }
     })
@@ -185,11 +186,11 @@ export default function App() {
   const editAccount = (account?: Account) => setDraft(account ? {
     id: account.id, provider: account.provider, label: account.label, email: account.email,
     username: account.username, host: account.host, port: account.port, useProxy: account.useProxy ?? true, secret: '',
-  } : emptyDraft())
+  } : emptyDraft(locale))
 
   const applyProvider = (provider: Provider) => {
     const preset = providers[provider]
-    setDraft(current => current ? { ...current, provider, label: provider === 'custom' ? current.label : preset.label, host: preset.host, port: preset.port } : current)
+    setDraft(current => current ? { ...current, provider, label: provider === 'custom' ? current.label : preset.label[locale], host: preset.host, port: preset.port } : current)
   }
 
   const saveAccount = async (testOnly = false) => {
@@ -268,7 +269,7 @@ export default function App() {
 
     {draft && <Dialog open onClose={() => { if (!busy) setDraft(null) }} className="modal" aria-label={t('dialogAria', locale)}>
       <header><div><h2>{draft.id ? t('dialogTitleEdit', locale) : t('dialogTitleAdd', locale)}</h2><p>{t('dialogSubtitle', locale)}</p></div><Button className="icon" onClick={() => setDraft(null)}><X size={18} /></Button></header>
-      <div className="dw-segmented provider-tabs">{(Object.keys(providers) as Provider[]).map(provider => <Button key={provider} className={draft.provider === provider ? 'active' : ''} onClick={() => applyProvider(provider)}>{providers[provider].label}</Button>)}</div>
+      <div className="dw-segmented provider-tabs">{(Object.keys(providers) as Provider[]).map(provider => <Button key={provider} className={draft.provider === provider ? 'active' : ''} onClick={() => applyProvider(provider)}>{providers[provider].label[locale]}</Button>)}</div>
       <div className="form-grid">
         <FormField label={t('displayName', locale)}><Input value={draft.label} onChange={event => setDraft({ ...draft, label: event.target.value })} /></FormField>
         <label>{t('emailAddress', locale)}<Input type="email" value={draft.email} onChange={event => setDraft({ ...draft, email: event.target.value, username: event.target.value })} /></label>

@@ -64,7 +64,12 @@ export function createPluginBridge(pluginId: string, options: PluginBridgeOption
     if (message.kind === 'locale' && typeof message.payload === 'object' && message.payload) {
       const loc = (message.payload as { locale?: string }).locale ?? 'en'
       document.documentElement.lang = loc
-      for (const listener of listeners.get('locale') ?? []) listener(loc)
+      const eventPayload = { locale: loc }
+      for (const listener of listeners.get('locale') ?? []) {
+        try {
+          listener(eventPayload)
+        } catch {}
+      }
     }
   })
 
