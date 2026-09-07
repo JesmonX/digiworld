@@ -275,7 +275,10 @@ function buildPreset(id: ThemeId, schemeId: ColorSchemeId = DEFAULT_COLOR_SCHEME
   const { label, scheme } = THEME_LABELS[id]
   const [bg, surface, raised, subtle, border, control, text, muted, , , success, warning, danger] = RAW_THEME_COLORS[id]
   const palette = SCHEME_PALETTES[id]?.[schemeId] ?? SCHEME_PALETTES[id].classic
-  const { accent, secondary, chart } = palette
+  const { secondary, chart } = palette
+  // Adjust control colors independently from the source chart palette.
+  const accent = id === 'catppuccin-latte' && schemeId === 'pine' ? '#117b80'
+    : id === 'catppuccin-latte' && schemeId === 'amber' ? '#bb4900' : palette.accent
   const mix = (color: string, percent: number, base = surface) => `color-mix(in srgb, ${color} ${percent}%, ${base})`
 
   return {
@@ -284,7 +287,7 @@ function buildPreset(id: ThemeId, schemeId: ColorSchemeId = DEFAULT_COLOR_SCHEME
     scheme,
     colors: {
       bg, surface, 'surface-raised': raised, 'surface-subtle': subtle, border, 'border-strong': control,
-      text, 'text-muted': muted, accent, 'accent-strong': scheme === 'light' ? mix(accent, 85, text) : accent,
+      text, 'text-muted': muted, accent, 'accent-strong': scheme === 'light' ? mix(accent, 85, text) : mix(accent, 72, text),
       'accent-contrast': scheme === 'light' ? '#ffffff' : bg, 'accent-secondary': secondary,
       'accent-soft': mix(accent, scheme === 'light' ? 9 : 14), 'accent-border': accent, success, warning, danger,
       // Dark palettes keep success states readable without creating large green-tinted slabs.
@@ -307,8 +310,8 @@ function buildPreset(id: ThemeId, schemeId: ColorSchemeId = DEFAULT_COLOR_SCHEME
       'heat-count-strong': '#ffffff',
       'glass-surface': mix(surface, scheme === 'light' ? 92 : 96, 'transparent'), 'glass-filter': 'blur(18px) saturate(115%)',
       'material-panel': mix(surface, scheme === 'light' ? 78 : 92, 'transparent'),
-      'material-card': mix(surface, scheme === 'light' ? 88 : 96, 'transparent'),
-      'material-raised': mix(raised, scheme === 'light' ? 94 : 98, 'transparent'),
+      'material-card': mix(surface, scheme === 'light' ? 90 : 96, 'transparent'),
+      'material-raised': raised,
       'material-inset': mix(subtle, scheme === 'light' ? 64 : 88, 'transparent'),
       'material-border': mix(border, 64, 'transparent'),
       'material-border-strong': mix(control, 72, 'transparent'),
