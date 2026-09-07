@@ -266,7 +266,7 @@ fn parse_json_groups(
         source_id: Some(source_id),
         source_label: Some(source_label),
         fetched_at: Some(Utc::now().to_rfc3339()),
-        plan_type: groups.first().map(|g| g.name.clone()),
+        plan_type: Some("AI Pro".to_string()),
         description,
         groups,
         windows: primary_windows,
@@ -364,7 +364,7 @@ fn parse_text_output(
         source_id: Some(source_id),
         source_label: Some(source_label),
         fetched_at: Some(Utc::now().to_rfc3339()),
-        plan_type: groups.first().map(|g| g.name.clone()),
+        plan_type: Some("AI Pro".to_string()),
         description: None,
         groups,
         windows: primary_windows,
@@ -441,6 +441,7 @@ mod tests {
 
         let parsed = parse_response(&raw, "local".into(), "本机".into()).unwrap();
         assert_eq!(parsed.status, "ready");
+        assert_eq!(parsed.plan_type.as_deref(), Some("AI Pro"));
         assert_eq!(parsed.groups.len(), 2);
         assert_eq!(parsed.windows.len(), 2);
 
@@ -472,6 +473,7 @@ mod tests {
         let text = "Quota:\nGemini Models\tWeekly Limit Remaining\t38%\t2026-09-11T04:56:07Z\nGemini Models\tFive Hour Limit Remaining\t86%\t2026-09-07T15:52:25Z\n";
         let parsed = parse_response(text, "local".into(), "本机".into()).unwrap();
         assert_eq!(parsed.status, "ready");
+        assert_eq!(parsed.plan_type.as_deref(), Some("AI Pro"));
         assert_eq!(parsed.windows.len(), 2);
         assert_eq!(parsed.windows[0].window, "5h");
         assert_eq!(parsed.windows[0].remaining_percent, 86);

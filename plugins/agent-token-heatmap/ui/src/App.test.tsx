@@ -411,37 +411,35 @@ describe('token usage layout', () => {
     // Still only ONE quota card is displayed, now Antigravity
     expect(container.querySelectorAll('.quota-card')).toHaveLength(1)
     expect(container.querySelector('.quota-card h2')?.textContent).toBe('Antigravity 限额')
+    expect(container.querySelector('.quota-card p')?.textContent).toBe('本机 · AI Pro')
     expect(container.querySelector('.quota-page-badge')?.textContent).toBe('2/2')
     expect(dots[0]?.classList.contains('active')).toBe(false)
     expect(dots[1]?.classList.contains('active')).toBe(true)
 
-    // Verify 5h and weekly limit bars in AGY card
+    // Verify both Gemini and Claude & GPT model groups are displayed together on one page
+    const groups = container.querySelectorAll('.quota-agy-group')
+    expect(groups).toHaveLength(2)
+    expect(groups[0]?.querySelector('.quota-agy-group-header')?.textContent).toBe('Gemini 模型')
+    expect(groups[1]?.querySelector('.quota-agy-group-header')?.textContent).toBe('Claude 与 GPT 模型')
+
+    // Verify concise 5h and 7d limit bars in AGY card
     const windows = container.querySelectorAll('.quota-window')
-    expect(windows).toHaveLength(2)
-    expect(windows[0]?.textContent).toContain('Gemini 5h Limit')
+    expect(windows).toHaveLength(3)
+    // Gemini 5h limit
+    expect(windows[0]?.textContent).toContain('5h')
     expect(windows[0]?.textContent).toContain('剩余 85%')
     expect(windows[0]?.querySelector<HTMLElement>('.quota-track i')?.style.width).toBe('85%')
-    expect(windows[1]?.textContent).toContain('Gemini Weekly Limit')
+    // Gemini weekly limit (7d)
+    expect(windows[1]?.textContent).toContain('7d')
     expect(windows[1]?.textContent).toContain('剩余 37%')
     expect(windows[1]?.querySelector<HTMLElement>('.quota-track i')?.style.width).toBe('37%')
+    // Claude weekly limit (7d)
+    expect(windows[2]?.textContent).toContain('7d')
+    expect(windows[2]?.textContent).toContain('剩余 50%')
+    expect(windows[2]?.querySelector<HTMLElement>('.quota-track i')?.style.width).toBe('50%')
 
-    // Verify model group selector
-    const groupPills = container.querySelectorAll('.quota-group-pill')
-    expect(groupPills).toHaveLength(2)
-    expect(groupPills[0]?.textContent).toBe('Gemini 模型')
-    expect(groupPills[1]?.textContent).toBe('Claude 与 GPT 模型')
-    expect(groupPills[0]?.classList.contains('active')).toBe(true)
-
-    // Click on Claude & GPT group pill
-    await act(async () => {
-      (groupPills[1] as HTMLButtonElement).click()
-      await flush()
-    })
-    expect(groupPills[1]?.classList.contains('active')).toBe(true)
-    const claudeWindows = container.querySelectorAll('.quota-window')
-    expect(claudeWindows).toHaveLength(1)
-    expect(claudeWindows[0]?.textContent).toContain('Claude and GPT Weekly Limit')
-    expect(claudeWindows[0]?.textContent).toContain('剩余 50%')
+    // Plan tier card should be removed from AGY card
+    expect(container.querySelector('.quota-card .quota-credits')).toBeNull()
 
     // Test refreshing AGY quota
     mocks.request.mockClear()

@@ -700,8 +700,6 @@ function QuotaCard(props: QuotaCardProps) {
   const effectiveCodexConfigured = codexConfigured ?? configured
   const effectiveCodexRefresh = onRefreshCodex ?? onRefresh ?? (() => {})
 
-  const [selectedAgyGroupIndex, setSelectedAgyGroupIndex] = useState(0)
-
   const isCodex = effectiveAgent === 'codex'
   const currentStatus = isCodex ? effectiveCodexQuota?.status : agyQuota?.status
   const currentLoading = isCodex ? effectiveCodexLoading : agyLoading
@@ -709,7 +707,9 @@ function QuotaCard(props: QuotaCardProps) {
   const currentSourceLabel = isCodex
     ? (effectiveCodexQuota?.sourceLabel ?? (locale === 'zh' ? '指定账号设备' : 'Designated Device'))
     : (agyQuota?.sourceLabel ?? (locale === 'zh' ? '指定账号设备' : 'Designated Device'))
-  const currentPlanType = isCodex ? effectiveCodexQuota?.planType : agyQuota?.planType
+  const currentPlanType = isCodex
+    ? formatCodexPlan(effectiveCodexQuota?.planType)
+    : formatAgyPlan(agyQuota?.planType)
   const currentFetchedAt = isCodex ? effectiveCodexQuota?.fetchedAt : agyQuota?.fetchedAt
   const currentError = isCodex ? effectiveCodexQuota?.error : agyQuota?.error
 
@@ -722,9 +722,11 @@ function QuotaCard(props: QuotaCardProps) {
     : formatCreditBalance(effectiveCodexQuota?.credits?.balance, locale)
 
   const agyAvailable = agyQuota && (agyQuota.status === 'ready' || agyQuota.status === 'stale') && (agyQuota.windows.length > 0 || (agyQuota.groups && agyQuota.groups.length > 0))
-  const agyGroups = agyQuota?.groups ?? []
-  const activeGroup = agyGroups.length > 0 ? agyGroups[Math.min(selectedAgyGroupIndex, agyGroups.length - 1)] : null
-  const agyBuckets = activeGroup?.buckets?.length ? activeGroup.buckets : (agyQuota?.windows ?? [])
+  const agyGroups = agyQuota?.groups && agyQuota.groups.length > 0
+    ? agyQuota.groups
+    : (agyQuota?.windows && agyQuota.windows.length > 0
+        ? [{ name: 'Gemini Models', description: null, buckets: agyQuota.windows }]
+        : [])
 
   const handlePrev = () => handleSwitch(isCodex ? 'agy' : 'codex')
   const handleNext = () => handleSwitch(isCodex ? 'agy' : 'codex')
@@ -861,78 +863,41 @@ function QuotaCard(props: QuotaCardProps) {
             <span>{locale === 'zh' ? '正在获取最新限额…' : 'Fetching latest quota...'}</span>
           </div>
         ) : agyAvailable ? (
-          <>
-            {agyGroups.length > 1 && (
-              <div className="quota-group-selector" role="tablist">
-                {agyGroups.map((group, idx) => (
-                  <button
-                    key={group.name || idx}
-                    type="button"
-                    role="tab"
-                    aria-selected={selectedAgyGroupIndex === idx}
-                    className={`quota-group-pill ${selectedAgyGroupIndex === idx ? 'active' : ''}`}
-                    onClick={() => setSelectedAgyGroupIndex(idx)}
-                  >
-                    {group.name === 'Gemini Models' ? t('geminiModels', locale) : group.name === 'Claude and GPT models' ? t('claudeGptModels', locale) : group.name}
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="quota-windows">
-              {agyBuckets.map((bucket, index) => {
-                const remaining = Math.max(0, Math.min(100, Math.round(bucket.remainingPercent)))
-                return (
-                  <div key={bucket.id || `${bucket.window}-${index}`} className="quota-window">
-                    <div>
-                      <strong>{bucket.name || formatDuration(bucket.windowDurationMins, locale)}</strong>
-                      <span>{locale === 'zh' ? `剩余 ${remaining}%` : `Remaining ${remaining}%`}</span>
-                    </div>
-                    <div className="quota-track">
-                      <i style={{ width: `${remaining}%` }} />
-                    </div>
-                    <small>
-                      <Clock3 />
-                      {formatAgyReset(bucket.resetsAt, bucket.resetTime, locale)}
-                    </small>
+          <div className="quota-agy-groups">
+            {agyGroups.map((group, gIdx) => {
+              const buckets = [...(group.buckets ?? [])].sort(
+                (a, b) => (a.windowDurationMins ?? (a.window === '5h' ? 300 : 10080)) - (b.windowDurationMins ?? (b.window === '5h' ? 300 : 10080))
+              )
+              return (
+                <div key={group.name || gIdx} className="quota-agy-group">
+                  <div className="quota-agy-group-header">
+                    <span>{formatAgyGroupName(group.name, locale)}</span>
                   </div>
-                )
-              })}
-            </div>
-            <div className="quota-credits" data-has-credits={true}>
-              <div className="quota-credits-icon"><AgentIcon agent="agy" /></div>
-              <div>
-                <span>{t('planTier', locale)}</span>
-                <strong>{agyQuota.planType || t('quotaTierInfo', locale)}</strong>
-              </div>
-            </div>
-            <div className="quota-resets">
-              <div className="quota-resets-header">
-                <span className="quota-resets-title">
-                  <Gauge />
-                  {activeGroup?.name === 'Gemini Models'
-                    ? t('geminiModels', locale)
-                    : activeGroup?.name === 'Claude and GPT models'
-                      ? t('claudeGptModels', locale)
-                      : (activeGroup?.name || t('agyQuota', locale))}
-                </span>
-                {agyQuota.planType && (
-                  <span className="quota-resets-badge active">
-                    {agyQuota.planType}
-                  </span>
-                )}
-              </div>
-              <div className="quota-reset-items">
-                <div className="quota-reset-item">
-                  <div className="quota-reset-item-name">
-                    <span>{activeGroup?.description || agyQuota.description || t('agyQuotaSharedDesc', locale)}</span>
-                  </div>
-                  <div className="quota-reset-item-dates">
-                    <span>{locale === 'zh' ? '5 小时与每周双周期滚动限额' : '5h and weekly rolling window quota'}</span>
+                  <div className="quota-windows">
+                    {buckets.map((bucket, index) => {
+                      const remaining = Math.max(0, Math.min(100, Math.round(bucket.remainingPercent)))
+                      const durationLabel = formatDuration(bucket.windowDurationMins ?? (bucket.window === '5h' ? 300 : 10080), locale)
+                      return (
+                        <div key={bucket.id || `${bucket.window}-${index}`} className="quota-window">
+                          <div>
+                            <strong>{durationLabel}</strong>
+                            <span>{locale === 'zh' ? `剩余 ${remaining}%` : `Remaining ${remaining}%`}</span>
+                          </div>
+                          <div className="quota-track">
+                            <i style={{ width: `${remaining}%` }} />
+                          </div>
+                          <small>
+                            <Clock3 />
+                            {formatAgyReset(bucket.resetsAt, bucket.resetTime, locale)}
+                          </small>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
-              </div>
-            </div>
-          </>
+              )
+            })}
+          </div>
         ) : (
           <div className="quota-empty error">
             <AlertTriangle />
@@ -971,6 +936,32 @@ function QuotaCard(props: QuotaCardProps) {
       </div>
     </Card>
   )
+}
+
+function formatCodexPlan(plan: string | null | undefined): string | null {
+  if (!plan) return null
+  if (plan.toLowerCase() === 'plus') return 'Plus'
+  if (plan.toLowerCase() === 'pro') return 'Pro'
+  if (plan.toLowerCase() === 'team') return 'Team'
+  if (plan.toLowerCase() === 'enterprise') return 'Enterprise'
+  return plan
+}
+
+function formatAgyPlan(plan: string | null | undefined): string {
+  if (!plan || plan === 'Gemini Models' || plan === 'Claude and GPT models' || plan.toLowerCase().includes('pro')) {
+    return 'AI Pro'
+  }
+  return plan
+}
+
+function formatAgyGroupName(name: string, locale: Locale = 'en'): string {
+  if (name === 'Gemini Models' || name.toLowerCase().includes('gemini')) {
+    return t('geminiModels', locale)
+  }
+  if (name === 'Claude and GPT models' || name.toLowerCase().includes('claude') || name.toLowerCase().includes('gpt')) {
+    return t('claudeGptModels', locale)
+  }
+  return name
 }
 
 function formatDuration(minutes: number | null, locale: Locale = 'en'): string {

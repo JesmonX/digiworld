@@ -68,10 +68,12 @@ button svg { width: 14px; height: 14px; }
 .quota-nav-btn:hover { color: var(--dw-text); background: var(--dw-surface); }
 .quota-nav-btn svg { width: 13px; height: 13px; }
 .quota-page-badge { font-size: var(--type-caption); color: var(--dw-text-muted); font-weight: var(--weight-medium); font-variant-numeric: tabular-nums; padding: 0 4px; user-select: none; }
-.quota-group-selector { display: flex; gap: 6px; margin: 4px 0 8px; flex-wrap: wrap; }
-.quota-group-pill { font-size: var(--type-caption); padding: 2px 9px; border-radius: 999px; border: 1px solid var(--dw-border); background: var(--dw-surface); color: var(--dw-text-muted); cursor: pointer; transition: all var(--dw-motion-fast); }
-.quota-group-pill:hover { color: var(--dw-text); border-color: var(--dw-accent); }
-.quota-group-pill.active { background: var(--dw-accent-soft); border-color: var(--dw-accent); color: var(--dw-accent-strong); font-weight: var(--weight-semibold); }
+.quota-agy-groups { display: flex; flex-direction: column; gap: 10px; padding-top: 2px; }
+.quota-agy-group { display: flex; flex-direction: column; gap: 5px; }
+.quota-agy-group-header { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.quota-agy-group-header span { font-size: var(--type-caption); font-weight: var(--weight-semibold); color: var(--dw-text); }
+.quota-agy-group .quota-windows { gap: 6px; padding-top: 0; }
+.quota-agy-group .quota-track { margin: 3px 0 3px; height: 6px; }
 .quota-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--dw-border); }
 .quota-footer .quota-meta { margin-top: 0; padding-top: 0; border-top: none; min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quota-dots { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
