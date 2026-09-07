@@ -31,6 +31,7 @@
 .dw-panel-raised { background: var(--dw-material-raised); box-shadow: var(--dw-shadow-sm); }
 .dw-panel-inset { background: var(--dw-material-inset); box-shadow: none; }
 .dw-card { padding: var(--dw-space-4); }
+.dw-card { border-radius: var(--dw-radius-md); background: var(--dw-material-card); }
 .dw-metric { min-width: 0; display: grid; gap: 2px; }
 .dw-metric-label, .dw-metric-hint { color: var(--dw-text-muted); font-size: var(--dw-type-caption); line-height: var(--dw-leading-caption); }
 .dw-metric-value { color: var(--dw-text); font-size: var(--dw-type-metric); line-height: var(--dw-leading-metric); font-weight: var(--dw-weight-semibold); font-variant-numeric: tabular-nums; }

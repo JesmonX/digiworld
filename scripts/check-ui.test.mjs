@@ -10,3 +10,8 @@ test('checks inline typography and SVG palette literals', () => {
   assert.ok(inspectCode('const x = <svg fill="#ffffff" style={{ fontSize: 10 }} />').length >= 2)
   assert.deepEqual(inspectCode('const x = <svg fill="var(--dw-chart-1)" style={{ width: 100 }} />'), [])
 })
+test('keeps shared layout defaults in the framework and permits business geometry', () => {
+  assert.ok(inspectCss('.dw-page { padding: 40px }').length)
+  assert.ok(inspectCss('.dw-master-detail { display: block }').length)
+  assert.deepEqual(inspectCss('.keyboard-board { grid-template-columns: repeat(15, 1fr) }'), [])
+})

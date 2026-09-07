@@ -1,8 +1,8 @@
 * { box-sizing: border-box; }
 html, body, #root { width: 100%; height: 100%; margin: 0; }
 body { background: transparent; color: var(--dw-text); }
-main { min-height: 100%; display: grid; gap: var(--dw-space-3); padding: 0 0 var(--dw-space-5); }
-.dw-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--dw-space-2); min-height: 54px; }
+
+
 .dw-toolbar > div { display: flex; align-items: center; gap: var(--dw-space-2); min-width: 0; margin-right: auto; }
 .dw-toolbar strong { font-size: var(--dw-type-title); }
 .layout-select { margin-left: auto; }

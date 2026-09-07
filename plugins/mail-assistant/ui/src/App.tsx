@@ -1,7 +1,7 @@
-import { Button, Input, Select, Card, Dialog, Status } from '@digiworld/design-system/react'
+import {  PluginPage, PageToolbar, MasterDetail, EmptyState, FormField, Button, Input, Select, Card, Dialog, Status } from '@digiworld/design-system/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  AlertCircle, ArrowLeft, ChevronDown, Inbox, LoaderCircle, Mail, MailCheck, Paperclip, Plus, RefreshCw,
+  AlertCircle, ChevronDown, Inbox, LoaderCircle, Mail, MailCheck, Paperclip, Plus, RefreshCw,
   Search, Settings, Trash2, X,
 } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
@@ -194,8 +194,8 @@ export default function App() {
     } catch (reason) { setError(errorText(reason)) } finally { setBusy('') }
   }
 
-  return <main className="mail-app">
-    <header className="dw-toolbar toolbar">
+  return <PluginPage scroll="panes" className="mail-app">
+    <PageToolbar className=" toolbar">
       <div className="search"><Search size={15} /><Input aria-label="搜索邮件" placeholder="搜索发件人、主题或正文" value={query} onChange={event => setQuery(event.target.value)} /></div>
       <label className="poll"><Settings size={15} /><span>每</span><Select value={pollMinutes} onChange={event => void changePoll(Number(event.target.value))}>
         {[5, 10, 15, 30].map(value => <option key={value} value={value}>{value} 分钟</option>)}
@@ -203,7 +203,7 @@ export default function App() {
       {currentAccount && <Button className="secondary mark-all" onClick={() => void markAllRead()} disabled={!!busy || syncing.includes(currentAccount.id)}><MailCheck size={15} />{busy === 'mark-all-read' ? '标记中…' : '全部标为已读'}</Button>}
       <Button className="secondary" onClick={() => void syncNow()} disabled={busy === 'sync'}>{busy === 'sync' ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}刷新</Button>
       <Button className="primary" onClick={() => editAccount()}><Plus size={16} />添加账号</Button>
-    </header>
+    </PageToolbar>
 
     {error && <Status tone="error" className="error"><AlertCircle size={16} /><span>{error}</span><Button onClick={() => setError('')}><X size={15} /></Button></Status>}
     {actionNotice && <div className="notice" role="status">{actionNotice}</div>}
@@ -217,7 +217,7 @@ export default function App() {
         {currentAccount && <Button className="manage" onClick={() => editAccount(currentAccount)}><Settings size={15} />账号设置</Button>}
       </aside>
 
-      <section className="dw-card message-list" aria-label="邮件列表" aria-busy={listBusy}>
+      <MasterDetail selected={Boolean(selected)} onBack={() => setSelected(null)} backLabel="返回邮件列表" list={<section className="dw-card message-list" aria-label="邮件列表" aria-busy={listBusy}>
         {listBusy && messages.length === 0 ? <Empty icon={<LoaderCircle className="spin" />} title="正在载入邮件" text="正在读取本地缓存。" /> : accounts.length === 0 ? <Empty icon={<Mail />} title="添加邮箱账号" text="支持 Gmail、QQ、163 和自定义 IMAP。" action={() => editAccount()} /> : messages.length === 0 ? <Empty icon={<Inbox />} title={syncing.length ? '正在同步收件箱' : '没有找到邮件'} text={syncing.length ? '首次完整同步可在后台继续。' : '尝试刷新或更换搜索条件。'} /> : <>
           {messages.map(message => <Button key={message.id} className={`mail-row ${selected?.id === message.id ? 'selected' : ''} ${(!message.serverSeen && !message.locallyViewed) ? 'new' : ''}`} aria-busy={detailBusy === message.id} onClick={() => void openMessage(message)}>
             <span className="row-top"><strong>{message.sender || '未知发件人'}</strong><time>{fmtDate(message.receivedAt)}</time></span>
@@ -227,11 +227,8 @@ export default function App() {
           </Button>)}
           {nextCursor !== undefined && <Button className="load-more" onClick={() => void loadMessages(true, nextCursor)}>加载更多<ChevronDown size={15} /></Button>}
         </>}
-      </section>
-
-      <Card className="dw-card detail">
+      </section>} detail={<Card className="dw-card detail">
         {!selected ? <Empty icon={<Mail />} title="选择一封邮件" text="正文以纯文本显示，不加载远程图片。" /> : <>
-          <Button className="back-to-list" onClick={() => setSelected(null)}><ArrowLeft size={15} />返回邮件列表</Button>
           <div className="detail-head">
             <h2>{selected.subject || '（无主题）'}</h2>
             <div><strong>{selected.sender || '未知发件人'}</strong><time>{fmtDate(selected.receivedAt)}</time></div>
@@ -240,14 +237,14 @@ export default function App() {
           {selected.attachments.length > 0 && <div className="attachments">{selected.attachments.map((attachment, index) => <span key={`${attachment.filename}-${index}`}><Paperclip size={13} />{attachment.filename}<small>{fmtSize(attachment.size)}</small></span>)}</div>}
           <pre>{selected.body || (selected.hasBody ? '这封邮件没有纯文本正文。' : '正文正在后台同步…')}{selected.bodyTruncated ? '\n\n[正文已截断]' : ''}</pre>
         </>}
-      </Card>
+      </Card>} />
     </section>
 
     {draft && <Dialog open onClose={() => { if (!busy) setDraft(null) }} className="modal" aria-label="邮箱账号设置">
       <header><div><h2>{draft.id ? '账号设置' : '添加邮箱账号'}</h2><p>使用应用专用密码或客户端授权码，凭据只保存到系统凭据库。</p></div><Button className="icon" onClick={() => setDraft(null)}><X size={18} /></Button></header>
       <div className="dw-segmented provider-tabs">{(Object.keys(providers) as Provider[]).map(provider => <Button key={provider} className={draft.provider === provider ? 'active' : ''} onClick={() => applyProvider(provider)}>{providers[provider].label}</Button>)}</div>
       <div className="form-grid">
-        <label>显示名称<Input value={draft.label} onChange={event => setDraft({ ...draft, label: event.target.value })} /></label>
+        <FormField label="显示名称"><Input value={draft.label} onChange={event => setDraft({ ...draft, label: event.target.value })} /></FormField>
         <label>邮箱地址<Input type="email" value={draft.email} onChange={event => setDraft({ ...draft, email: event.target.value, username: event.target.value })} /></label>
         <label>IMAP 主机<Input disabled={draft.provider !== 'custom'} value={draft.host} onChange={event => setDraft({ ...draft, host: event.target.value })} /></label>
         <label>端口<Input type="number" disabled={draft.provider !== 'custom'} value={draft.port} onChange={event => setDraft({ ...draft, port: Number(event.target.value) })} /></label>
@@ -259,9 +256,9 @@ export default function App() {
       <footer>{draft.id ? <Button className="danger" onClick={() => void removeAccount()} disabled={!!busy}><Trash2 size={15} />删除账号</Button> : <span />}
         <div><Button className="secondary" onClick={() => void saveAccount(true)} disabled={!!busy}>{busy === 'test' && <LoaderCircle className="spin" size={14} />}测试连接</Button><Button className="primary" onClick={() => void saveAccount(false)} disabled={!!busy}>{busy === 'save' && <LoaderCircle className="spin" size={14} />}保存并同步</Button></div></footer>
     </Dialog>}
-  </main>
+  </PluginPage>
 }
 
 function Empty({ icon, title, text, action }: { icon: React.ReactNode; title: string; text: string; action?: () => void }) {
-  return <div className="empty"><span>{icon}</span><strong>{title}</strong><p>{text}</p>{action && <Button className="primary" onClick={action}><Plus size={15} />添加账号</Button>}</div>
+  return <EmptyState icon={icon} title={title} description={text} action={action && <Button className="primary" onClick={action}><Plus size={15} />添加账号</Button>} />
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Input, Card, Status, Dialog } from '@digiworld/design-system/react'
+import { PluginPage, PageToolbar, Button, Input, Card, Status, Dialog } from '@digiworld/design-system/react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import { Github, RefreshCw, Settings, ExternalLink, CheckCircle2, XCircle, LoaderCircle, Clock3, CircleSlash2, Search, X } from 'lucide-react'
 import './styles.css'
@@ -72,8 +72,8 @@ export default function App() {
   const filteredRepos = useMemo(() => repos.filter(repo => repo.fullName.toLowerCase().includes(repoQuery.trim().toLowerCase())), [repos, repoQuery])
 
   if (!connected) return <main className="center"><Card><Github size={28} /><h1>连接 GitHub</h1><p>Token 只保存在系统凭据库，需要仓库 Actions 只读权限。</p><Input aria-label="GitHub Token" type="password" value={token} onChange={event => setToken(event.target.value)} placeholder="github_pat_…" /><Button variant="primary" onClick={() => void connect()} disabled={busy || !token}>{busy && <LoaderCircle className="spin" />}连接账号</Button>{error && <Status tone="error">{error}</Status>}</Card></main>
-  return <main>
-    <header className="dw-toolbar"><div><Github size={18} /><strong>{login} 的 Actions</strong><small>{updatedAt ? `更新于 ${dateText(updatedAt)}` : ''}</small></div><Button onClick={() => setSettings(true)}><Settings size={15} />仓库</Button><Button onClick={() => { setBusy(true); void loadRuns().catch(reason => setError(String(reason))).finally(() => setBusy(false)) }} disabled={busy}>{busy ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}刷新</Button></header>
+  return <PluginPage>
+    <PageToolbar className=""><div><Github size={18} /><strong>{login} 的 Actions</strong><small>{updatedAt ? `更新于 ${dateText(updatedAt)}` : ''}</small></div><Button onClick={() => setSettings(true)}><Settings size={15} />仓库</Button><Button onClick={() => { setBusy(true); void loadRuns().catch(reason => setError(String(reason))).finally(() => setBusy(false)) }} disabled={busy}>{busy ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}刷新</Button></PageToolbar>
     {error && <Status tone="error" className="error"><span>{error}</span><Button aria-label="关闭错误" onClick={() => setError('')}><X size={14} /></Button></Status>}
     <section className="runs">{runs.length === 0 ? <Status>{selected.length ? '没有找到由你触发的运行' : '请先选择仓库'}</Status> : runs.map(run => <Card key={run.id} className="run">
       <div className="run-head"><RunIcon run={run} /><div><strong>{run.title || run.name}</strong><small>{run.repository} · {run.branch} · {run.sha?.slice(0, 7)}</small></div><span className={`run-status ${run.conclusion ?? run.status}`}>{statusText(run.status, run.conclusion)}</span><a href={run.url} target="_blank" rel="noreferrer">GitHub <ExternalLink size={13} /></a></div>
@@ -86,5 +86,5 @@ export default function App() {
       <div className="repo-list">{filteredRepos.map(repo => <label key={repo.fullName}><input type="checkbox" checked={selected.includes(repo.fullName)} onChange={event => setSelected(event.target.checked ? [...selected, repo.fullName] : selected.filter(item => item !== repo.fullName))} /><span>{repo.fullName}<small>{repo.private ? '私有' : '公开'}</small></span></label>)}</div>
       <footer><Button onClick={() => setSettings(false)} disabled={saving}>取消</Button><Button variant="primary" onClick={() => void save()} disabled={saving}>{saving && <LoaderCircle className="spin" size={14} />}保存</Button></footer>
     </Dialog>
-  </main>
+  </PluginPage>
 }

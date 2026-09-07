@@ -7,7 +7,8 @@ import { Button, Card, Dialog, Input, Menu, Select, Segmented, Status, Switch, T
 import App from './App'
 import { api } from './lib/api'
 import { fixture } from './design-fixtures'
-import { getAccentTheme, pluginTheme } from './theme'
+import { getAccentTheme, pluginTheme, type ColorSchemeId } from './theme'
+import { DesignTemplate } from './design-template'
 
 const names = ['keyboard-heatmap', 'agent-token-heatmap', 'mail-assistant', 'github-actions', 'server-monitor', 'calendar-todo']
 const labels = ['键盘热力图', 'Agent Overview', '邮件助手', 'Git Actions', 'Servers', '日历与 Todo']
@@ -25,8 +26,10 @@ api.checkCoreUpdate = async () => null
 function Gallery() {
   const [open, setOpen] = useState(false)
   const [checked, setChecked] = useState(false)
-  const theme = pluginTheme(getAccentTheme(new URLSearchParams(location.search).get('theme') as never))
+  const params = new URLSearchParams(location.search)
+  const theme = pluginTheme(getAccentTheme(params.get('theme') as never, (params.get('scheme') ?? 'classic') as ColorSchemeId))
   for (const [key, value] of Object.entries(theme)) if (value) document.documentElement.style.setProperty('--dw-' + key, value)
+  if (new URLSearchParams(location.search).has('template')) return <DesignTemplate />
   return <main className="design-gallery"><h1>组件与状态</h1><Card><Toolbar><Button variant="primary">主要操作</Button><Button>次要操作</Button><Button variant="danger">删除</Button><Button disabled>不可用</Button><Button aria-busy="true">载入中…</Button></Toolbar></Card><Card><Toolbar><Input aria-label="名称" placeholder="输入名称" /><Select aria-label="选择"><option>选择内容</option></Select><Switch aria-label="开关" checked={checked} onCheckedChange={setChecked} /></Toolbar><Textarea aria-label="正文" placeholder="正文" /><Segmented><Button aria-pressed="true">今天</Button><Button>全部</Button></Segmented></Card><Status>暂无内容</Status><Status tone="error">暂时无法加载，请重试</Status><Status tone="success">已保存</Status><Menu aria-label="示例菜单"><Button role="menuitem">设置</Button></Menu><Button onClick={() => setOpen(true)}>打开对话框</Button><Dialog open={open} onClose={() => setOpen(false)} aria-label="示例对话框"><h2>对话框</h2><Input aria-label="对话框输入" /><Button onClick={() => setOpen(false)}>关闭</Button></Dialog></main>
 }
-createRoot(document.getElementById('root')!).render(new URLSearchParams(location.search).has('gallery') ? <Gallery /> : <App />)
+createRoot(document.getElementById('root')!).render(new URLSearchParams(location.search).has('gallery') || new URLSearchParams(location.search).has('template') ? <Gallery /> : <App />)

@@ -1,14 +1,10 @@
 body {
   margin: 0;
-  background: var(--dw-bg);
+  background: transparent;
   color: var(--dw-text);
 }
 
-main {
-  padding: var(--dw-space-3);
-  display: grid;
-  gap: var(--dw-space-3);
-}
+
 
 .connect {
   min-height: 80vh;
@@ -38,19 +34,6 @@ label {
 
 .dw-toolbar > :last-child {
   margin-left: auto;
-}
-
-.calendar-view {
-  display: grid;
-  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
-  gap: var(--dw-space-3);
-  align-items: start;
-}
-
-@media (max-width: 720px) {
-  .calendar-view {
-    grid-template-columns: 1fr;
-  }
 }
 
 .calendar-sidebar {
@@ -337,9 +320,6 @@ html[data-dw-scheme="dark"] .calendar-meta-card {
 
 /* Agenda-first calendar workspace: month navigation is supporting context. */
 body { background: transparent; }
-main { max-width: 1180px; margin-inline: auto; padding: 0 0 var(--dw-space-5); }
-.dw-toolbar { min-height: 54px; }
-.calendar-view { grid-template-columns: minmax(0, 1.8fr) minmax(260px, .8fr); gap: var(--dw-space-4); }
 .calendar-agenda-pane { grid-column: 1; grid-row: 1; }
 .calendar-sidebar { grid-column: 2; grid-row: 1; }
 .month-card { background: var(--dw-material-panel); border-color: var(--dw-material-border); box-shadow: var(--dw-shadow-xs); }
@@ -353,4 +333,4 @@ main { max-width: 1180px; margin-inline: auto; padding: 0 0 var(--dw-space-5); }
 .todo-add { background: var(--dw-material-panel); border-color: var(--dw-material-border); }
 .todo > .dw-card:not(.todo-add) { border: 0; border-bottom: 1px solid var(--dw-material-border); border-radius: 0; background: transparent; box-shadow: none; }
 .editor { position: relative; inset: auto; width: min(620px, calc(100vw - 32px)); max-height: calc(100vh - 32px); margin: auto; background: var(--dw-material-raised); border-color: var(--dw-material-border-strong); box-shadow: var(--dw-shadow-lg); }
-@media (max-width: 720px) { .calendar-view { grid-template-columns: 1fr; }.calendar-agenda-pane, .calendar-sidebar { grid-column: auto; grid-row: auto; }.calendar-sidebar { order: -1; } }
+@media (max-width: 720px) {.calendar-agenda-pane, .calendar-sidebar { grid-column: auto; grid-row: auto; }.calendar-sidebar { order: -1; } }

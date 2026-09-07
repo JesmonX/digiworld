@@ -2,11 +2,11 @@
 
 * { box-sizing: border-box; }
 html, body, #root { width: 100%; height: 100%; margin: 0; }
-body { overflow: hidden; background: var(--dw-bg); font-feature-settings: "liga" 1, "calt" 1; font-variant-numeric: normal; }
+body { overflow: hidden; background: transparent; font-feature-settings: "liga" 1, "calt" 1; font-variant-numeric: normal; }
 button { font: inherit; }
 
-.heatmap-app { width: 100%; height: 100%; padding: 0 3px 20px 0; overflow: auto; scrollbar-gutter: stable; }
-.plugin-header { min-height: 46px; display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 12px; }
+
+
 .summary-line { display: flex; align-items: center; gap: 24px; min-height: 38px; }
 .summary-line > div { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
 .summary-line > div + div { padding-left: 22px; border-left: 1px solid var(--dw-border); }
@@ -124,8 +124,8 @@ button.primary:active, button.secondary:active, .pause-button:active, .layout-pi
 }
 
 /* Keep the board dominant while matching the host's compact surface hierarchy. */
-.heatmap-app { max-width: 1180px; margin-inline: auto; padding-inline: 3px; }
-.plugin-header { min-height: 56px; margin-bottom: 14px; }
+
+
 .keyboard-card, .ranking-card { border-radius: var(--dw-radius-md); box-shadow: var(--dw-shadow-xs); transition: transform var(--dw-motion-normal) var(--dw-ease-out), border-color var(--dw-motion-normal) var(--dw-ease-out), box-shadow var(--dw-motion-normal) var(--dw-ease-out); }
 .scope-toggle, .layout-picker-trigger { border-radius: var(--dw-radius-sm); }
 .layout-picker-trigger { box-shadow: var(--dw-shadow-sm); }
@@ -153,8 +153,8 @@ html[data-dw-glass="disabled"] .keyboard-card, html[data-dw-glass="disabled"] .r
 
 /* The keyboard is the domain surface; surrounding chrome stays quiet. */
 body { background: transparent; }
-.heatmap-app { max-width: 1180px; margin-inline: auto; padding: 0 0 var(--dw-space-5); }
-.plugin-header { min-height: 62px; margin-bottom: var(--dw-space-3); }
+
+
 .summary-line { gap: var(--dw-space-4); }
 .summary-line > div + div { border-color: var(--dw-material-border); }
 .keyboard-card { padding: var(--dw-space-4); border-color: var(--dw-material-border); border-radius: var(--dw-radius-lg); background: var(--dw-material-panel); box-shadow: var(--dw-shadow-xs); }

@@ -195,7 +195,7 @@ function App() {
   }
 
   const pageTitle = typeof page === 'string'
-    ? { home: 'Dashboard', catalog: '功能库', settings: '设置' }[page]
+    ? { home: '工作台', catalog: '功能库', settings: '设置' }[page]
     : selectedPlugin?.name ?? '插件'
   const pluginOpen = typeof page !== 'string'
   const pageSubtitle = page === 'home' ? '你的本地数字工作台' : undefined

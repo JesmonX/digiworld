@@ -118,7 +118,7 @@ describe('token usage layout', () => {
     expect(filterBar.querySelector('.range-group')).toBeNull()
     expect(insights.compareDocumentPosition(heatmap) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
     expect(heatmap.querySelector('.range-group')).not.toBeNull()
-    expect(heatmap.querySelector('.summary-grid')?.children).toHaveLength(6)
+    expect(heatmap.querySelector('[aria-label="所选范围用量汇总"]')?.children).toHaveLength(6)
     expect(mocks.request).toHaveBeenCalledWith('usage.getCodexQuota', { force: false })
 
     const cacheAxisLabels = Array.from(container.querySelectorAll('.weekly-chart .chart-axis-label')).filter((_, index) => index % 2 === 1).map(label => label.textContent)

@@ -8,18 +8,18 @@
   --dw-weight-semibold: 600;
   --dw-weight-bold: 700;
   --dw-type-caption: calc(12px * var(--dw-text-scale));
-  --dw-type-body-sm: calc(13px * var(--dw-text-scale));
+  --dw-type-body-sm: calc(14px * var(--dw-text-scale));
   --dw-type-body: calc(14px * var(--dw-text-scale));
   --dw-type-title: calc(16px * var(--dw-text-scale));
-  --dw-type-page: calc(20px * var(--dw-text-scale));
-  --dw-type-metric: calc(24px * var(--dw-text-scale));
+  --dw-type-page: calc(24px * var(--dw-text-scale));
+  --dw-type-metric: calc(28px * var(--dw-text-scale));
   --dw-type-display: calc(28px * var(--dw-text-scale));
   --dw-leading-caption: calc(18px * var(--dw-text-scale));
   --dw-leading-body-sm: calc(20px * var(--dw-text-scale));
   --dw-leading-body: calc(22px * var(--dw-text-scale));
   --dw-leading-title: calc(24px * var(--dw-text-scale));
-  --dw-leading-page: calc(28px * var(--dw-text-scale));
-  --dw-leading-metric: calc(30px * var(--dw-text-scale));
+  --dw-leading-page: calc(32px * var(--dw-text-scale));
+  --dw-leading-metric: calc(36px * var(--dw-text-scale));
   --dw-leading-display: calc(36px * var(--dw-text-scale));
   --dw-space-1: 4px;
   --dw-space-2: 8px;
@@ -93,8 +93,8 @@
   --dw-radius-lg: 20px;
 
   --dw-material-panel: color-mix(in srgb, var(--dw-surface) 78%, transparent);
-  --dw-material-card: color-mix(in srgb, var(--dw-surface) 88%, transparent);
-  --dw-material-raised: color-mix(in srgb, var(--dw-surface-raised) 94%, transparent);
+  --dw-material-card: color-mix(in srgb, var(--dw-surface) 90%, transparent);
+  --dw-material-raised: var(--dw-surface-raised);
   --dw-material-inset: color-mix(in srgb, var(--dw-surface-subtle) 64%, transparent);
   --dw-material-border: color-mix(in srgb, var(--dw-border) 64%, transparent);
   --dw-material-border-strong: color-mix(in srgb, var(--dw-border-strong) 72%, transparent);

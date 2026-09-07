@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Button, Input, Card, Progress, Status, Select } from '@digiworld/design-system/react'
+import { PluginPage, PageToolbar, Button, Input, Card, Progress, Status, Select } from '@digiworld/design-system/react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import { Server, Plus, RefreshCw, HardDrive, MemoryStick, Cpu, Gauge, Network, Settings, X, LoaderCircle, AlertCircle } from 'lucide-react'
 
@@ -262,8 +262,8 @@ export default function App() {
   }
 
   return (
-    <main>
-      <header className="dw-toolbar">
+    <PluginPage>
+      <PageToolbar className="">
         <div>
           <Server size={18} />
           <strong>远程 Linux 设备</strong>
@@ -280,7 +280,7 @@ export default function App() {
         <Button onClick={() => void loadSettings()} disabled={busy}>
           <RefreshCw className={busy ? 'spin' : ''} size={15} />刷新
         </Button>
-      </header>
+      </PageToolbar>
 
       {error && <Status tone="error">{error}</Status>}
 
@@ -553,7 +553,7 @@ export default function App() {
           </footer>
         </Card>
       )}
-    </main>
+    </PluginPage>
   )
 }
 

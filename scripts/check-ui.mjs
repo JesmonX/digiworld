@@ -12,6 +12,7 @@ export function inspectCss(css, file = 'style.css') {
   const errors = []
   postcss.parse(css, { from: file }).walkDecls(decl => {
     const value = decl.value
+    if (decl.parent.type === 'rule' && /(?:^|,)\s*\.dw-(?:page(?:-page|-panes|-toolbar)?|master-detail|split-pane|metric-grid|form-field|empty-state)\s*(?:,|$)/.test(decl.parent.selector)) errors.push(`${file}:${decl.source.start.line}: shared layout defaults belong in the design system`)
     if (controlled.test(decl.prop) && literalColor.test(value)) errors.push(`${file}:${decl.source.start.line}: literal color in ${decl.prop}`)
     if (/^font(?:-family|-size|-weight)?$/.test(decl.prop) && !/var\(--(?:dw-|type-|weight-|font-)|^(?:inherit|normal)$/.test(value)) errors.push(`${file}:${decl.source.start.line}: typography must use shared roles`)
     if (/^(?:box-shadow|text-shadow|border-radius)$/.test(decl.prop) && !/^(?:none|0|inherit|50%|99px|999px)$/.test(value) && !value.includes('var(--dw-')) errors.push(`${file}:${decl.source.start.line}: use shared geometry/elevation`)

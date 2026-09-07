@@ -117,4 +117,15 @@ describe('PluginFrame theme', () => {
     expect(fragHostIndex).toBeGreaterThan(fragBundledIndex)
     expect(fragmentThemed).toContain(`--dw-success-soft:${darkTheme['surface-subtle']}`)
   })
+
+  it('provides layout defaults and correct glass attributes before plugin ready', () => {
+    const theme = { ...pluginTheme(getAccentTheme('catppuccin-mocha')), glass: 'enabled' as const }
+    for (const html of ['<main />', '<html data-dw-scheme="light"><head></head><body></body></html>']) {
+      const source = withInitialTheme(html, theme)
+      expect(source).toContain('data-digiworld-host-components')
+      expect(source).toContain('data-dw-glass="enabled"')
+      expect(source).toContain('data-dw-scheme="dark"')
+      expect(source).not.toContain('data-dw-scheme="light"')
+    }
+  })
 })

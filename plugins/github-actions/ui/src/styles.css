@@ -1,13 +1,13 @@
 * { box-sizing: border-box; }
 html, body, #root { width: 100%; height: 100%; margin: 0; }
 body { background: transparent; color: var(--dw-text); }
-main { min-height: 100%; display: grid; gap: var(--dw-space-3); padding: 0 0 var(--dw-space-5); }
-.dw-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--dw-space-2); min-height: 54px; }
+
+
 .dw-toolbar > div { display: flex; align-items: center; gap: var(--dw-space-2); min-width: 0; margin-right: auto; }
 .dw-toolbar small, .run-head small, .repo-list small, .run-meta { color: var(--dw-text-muted); }
 .center { min-height: 80vh; place-items: center; }
 .center .dw-card { width: min(420px, 100%); display: grid; gap: var(--dw-space-3); }
-.runs { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: var(--dw-space-3); align-items: start; }
+.runs { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--dw-space-3); align-items: start; }
 .run { min-height: 156px; padding: var(--dw-space-4); border-color: var(--dw-material-border); background: var(--dw-material-card); }
 .run:has(.run-status.in_progress), .run:has(.run-status.queued), .run:has(.run-status.waiting) { border-color: color-mix(in srgb, var(--dw-accent) 30%, var(--dw-material-border)); }
 .run-head { display: flex; align-items: center; gap: var(--dw-space-3); min-width: 0; }

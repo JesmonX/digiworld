@@ -1,4 +1,4 @@
-import { Button, Card, Menu, Status } from '@digiworld/design-system/react'
+import {  PluginPage, PageToolbar, Button, Card, Menu, Status } from '@digiworld/design-system/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronDown, Flame, Keyboard, Pause, Play } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
@@ -103,8 +103,8 @@ export default function App() {
   }
 
   return (
-    <div className="heatmap-app">
-      <header className="dw-toolbar plugin-header">
+    <PluginPage className="heatmap-app">
+      <PageToolbar className=" plugin-header">
         <div className="summary-line" aria-label="键盘统计摘要">
           <div><span>总次数</span><strong>{(snapshot?.total ?? 0).toLocaleString()}</strong></div>
           <div><Flame /><span>最高频</span><strong>{snapshot?.topKey ?? '—'}</strong></div>
@@ -113,7 +113,7 @@ export default function App() {
           <div className="dw-segmented scope-toggle" role="group" aria-label="统计时间范围"><Button aria-pressed={scope === 'today'} className={scope === 'today' ? 'active' : ''} onClick={() => setScope('today')}>今天</Button><Button aria-pressed={scope === 'all'} className={scope === 'all' ? 'active' : ''} onClick={() => setScope('all')}>全部</Button></div>
           <Button className={`pause-button ${snapshot?.paused ? 'paused' : ''}`} disabled={pauseBusy || !snapshot} onClick={() => void togglePause()}>{snapshot?.paused ? <Play /> : <Pause />}{pauseBusy ? '处理中…' : snapshot?.paused ? '继续' : '暂停'}</Button>
         </div>
-      </header>
+      </PageToolbar>
 
       {error && <Status tone="error" className="plugin-error">{error}</Status>}
 
@@ -166,7 +166,7 @@ export default function App() {
           </div>
         </Card>
       </section>
-    </div>
+    </PluginPage>
   )
 }
 

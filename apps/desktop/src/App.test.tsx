@@ -90,9 +90,9 @@ describe('workspace redesign', () => {
     expect(container.querySelector('.rail-divider')).not.toBeNull()
     expect(container.textContent).toContain('数字工作台')
     expect(container.textContent).toContain('已安装功能')
-    expect(container.textContent).toContain('快捷操作')
-    expect(container.textContent).toContain('运行稳定')
-    expect(container.querySelectorAll('.summary-card')).toHaveLength(4)
+    expect(container.textContent).not.toContain('快捷操作')
+    expect(container.textContent).toContain('暂无异常')
+    expect(container.querySelectorAll('.workspace-metric')).toHaveLength(3)
     expect(container.querySelectorAll('.plugin-row')).toHaveLength(1)
 
     await act(async () => root.unmount())

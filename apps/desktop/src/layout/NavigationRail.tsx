@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode, type SyntheticEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from '@digiworld/design-system/react'
 
 export interface NavigationRailItem {
@@ -10,16 +11,30 @@ export interface NavigationRailItem {
   onClick(): void
 }
 function RailButton({ item }: { item: NavigationRailItem }) {
+  const [tooltip, setTooltip] = useState<{ top: number; left: number } | null>(null)
+  const show = (event: SyntheticEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    setTooltip({ top: rect.top + rect.height / 2, left: rect.right + 12 })
+  }
   return (
+    <>
     <Button
       title={item.label}
       aria-label={item.label}
+      aria-current={item.active ? 'page' : undefined}
       className={`nav-item ${item.active ? 'active' : ''}`}
       onClick={item.onClick}
+      onMouseEnter={show}
+      onFocus={show}
+      onMouseLeave={() => setTooltip(null)}
+      onBlur={() => setTooltip(null)}
+      onKeyDown={event => { if (event.key === 'Escape') setTooltip(null) }}
     >
       <span>{item.icon}</span>
       {item.status && <i className={`state-dot ${item.status}`} aria-label={item.status} />}
     </Button>
+    {tooltip && createPortal(<span role="tooltip" className="rail-tooltip" style={tooltip}>{item.label}</span>, document.body)}
+    </>
   )
 }
 

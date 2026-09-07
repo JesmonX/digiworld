@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Input, Card, Status, Textarea, Select, Dialog } from '@digiworld/design-system/react'
+import { PluginPage, PageToolbar, SplitPane, Button, Input, Card, Status, Textarea, Select, Dialog } from '@digiworld/design-system/react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import { CalendarDays, CheckSquare, Plus, RefreshCw, Settings, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
@@ -275,8 +275,8 @@ export default function App() {
   }
 
   return (
-    <main>
-      <header className="dw-toolbar">
+    <PluginPage>
+      <PageToolbar className="">
         <div className="tabs">
           <Button aria-pressed={tab === 'calendar'} onClick={() => setTab('calendar')}>
             <CalendarDays size={15} />日历
@@ -291,13 +291,12 @@ export default function App() {
         <Button onClick={() => { setPreviousAccount(account); setAccountDraft(account); setAccount(null) }}>
           <Settings size={15} />账号
         </Button>
-      </header>
+      </PageToolbar>
 
       {error && <Status tone="error">{error}</Status>}
 
       {tab === 'calendar' ? (
-        <div className="calendar-view">
-          <div className="calendar-sidebar">
+        <SplitPane aside={<div className="calendar-sidebar">
             <Card className="month-card">
               <header className="month-header">
                 <h3>{formatDisplayMonth(viewYear, viewMonth)}</h3>
@@ -367,8 +366,7 @@ export default function App() {
                 ))}
               </div>
             </div>
-          </div>
-
+          </div>}>
           <div className="calendar-agenda-pane">
             <header className="agenda-header">
               <div>
@@ -416,7 +414,7 @@ export default function App() {
               )}
             </section>
           </div>
-        </div>
+        </SplitPane>
       ) : (
         <section className="todo">
           <Card className="todo-add">
@@ -515,7 +513,7 @@ export default function App() {
           </footer>
         </Dialog>
       )}
-    </main>
+    </PluginPage>
   )
 }
 

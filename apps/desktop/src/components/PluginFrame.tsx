@@ -3,6 +3,8 @@ import type { HostToPluginMessage, PluginTheme, PluginToHostMessage } from '@dig
 import hostTypographyCss from '@digiworld/typography/fonts.css?inline'
 import designTokensCss from '@digiworld/design-system/tokens.css?inline'
 import designBaseCss from '@digiworld/design-system/base.css?inline'
+import designComponentsCss from '@digiworld/design-system/components.css?inline'
+import designLayoutsCss from '@digiworld/design-system/layouts.css?inline'
 import { api } from '../lib/api'
 
 interface PluginFrameProps {
@@ -56,6 +58,9 @@ export function withInitialTheme(html: string, theme: PluginTheme): string {
     .filter(([key, value]) => /^[a-z][a-z0-9-]*$/.test(key) && value !== undefined)
     .map(([key, value]) => `--dw-${key}:${String(value).replace(/[<>;{}]/g, '')}`)
     .join(';')
+  const controls = `<style data-digiworld-host-components>${designComponentsCss}\n${designLayoutsCss}</style>`
+  // Component defaults precede business CSS; resolved host tokens follow it.
+  html = /<head(?:\s[^>]*)?>/i.test(html) ? html.replace(/<head(?:\s[^>]*)?>/i, match => `${match}${controls}`) : `${controls}${html}`
   const style = `<style data-digiworld-host-design>${designTokensCss}\n${designBaseCss}\nhtml,body,#root{background:transparent}\n:root{${declarations};color-scheme:${theme['color-scheme']}}</style>`
 
   let themed: string
@@ -72,8 +77,8 @@ export function withInitialTheme(html: string, theme: PluginTheme): string {
 
   return /<html(?:\s[^>]*)?>/i.test(themed)
     ? themed.replace(/<html(\s[^>]*)?>/i, (match, attrs) => {
-        if (attrs && attrs.includes('data-dw-scheme')) return match
-        return `<html${attrs ?? ''} data-dw-scheme="${theme['color-scheme']}">`
+        const clean = (attrs ?? '').replace(/\sdata-dw-(?:scheme|glass)=(?:"[^"]*"|'[^']*')/g, '')
+        return `<html${clean} data-dw-scheme="${theme['color-scheme']}" data-dw-glass="${theme.glass === 'enabled' ? 'enabled' : 'disabled'}">`
       })
     : themed
 }

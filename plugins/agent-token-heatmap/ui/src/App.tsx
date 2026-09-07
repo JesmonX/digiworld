@@ -1,4 +1,4 @@
-import { Button, Input, Select, Textarea, Card, Dialog, Status } from '@digiworld/design-system/react'
+import { PluginPage, PageToolbar, MetricGrid, Metric as MetricValue, EmptyState, Button, Input, Select, Textarea, Card, Dialog, Status } from '@digiworld/design-system/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Check, Clock3, Database, Gauge, HardDrive, PieChart, Plus, RefreshCw, Server, Settings2, Ticket, Trash2, X } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
@@ -333,13 +333,13 @@ export default function App() {
   const sourceOptions = settings ? [{ id: 'local', label: '本机' }, ...settings.sshSources] : []
 
   return (
-    <div className="usage-app">
-      <header className="dw-toolbar usage-header">
+    <PluginPage className="usage-app">
+      <PageToolbar className=" usage-header">
         <div className="header-buttons">
           <Button className="secondary" onClick={() => setSettingsOpen(true)}><Settings2 />设置</Button>
           <Button className="primary" disabled={refresh.running} onClick={() => void startRefresh()}><RefreshCw className={refresh.running ? 'spin' : ''} />{refresh.running ? `${refresh.completed}/${refresh.total} ${refresh.currentSource ?? ''}` : '手动刷新'}</Button>
         </div>
-      </header>
+      </PageToolbar>
 
       {(error || refresh.errors.length > 0) && <Status tone="error" className="error-banner"><AlertTriangle /><span>{error ?? refresh.errors.join('；')}</span><Button onClick={() => { setError(null); setRefresh(current => ({ ...current, errors: [] })) }}><X /></Button></Status>}
 
@@ -361,14 +361,14 @@ export default function App() {
             <Select aria-label="热力图指标" value={metric} onChange={event => setMetric(event.target.value as Metric)}><option value="totalTokens">总 Token</option><option value="inputTokens">输入</option><option value="outputTokens">输出</option><option value="cacheReadTokens">缓存读取</option></Select>
           </div>
         </div>
-        <div className="summary-grid" aria-label="所选范围用量汇总">
+        <MetricGrid aria-label="所选范围用量汇总">
           <Summary label="总 Token" value={snapshot?.totals.totalTokens} />
           <Summary label="输入" value={snapshot?.totals.inputTokens} />
           <Summary label="输出" value={snapshot?.totals.outputTokens} />
           <Summary label="缓存读取" value={snapshot?.totals.cacheReadTokens} />
           <Summary label="缓存写入" value={snapshot?.totals.cacheWriteTokens} />
           <Summary label="缓存率" text={snapshot?.totals.cacheRate == null ? '—' : `${(snapshot.totals.cacheRate * 100).toFixed(1)}%`} />
-        </div>
+        </MetricGrid>
         {snapshot && cells.length ? <div className="calendar-wrap"><div className="weekday-labels"><span>一</span><span>三</span><span>五</span><span>日</span></div><div className="calendar-grid">{cells.map((cell, index) => <i key={cell.day ?? `blank-${index}`} tabIndex={cell.day ? 0 : undefined} aria-label={cell.day ? `${cell.day}，${formatTokens(cell.value)}` : undefined} className={`level-${heatLevel(cell.value, max)} ${cell.day ? '' : 'blank'}`} title={cell.day ? `${cell.day} · ${formatTokens(cell.value)}` : undefined} />)}</div><div className="legend"><span>低</span>{[0, 1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>高</span></div></div> : <Empty />}
       </section>
 
@@ -398,7 +398,7 @@ export default function App() {
         setSettingsOpen(false)
         await loadSnapshot(saved, agents, effectiveSources)
       }} onScan={testSource} onQuotaTest={async value => bridge.request<CodexQuotaSnapshot>('usage.testCodexQuota', { settings: value })} />}
-    </div>
+    </PluginPage>
   )
 }
 
@@ -594,8 +594,8 @@ function formatFetchedAt(value: string | null): string {
 
 function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) { return <div className="filter-group"><span>{label}</span>{children}</div> }
 function FilterChip({ active, label, icon, onClick }: { active: boolean; label: string; icon?: React.ReactNode; onClick(): void }) { return <Button className={`filter-chip ${active ? 'active' : ''}`} aria-pressed={active} onClick={onClick}>{active && <Check className="chip-check" />}{icon}<span>{label}</span></Button> }
-function Summary({ label, value, text }: { label: string; value?: number | undefined; text?: string }) { return <div className="summary-item"><small>{label}</small><strong>{text ?? formatTokens(value ?? 0)}</strong></div> }
-function Empty() { return <div className="empty"><Database /><span>暂无数据，点击“手动刷新”开始扫描</span></div> }
+function Summary({ label, value, text }: { label: string; value?: number | undefined; text?: string }) { return <MetricValue label={label} value={text ?? (value == null ? '—' : formatTokens(value))} /> }
+function Empty() { return <EmptyState icon={<Database />} title="暂无数据" description="点击“手动刷新”开始扫描。" /> }
 
 function SourceDialog({ settings, refreshRunning, onClose, onSave, onScan, onQuotaTest }: { settings: UsageSettings; refreshRunning: boolean; onClose(): void; onSave(value: UsageSettings): Promise<void>; onScan(source: SshSource): Promise<void>; onQuotaTest(value: UsageSettings): Promise<CodexQuotaSnapshot> }) {
   const [draft, setDraft] = useState<UsageSettings>(structuredClone(settings))
