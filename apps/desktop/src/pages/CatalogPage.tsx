@@ -37,6 +37,9 @@ export function CatalogPage({
         {catalog.plugins.map(plugin => {
           const current = installed.get(plugin.id)
           const supported = Boolean(currentTarget && plugin.artifacts.some(artifact => artifact.target === currentTarget))
+          const unsupportedTitle = currentTarget
+            ? `${t('unsupportedArchitecture', locale)} (${currentTarget})`
+            : t('unsupportedBtn', locale)
           return (
             <Panel padding="lg" className="catalog-card" key={plugin.id}>
               <div className="catalog-title">
@@ -52,7 +55,7 @@ export function CatalogPage({
               {current
                 ? <Button className="secondary full" onClick={() => onOpen(plugin.id)}>{t('openBtn', locale)} <ChevronRight /></Button>
                 : !supported
-                  ? <Button className="secondary full" disabled title={`Plugin not yet supported on architecture (${currentTarget})`}>{t('unsupportedBtn', locale)}</Button>
+                  ? <Button className="secondary full" disabled title={unsupportedTitle}>{t('unsupportedBtn', locale)}</Button>
                   : <Button className="primary full" disabled={busy === plugin.id} onClick={() => onInstall(plugin)}>{busy === plugin.id ? <LoaderCircle className="spin" /> : <Download />}{t('installBtn', locale)}</Button>}
             </Panel>
           )
