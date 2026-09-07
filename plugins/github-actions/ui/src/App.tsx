@@ -7,8 +7,35 @@ import './styles.css'
 
 const bridge = createPluginBridge('io.github.jesmonx.digiworld.github-actions')
 type Repo = { fullName: string; private: boolean; updatedAt?: string }
-type Job = { id: number; name: string; status: string; conclusion?: string; html_url?: string }
-type Run = { id: number; repository: string; name: string; title: string; branch: string; sha: string; status: string; conclusion?: string; url: string; createdAt: string; startedAt?: string; updatedAt?: string; attempt?: number; jobs: Job[] }
+export type Step = { name: string; status: string; conclusion?: string | null; number?: number; started_at?: string | null; completed_at?: string | null }
+export type Job = { id: number; name: string; status: string; conclusion?: string | null; html_url?: string; run_url?: string; check_run_url?: string; started_at?: string | null; completed_at?: string | null; steps?: Step[] }
+export type Run = { id: number; repository: string; name: string; title: string; branch: string; sha: string; status: string; conclusion?: string | null; url: string; createdAt: string; startedAt?: string; updatedAt?: string; attempt?: number; jobs: Job[]; jobsLoaded?: boolean }
+
+const TERMINAL_CONCLUSIONS = new Set(['success', 'failure', 'cancelled', 'skipped', 'neutral', 'timed_out', 'action_required', 'stale'])
+const isFinished = (status?: string, conclusion?: string | null) => status === 'completed' || Boolean(conclusion && TERMINAL_CONCLUSIONS.has(conclusion))
+
+export function runProgress(run: Run, jobs = run.jobs, loaded = run.jobsLoaded ?? jobs.length > 0) {
+  if (!loaded) {
+    const total = 1
+    const done = run.status === 'completed' ? 1 : 0
+    return { done, total, current: undefined as string | undefined, percent: done * 100 }
+  }
+  const steps = jobs.flatMap(job => job.steps ?? [])
+  if (steps.length > 0) {
+    const done = steps.filter(step => isFinished(step.status, step.conclusion)).length
+    const current = steps.find(step => !isFinished(step.status, step.conclusion))?.name
+    return { done, total: steps.length, current, percent: done / steps.length * 100 }
+  }
+  if (jobs.length > 0) {
+    const done = jobs.filter(job => isFinished(job.status, job.conclusion)).length
+    const current = jobs.find(job => !isFinished(job.status, job.conclusion))?.name
+    return { done, total: jobs.length, current, percent: done / jobs.length * 100 }
+  }
+  const done = run.status === 'completed' ? 1 : 0
+  return { done, total: 1, current: undefined as string | undefined, percent: done * 100 }
+}
+
+type JobState = { jobs: Job[]; loaded: boolean; loading: boolean; error?: string }
 
 const dateText = (value?: string, locale: Locale = 'en') => {
   if (!value) return '—'
@@ -16,7 +43,7 @@ const dateText = (value?: string, locale: Locale = 'en') => {
   return Number.isNaN(+date) ? '—' : new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date)
 }
 
-const statusText = (status: string, conclusion: string | undefined, locale: Locale) => {
+const statusText = (status: string, conclusion: string | null | undefined, locale: Locale) => {
   if (status !== 'completed') return status === 'queued' || status === 'waiting' ? t('queued', locale) : t('running', locale)
   const map: Record<string, keyof typeof DICTIONARY> = {
     success: 'success',
@@ -38,6 +65,38 @@ function RunIcon({ run }: { run: Run }) {
   return <XCircle className="bad" />
 }
 
+function JobDetails({ state, locale }: { state: JobState; locale: Locale }) {
+  if (state.loading && !state.loaded) return <Status className="job-detail-status">{t('loadingJobs', locale)}</Status>
+  if (state.error && !state.loaded) return <Status tone="error" className="job-detail-status">{t('jobsLoadFailed', locale).replace('{error}', state.error)}</Status>
+  if (!state.jobs.length) return <Status className="job-detail-status">{t('noJobs', locale)}</Status>
+  return (
+    <div className="jobs-detail">
+      {state.jobs.map(job => (
+        <details key={job.id} className="job-detail">
+          <summary>
+            <span className="job-summary-main"><strong>{job.name}</strong><small>{statusText(job.status, job.conclusion, locale)}</small></span>
+            <span className={`job-status ${job.conclusion ?? job.status}`}>{statusText(job.status, job.conclusion, locale)}</span>
+          </summary>
+          <div className="job-meta">
+            <span>{job.started_at ? dateText(job.started_at, locale) : '—'}{job.completed_at ? ` → ${dateText(job.completed_at, locale)}` : ''}</span>
+            {job.html_url && <a href={job.html_url} target="_blank" rel="noreferrer">{t('jobLink', locale)} <ExternalLink size={12} /></a>}
+          </div>
+          {job.steps && job.steps.length > 0 ? (
+            <ol className="steps">
+              {job.steps.map(step => (
+                <li key={`${job.id}-${step.number ?? step.name}`} className={step.conclusion ?? step.status}>
+                  <span><strong>{step.name}</strong><small>{statusText(step.status, step.conclusion, locale)}</small></span>
+                  <time>{step.completed_at ? dateText(step.completed_at, locale) : step.started_at ? dateText(step.started_at, locale) : '—'}</time>
+                </li>
+              ))}
+            </ol>
+          ) : <small className="no-steps">{t('noSteps', locale)}</small>}
+        </details>
+      ))}
+    </div>
+  )
+}
+
 export default function App() {
   const [locale, setLocale] = useState<Locale>(() => {
     return (document.documentElement.lang?.startsWith('zh') ? 'zh' : 'en') as Locale
@@ -54,11 +113,48 @@ export default function App() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [updatedAt, setUpdatedAt] = useState('')
+  const [expandedRuns, setExpandedRuns] = useState<Set<number>>(() => new Set())
+  const [jobStates, setJobStates] = useState<Record<number, JobState>>({})
 
   const loadRuns = async () => {
     const data = await bridge.request<{ runs: Run[]; updatedAt?: string }>('git.runs.snapshot')
     setRuns(data.runs)
     setUpdatedAt(data.updatedAt ?? '')
+    setJobStates(current => {
+      const next = { ...current }
+      for (const run of data.runs) {
+        const previous = next[run.id]
+        if (run.jobsLoaded || run.jobs.length > 0) {
+          next[run.id] = { jobs: run.jobs, loaded: true, loading: previous?.loading ?? false, ...(previous?.error ? { error: previous.error } : {}) }
+        } else if (!previous) {
+          next[run.id] = { jobs: [], loaded: false, loading: false }
+        }
+      }
+      return next
+    })
+  }
+
+  const loadJobs = async (run: Run) => {
+    const current = jobStates[run.id]
+    if (current?.loaded || current?.loading) return
+    setJobStates(value => ({ ...value, [run.id]: { jobs: value[run.id]?.jobs ?? [], loaded: false, loading: true } }))
+    try {
+      const data = await bridge.request<{ jobs: Job[] }>('git.run.jobs', { repository: run.repository, runId: run.id })
+      setJobStates(value => ({ ...value, [run.id]: { jobs: data.jobs, loaded: true, loading: false } }))
+    } catch (reason) {
+      setJobStates(value => ({ ...value, [run.id]: { ...(value[run.id] ?? { jobs: [] }), loaded: false, loading: false, error: String(reason) } }))
+    }
+  }
+
+  const toggleRun = (run: Run) => {
+    const opening = !expandedRuns.has(run.id)
+    setExpandedRuns(current => {
+      const next = new Set(current)
+      if (next.has(run.id)) next.delete(run.id)
+      else next.add(run.id)
+      return next
+    })
+    if (opening && !jobStates[run.id]?.loaded && run.jobs.length === 0) void loadJobs(run)
   }
 
   const load = async () => {
@@ -200,37 +296,41 @@ export default function App() {
         {runs.length === 0 ? (
           <Status>{selected.length ? t('noRuns', locale) : t('noReposSelected', locale)}</Status>
         ) : (
-          runs.map(run => (
-            <Card key={run.id} className="run">
-              <div className="run-head">
-                <RunIcon run={run} />
-                <div>
-                  <strong tabIndex={0} data-tooltip={run.title || run.name}>{run.title || run.name}</strong>
-                  <small tabIndex={0} data-tooltip={`${run.repository} · ${run.branch} · ${run.sha ?? ''}`}>{run.repository} · {run.branch} · {run.sha?.slice(0, 7)}</small>
+          runs.map(run => {
+            const state = jobStates[run.id] ?? { jobs: run.jobs, loaded: run.jobsLoaded ?? run.jobs.length > 0, loading: false }
+            const progress = runProgress(run, state.loaded ? state.jobs : run.jobs, state.loaded)
+            const expanded = expandedRuns.has(run.id)
+            return (
+              <Card key={run.id} className="run">
+                <div className="run-head">
+                  <RunIcon run={run} />
+                  <div>
+                    <strong tabIndex={0} data-tooltip={run.title || run.name}>{run.title || run.name}</strong>
+                    <small tabIndex={0} data-tooltip={`${run.repository} · ${run.branch} · ${run.sha ?? ''}`}>{run.repository} · {run.branch} · {run.sha?.slice(0, 7)}</small>
+                  </div>
+                  <span className={`run-status ${run.conclusion ?? run.status}`}>
+                    {statusText(run.status, run.conclusion, locale)}
+                  </span>
+                  <a href={run.url} target="_blank" rel="noreferrer">
+                    GitHub <ExternalLink size={13} />
+                  </a>
                 </div>
-                <span className={`run-status ${run.conclusion ?? run.status}`}>
-                  {statusText(run.status, run.conclusion, locale)}
-                </span>
-                <a href={run.url} target="_blank" rel="noreferrer">
-                  GitHub <ExternalLink size={13} />
-                </a>
-              </div>
-              <div className="run-meta">
-                <span>{t('startedAt', locale).replace('{time}', dateText(run.startedAt || run.createdAt, locale))}</span>
-                {(run.attempt ?? 1) > 1 && <span>{t('attempt', locale).replace('{attempt}', String(run.attempt))}</span>}
-              </div>
-              {run.jobs.length > 0 && (
-                <div className="jobs">
-                  {run.jobs.map(job => (
-                    <div key={job.id}>
-                      <span>{job.name}</span>
-                      <small>{statusText(job.status, job.conclusion, locale)}</small>
-                    </div>
-                  ))}
+                <div className="run-meta">
+                  <span>{t('startedAt', locale).replace('{time}', dateText(run.startedAt || run.createdAt, locale))}</span>
+                  {(run.attempt ?? 1) > 1 && <span>{t('attempt', locale).replace('{attempt}', String(run.attempt))}</span>}
                 </div>
-              )}
-            </Card>
-          ))
+                <div className="run-progress">
+                  <div className="run-progress-head"><span>{t('progress', locale)}</span><strong>{progress.done}/{progress.total}</strong></div>
+                  <div className="run-progress-track" role="progressbar" aria-label={t('progress', locale)} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress.percent)}><span style={{ width: `${Math.max(0, Math.min(100, progress.percent))}%` }} /></div>
+                  <small>{progress.current ? t('currentStep', locale).replace('{step}', progress.current) : progress.percent >= 100 ? t('allStepsComplete', locale) : t('waitingForStep', locale)}</small>
+                </div>
+                <Button className="run-details-toggle" aria-expanded={expanded} aria-controls={`run-details-${run.id}`} onClick={() => toggleRun(run)}>
+                  {expanded ? t('hideJobs', locale) : t('showJobs', locale)}
+                </Button>
+                {expanded && <div id={`run-details-${run.id}`}><JobDetails state={state} locale={locale} /></div>}
+              </Card>
+            )
+          })
         )}
       </section>
 

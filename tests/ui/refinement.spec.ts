@@ -91,10 +91,69 @@ test('keyboard data uses one Tab stop and shared full-name tooltips', async ({ p
   const frame = page.frameLocator('iframe')
   await expect(frame.locator('.key[tabindex="0"]')).toHaveCount(1)
   const key = frame.locator('.key[data-tooltip*="Backspace"]')
+  await expect(key).toHaveAttribute('data-tooltip-pointer-only', 'true')
+  await expect(key).toHaveAttribute('aria-label', /Backspace/)
   await key.focus()
+  await expect(frame.getByRole('tooltip')).toBeHidden()
+  await expect(key).not.toHaveAttribute('aria-describedby', /dw-tooltip/)
+  await key.hover()
   await expect(frame.getByRole('tooltip')).toContainText('Backspace')
+  await page.emulateMedia({ reducedMotion: 'no-preference' })
+  const box = await key.boundingBox()
+  if (!box) throw new Error('keyboard key has no layout box')
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await expect(key).toHaveClass(/is-pressing/)
+  await page.mouse.up()
+  await expect(key).not.toHaveClass(/is-pressing/)
+  await page.keyboard.down('Enter')
+  await expect(key).toHaveClass(/is-pressing/)
+  await page.keyboard.up('Enter')
+  await expect(key).not.toHaveClass(/is-pressing/)
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await page.keyboard.down('Enter')
+  await expect(key).not.toHaveClass(/is-pressing/)
+  await page.keyboard.up('Enter')
   await page.keyboard.press('ArrowRight')
   await expect(key).not.toBeFocused()
+})
+
+test('keyboard layouts keep a readable key unit at 100% and 125% zoom', async ({ page }) => {
+  const layouts = [
+    ['full', 104],
+    ['tkl', 87],
+    ['75', 84],
+    ['65', 68],
+    ['60', 61],
+  ] as const
+  for (const zoom of [1, 1.25]) {
+    await page.setViewportSize({ width: 900, height: 800 })
+    await gotoWithRetry(page, '/design.html')
+    await page.getByRole('button', { name: '键盘热力图', exact: true }).click()
+    const frame = page.frameLocator('iframe')
+    await frame.locator('html').evaluate((element, value) => { (element as HTMLElement).style.zoom = String(value) }, zoom)
+    for (const width of [900, 1280, 1600]) {
+      await page.setViewportSize({ width, height: 800 })
+      for (const [index, [id, count]] of layouts.entries()) {
+        await frame.locator('.layout-picker-trigger').click()
+        await frame.getByRole('menuitemradio').nth(index).click()
+        const board = frame.locator(`.keyboard-board.layout-${id}`)
+        await expect(board).toBeVisible()
+        const metrics = await board.evaluate((element, expectedCount) => {
+          const keys = [...element.querySelectorAll<HTMLElement>('.key')]
+          return {
+            count: keys.length,
+            keyUnit: parseFloat(getComputedStyle(element).getPropertyValue('--key-unit')),
+            minHeight: Math.min(...keys.map(key => key.getBoundingClientRect().height)),
+            expectedCount,
+          }
+        }, count)
+        expect(metrics.count).toBe(metrics.expectedCount)
+        expect(metrics.keyUnit).toBeGreaterThanOrEqual(28)
+        expect(metrics.minHeight).toBeGreaterThanOrEqual(27)
+      }
+    }
+  }
 })
 
 for (const theme of THEMES) for (const scheme of COLOR_SCHEMES) test(`actual controls use ${theme.id} ${scheme.id} colors`, async ({ page }) => {
@@ -120,7 +179,7 @@ test('long action metadata remains readable through keyboard tooltips', async ({
   await gotoWithRetry(page, '/design.html?long')
   await page.getByRole('button', { name: 'Git Actions', exact: true }).click()
   const frame = page.frameLocator('iframe')
-  const title = frame.locator('.run-head strong')
+  const title = frame.locator('.run-head strong').first()
   await title.focus()
   await expect(frame.getByRole('tooltip')).toContainText('VeryLongWorkflowName')
   expect(await frame.getByRole('tooltip').evaluate(el => {

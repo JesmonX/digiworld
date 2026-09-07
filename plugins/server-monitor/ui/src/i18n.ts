@@ -37,6 +37,7 @@ export const DICTIONARY = {
   monitoredInterfaces: { en: 'Monitored Network Interfaces', zh: '监控网卡' },
   showDiskDevice: { en: 'Show disk device name', zh: '显示磁盘设备名' },
   showGpuLabels: { en: 'Show GPU metric labels', zh: '显示 GPU 指标标签' },
+  showGpuUtilization: { en: 'Show GPU utilization', zh: '显示 GPU 负载百分比' },
   showGpuTemp: { en: 'Show GPU temperature', zh: 'GPU 显示温度' },
   showGpuPower: { en: 'Show GPU power draw', zh: '显示 GPU 功耗' },
   gpuMemoryMode: { en: 'GPU Memory Display', zh: 'GPU 显存显示' },

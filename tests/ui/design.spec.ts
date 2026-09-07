@@ -95,6 +95,7 @@ test('servers plugin layout switching, GPU metrics and disk device display', asy
   await expect(frame.getByText('RTX 4090', { exact: false })).toBeVisible()
   await expect(frame.getByText('180W', { exact: false })).toBeVisible()
   await expect(frame.getByText('29.3 GB / 45.0 GB (65%)', { exact: false })).toBeVisible()
+  await expect(frame.locator('.gpu-grid .metric').first().locator('.dw-progress-track')).toHaveAttribute('aria-valuenow', '65')
 
   // Disk device display
   await expect(frame.getByText('/dev/nvme0n1p2', { exact: false })).toBeVisible()
@@ -118,6 +119,12 @@ test('servers plugin layout switching, GPU metrics and disk device display', asy
     await expect(gpuMemorySelect).toHaveValue(mode)
   }
   await expect(frame.getByText('GPU 显示温度', { exact: true })).toBeVisible()
+  await expect(frame.getByText('显示 GPU 负载百分比', { exact: true })).toBeVisible()
+  const gpuUtilization = frame.getByRole('checkbox', { name: '显示 GPU 负载百分比' })
+  await expect(gpuUtilization).toBeChecked()
+  await gpuUtilization.uncheck()
+  await expect(gpuUtilization).not.toBeChecked()
+  await gpuUtilization.check()
   await expect(gpuMemorySelect).toBeVisible()
 })
 
@@ -134,9 +141,13 @@ test('calendar plugin filters past events, displays month calendar and supports 
   // Today events should be visible
   await expect(frame.getByText('产品评审')).toBeVisible()
   await expect(frame.getByText('架构讨论')).toBeVisible()
+  await expect(frame.getByText('检查 Preview 构建')).toBeVisible()
+  await expect(frame.getByText('整理无日期任务')).toBeVisible()
+  await expect(frame.getByText('待安排')).toBeVisible()
 
   // Month calendar dots should exist
   await expect(frame.locator('.event-dot').first()).toBeVisible()
+  await expect(frame.locator('.todo-dot').first()).toBeVisible()
 
   // Date selection interaction
   const futureKey = await frame.locator('body').evaluate(() => {
@@ -147,6 +158,9 @@ test('calendar plugin filters past events, displays month calendar and supports 
   await expect(futureDay).toBeVisible()
   await futureDay.click()
   await expect(frame.getByText('后续同步')).toBeVisible()
+  await expect(frame.getByText('产品评审')).not.toBeVisible()
+  await expect(frame.getByText('待安排')).not.toBeVisible()
+  await expect(frame.locator('input[type="date"]')).toHaveValue(futureKey)
 
   // Event creation editor
   await frame.getByRole('button', { name: '新建日程' }).first().click()
@@ -174,8 +188,26 @@ test('actions shows running state as localized status', async ({ page }) => {
   await gotoWithRetry(page, '/design.html')
   await page.getByRole('button', { name: 'Git Actions', exact: true }).click()
   const frame = page.frameLocator('iframe')
-  await expect(frame.locator('.run-status')).toHaveText('运行中')
-  await expect(frame.getByText('开始于', { exact: false })).toBeVisible()
+  await expect(frame.locator('.run-status').first()).toHaveText('运行中')
+  await expect(frame.getByText('开始于', { exact: false }).first()).toBeVisible()
+  await expect(frame.locator('.run-progress')).toHaveCount(2)
+  await expect(frame.getByText('流程进度', { exact: true }).first()).toBeVisible()
+  await expect(frame.locator('.run').first().locator('.run-progress-head strong')).toHaveText('1/2')
+  await expect(frame.locator('.run').first().locator('.run-progress-track')).toHaveAttribute('aria-valuenow', '50')
+  await expect(frame.locator('.run').first().getByText('当前步骤：Build', { exact: true })).toBeVisible()
+  await frame.getByRole('button', { name: '展开 Job 与步骤' }).first().click()
+  const activeJob = frame.locator('.run').first().locator('details.job-detail')
+  await expect(activeJob).not.toHaveAttribute('open', '')
+  await expect(activeJob.getByText('Windows build', { exact: true })).toBeVisible()
+  await activeJob.locator('summary').click()
+  await expect(activeJob.getByText('Checkout', { exact: true })).toBeVisible()
+  const historicalRun = frame.locator('.run').nth(1)
+  await historicalRun.getByRole('button', { name: '展开 Job 与步骤' }).click()
+  await expect(historicalRun.getByText('Linux test', { exact: true })).toBeVisible()
+  const job = historicalRun.locator('details.job-detail')
+  await expect(job).not.toHaveAttribute('open', '')
+  await job.locator('summary').click()
+  await expect(job.getByText('Test', { exact: true })).toBeVisible()
 })
 
 test('agent overview auto-refresh interval selector', async ({ page }) => {
@@ -183,6 +215,8 @@ test('agent overview auto-refresh interval selector', async ({ page }) => {
   await page.getByRole('button', { name: 'Agent Overview', exact: true }).click()
   const frame = page.frameLocator('iframe')
   await expect(frame.locator('.weekly-card')).toBeVisible()
+  await expect(frame.getByText('Credits balance', { exact: true })).toBeVisible()
+  await expect(frame.getByText('$12.50', { exact: true })).toBeVisible()
 
   const settingsButton = frame.getByRole('button', { name: '设置', exact: true })
   await settingsButton.click()

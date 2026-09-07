@@ -1,8 +1,8 @@
 import { cloneElement, useEffect, type ReactElement, type KeyboardEvent } from 'react'
 
 /** Adds a shared tooltip without an extra layout box, including for SVG targets. */
-export function Tooltip({ content, children }: { content: string; children: ReactElement<Record<string, unknown>> }) {
-  return cloneElement(children, { 'data-tooltip': content, title: undefined })
+export function Tooltip({ content, pointerOnly = false, children }: { content: string; pointerOnly?: boolean; children: ReactElement<Record<string, unknown>> }) {
+  return cloneElement(children, { 'data-tooltip': content, 'data-tooltip-pointer-only': pointerOnly ? 'true' : undefined, title: undefined })
 }
 
 /** One delegated, top-layer tooltip per document. Mount beside the application root. */
@@ -57,6 +57,10 @@ export function TooltipLayer() {
     }
     const enter = (event: Event) => {
       const element = event.target instanceof Element ? event.target.closest('[data-tooltip]') : null
+      if (element?.hasAttribute('data-tooltip-pointer-only') && event.type === 'focusin') {
+        close()
+        return
+      }
       if (element) show(element)
     }
     const leave = (event: Event) => {

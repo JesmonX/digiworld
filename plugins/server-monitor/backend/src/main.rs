@@ -39,6 +39,8 @@ struct Device {
     #[serde(default = "yes")]
     show_gpu: bool,
     #[serde(default = "yes")]
+    show_gpu_utilization: bool,
+    #[serde(default = "yes")]
     show_traffic: bool,
     #[serde(default)]
     interfaces: Vec<String>,
@@ -142,6 +144,7 @@ impl App {
                 "interfaces": d.interfaces,
                 "showCpu": d.show_cpu,
                 "showGpu": d.show_gpu,
+                "showGpuUtilization": d.show_gpu_utilization,
                 "showTraffic": d.show_traffic,
                 "showDiskDevice": d.show_disk_device,
                 "showGpuLabels": d.show_gpu_labels,
@@ -381,6 +384,7 @@ mod tests {
         }))
         .unwrap();
         assert!(device.show_gpu_temperature);
+        assert!(device.show_gpu_utilization);
         assert_eq!(device.gpu_memory_display, GpuMemoryDisplay::Both);
     }
 }

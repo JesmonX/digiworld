@@ -17,6 +17,8 @@ export interface KeyboardLayout {
   keyCount: number
   description: string
   minWidth: number
+  boardUnits: number
+  gapUnits: number
   functionRow: KeyDefinition[]
   alphaRows: KeyDefinition[][]
   navRows: KeyDefinition[][]
@@ -72,27 +74,27 @@ const compactNavRows: KeyDefinition[][] = [
 export const keyboardLayouts: KeyboardLayout[] = [
   {
     id: 'full', label: '104 键', keyCount: 104, description: '全尺寸 · 独立功能区与数字小键盘', minWidth: 900,
-    functionRow, alphaRows, navRows, numpadKeys,
+    boardUnits: 22, gapUnits: 18, functionRow, alphaRows, navRows, numpadKeys,
     preview: [[17, 4], [14, 3, 4], [14, 3, 4], [14, 3, 4]],
   },
   {
     id: 'tkl', label: '87 键', keyCount: 87, description: 'TKL · 保留功能键与导航区', minWidth: 740,
-    functionRow, alphaRows, navRows, numpadKeys: [],
+    boardUnits: 18, gapUnits: 16, functionRow, alphaRows, navRows, numpadKeys: [],
     preview: [[17], [14, 3], [14, 3], [14, 3]],
   },
   {
     id: '75', label: '84 键', keyCount: 84, description: '75% · 紧凑功能键与导航区', minWidth: 700,
-    functionRow: compactFunctionRow, alphaRows, navRows, numpadKeys: [],
+    boardUnits: 18, gapUnits: 16, functionRow: compactFunctionRow, alphaRows, navRows, numpadKeys: [],
     preview: [[16], [14, 2], [14, 2], [14, 2]],
   },
   {
     id: '65', label: '68 键', keyCount: 68, description: '65% · 保留方向键与常用导航键', minWidth: 690,
-    functionRow: [], alphaRows, navRows: compactNavRows, numpadKeys: [],
+    boardUnits: 18, gapUnits: 16, functionRow: [], alphaRows, navRows: compactNavRows, numpadKeys: [],
     preview: [[14, 2], [14, 2], [14, 2], [14, 2]],
   },
   {
     id: '60', label: '61 键', keyCount: 61, description: '60% · 仅保留主键区', minWidth: 610,
-    functionRow: [], alphaRows, navRows: [], numpadKeys: [],
+    boardUnits: 15, gapUnits: 13, functionRow: [], alphaRows, navRows: [], numpadKeys: [],
     preview: [[14], [14], [14], [14]],
   },
 ]
@@ -124,4 +126,3 @@ export function heatLevel(value: number, max: number): number {
   if (ratio >= .001) return 2
   return 1
 }
-

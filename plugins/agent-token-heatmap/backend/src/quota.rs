@@ -1,6 +1,6 @@
 use crate::model::{
-    CodexQuotaSettings, CodexQuotaSnapshot, CodexQuotaWindow, CodexResetCreditsSummary,
-    ShellPreset, SshSource,
+    CodexQuotaCredits, CodexQuotaSettings, CodexQuotaSnapshot, CodexQuotaWindow,
+    CodexResetCreditsSummary, ShellPreset, SshSource,
 };
 use anyhow::{Context, Result, anyhow, bail};
 use chrono::Utc;
@@ -31,6 +31,8 @@ struct RateLimitSnapshot {
     plan_type: Option<String>,
     primary: Option<RateLimitWindow>,
     secondary: Option<RateLimitWindow>,
+    #[serde(default)]
+    credits: Option<CodexQuotaCredits>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -327,6 +329,7 @@ fn parse_response(
         fetched_at: Some(Utc::now().to_rfc3339()),
         plan_type: rate_limits.plan_type.clone(),
         windows,
+        credits: rate_limits.credits.clone(),
         reset_credits: response.rate_limit_reset_credits,
         error: None,
     })
@@ -343,7 +346,8 @@ mod tests {
             "rateLimitsByLimitId": {"codex": {
                 "primary": {"usedPercent": 64, "windowDurationMins": 10080, "resetsAt": 200},
                 "secondary": {"usedPercent": 60, "windowDurationMins": 300, "resetsAt": 100},
-                "planType": "plus"
+                "planType": "plus",
+                "credits": {"balance": "$12.50", "hasCredits": true, "unlimited": false}
             }},
             "rateLimitResetCredits": {
                 "availableCount": 1,
@@ -370,6 +374,44 @@ mod tests {
         assert_eq!(credits[0].title.as_deref(), Some("里程碑赠送"));
         assert_eq!(credits[0].granted_at, 1788500000);
         assert_eq!(credits[0].expires_at, Some(1789500000));
+        let quota_credits = parsed.credits.unwrap();
+        assert_eq!(quota_credits.balance.as_deref(), Some("$12.50"));
+        assert!(quota_credits.has_credits);
+        assert!(!quota_credits.unlimited);
+    }
+
+    #[test]
+    fn parses_unlimited_credits_without_reformatting_the_balance() {
+        let value = json!({
+            "rateLimits": {"primary": {"usedPercent": 1, "windowDurationMins": 300, "resetsAt": null}, "secondary": null},
+            "rateLimitsByLimitId": {"codex": {
+                "primary": {"usedPercent": 1, "windowDurationMins": 300, "resetsAt": null},
+                "secondary": null,
+                "credits": {"balance": null, "hasCredits": true, "unlimited": true}
+            }}
+        });
+        let parsed = parse_response(value, "local".into(), "本机".into()).unwrap();
+        let credits = parsed.credits.unwrap();
+        assert_eq!(credits.balance, None);
+        assert!(credits.has_credits);
+        assert!(credits.unlimited);
+    }
+
+    #[test]
+    fn keeps_missing_credit_balance_as_unavailable_data() {
+        let value = json!({
+            "rateLimits": {"primary": {"usedPercent": 1, "windowDurationMins": 300, "resetsAt": null}, "secondary": null},
+            "rateLimitsByLimitId": {"codex": {
+                "primary": {"usedPercent": 1, "windowDurationMins": 300, "resetsAt": null},
+                "secondary": null,
+                "credits": {"hasCredits": false, "unlimited": false}
+            }}
+        });
+        let parsed = parse_response(value, "local".into(), "本机".into()).unwrap();
+        let credits = parsed.credits.unwrap();
+        assert_eq!(credits.balance, None);
+        assert!(!credits.has_credits);
+        assert!(!credits.unlimited);
     }
 
     #[test]

@@ -14,6 +14,12 @@ const calendarDate = (offset: number, time: string) => {
   const ymd = [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('')
   return `${ymd}T${time}00`
 }
+const calendarDay = (offset: number) => {
+  const date = new Date()
+  date.setHours(12, 0, 0, 0)
+  date.setDate(date.getDate() + offset)
+  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-')
+}
 export function fixture(method: string, payload: unknown = {}): unknown {
   if (new URLSearchParams(location.search).get('state') === 'error') throw new Error('演示：暂时无法加载，请重试')
   const longText = new URLSearchParams(location.search).has('long')
@@ -26,7 +32,7 @@ export function fixture(method: string, payload: unknown = {}): unknown {
   if (method === 'usage.refreshStatus') return { running: false, completed: 1, total: 1, errors: [] }
   if (method === 'usage.startRefresh') return { running: false, completed: 1, total: 1, errors: [] }
   if (method === 'usage.snapshot') return { startDay: '2026-08-07', endDay: '2026-09-05', totals: empty ? { ...totals, inputTokens: 0, totalTokens: 0 } : totals, days: empty ? [] : days, breakdown: [], modelBreakdown: empty ? [] : [{ ...totals, sourceId: 'local', sourceLabel: '本机', agent: 'codex', model: 'gpt-5.6-sol' }] }
-  if (method === 'usage.getCodexQuota') return { status: 'ready', sourceId: 'local', sourceLabel: '本机', fetchedAt: '2026-09-05T04:00:00Z', planType: 'Plus', windows: [{ usedPercent: 32, windowDurationMins: 300, resetsAt: null }, { usedPercent: 62, windowDurationMins: 10080, resetsAt: null }] }
+  if (method === 'usage.getCodexQuota') return { status: 'ready', sourceId: 'local', sourceLabel: '本机', fetchedAt: '2026-09-05T04:00:00Z', planType: 'Plus', windows: [{ usedPercent: 32, windowDurationMins: 300, resetsAt: null }, { usedPercent: 62, windowDurationMins: 10080, resetsAt: null }], credits: { balance: '$12.50', hasCredits: true, unlimited: false } }
   if (method === 'mail.sync.status') return { accounts: empty ? [] : [account], syncingAccountIds: [] }
   if (method === 'mail.settings.get') return { pollMinutes: 10 }
   if (method === 'mail.messages.list') return { items: empty ? [] : messages }
@@ -34,9 +40,16 @@ export function fixture(method: string, payload: unknown = {}): unknown {
   if (method === 'git.auth.status') return { connected: true, account: { login: 'jesmonx' } }
   if (method === 'git.settings.get') return { repositories: ['JesmonX/digiworld'], pollSeconds: 30 }
   if (method === 'git.repositories.list') return { items: [{ fullName: 'JesmonX/digiworld', private: false }] }
-  if (method === 'git.runs.snapshot') return { login: 'jesmonx', runs: empty ? [] : [{ id: 1, repository: longText ? 'organization/' + 'long-repository-name-'.repeat(10) : 'JesmonX/digiworld', name: 'Preview', title: longText ? 'Release validation — ' + 'VeryLongWorkflowName'.repeat(12) : 'Build three plugins', branch: 'main', sha: '548f11f1234', status: 'in_progress', url: 'https://github.com', createdAt: '2026-09-05T04:00:00Z', jobs: [{ id: 2, name: 'Windows build', status: 'in_progress' }] }] }
-  if (method === 'servers.settings.get') return { devices: empty ? [] : [{ id: 'gpu1', label: 'GPU Server', host: 'gpu1', disks: ['/', '/data'], interfaces: ['eth0'], showCpu: true, showGpu: true, showTraffic: true, showDiskDevice: true, showGpuLabels: true, showGpuPower: true, showGpuTemperature: true, gpuMemoryDisplay: 'both' }] }
-  if (method === 'servers.sample') return { devices: empty ? [] : [{ id: 'gpu1', label: 'GPU Server', hostname: 'compute-01', timestamp: 1788580800, uptimeSeconds: 864000, memory: { total: 68719476736, used: 34359738368 }, cpu: { logicalCores: 32, load1: 8.2, load5: 7.4 }, disks: [{ device: '/dev/nvme0n1p2', mount: '/', total: 1099511627776, used: 549755813888, percent: 50 }, { device: '/dev/sda1', mount: '/data', total: 4398046511104, used: 1099511627776, percent: 25 }], gpus: [{ index: 0, name: 'NVIDIA L40', utilization: 72, memoryUsedMiB: 30000, memoryTotalMiB: 46068, temperatureC: 61, powerDrawW: 180 }, { index: 1, name: 'NVIDIA RTX 4090', utilization: 15, memoryUsedMiB: 4096, memoryTotalMiB: 24576, temperatureC: 45, powerDrawW: null }], network: [{ name: 'eth0', receivedBytes: 42949672960, sentBytes: 10737418240 }], vnstat: {}, selection: { disks: ['/', '/data'], interfaces: ['eth0'], showCpu: true, showGpu: true, showTraffic: true, showDiskDevice: true, showGpuLabels: true, showGpuPower: true, showGpuTemperature: true, gpuMemoryDisplay: 'both' } }] }
+  if (method === 'git.runs.snapshot') return {
+    login: 'jesmonx',
+    runs: empty ? [] : [
+      { id: 1, repository: longText ? 'organization/' + 'long-repository-name-'.repeat(10) : 'JesmonX/digiworld', name: 'Preview', title: longText ? 'Release validation — ' + 'VeryLongWorkflowName'.repeat(12) : 'Build three plugins', branch: 'main', sha: '548f11f1234', status: 'in_progress', url: 'https://github.com', createdAt: '2026-09-05T04:00:00Z', jobsLoaded: true, jobs: [{ id: 2, name: 'Windows build', status: 'in_progress', started_at: '2026-09-05T04:01:00Z', html_url: 'https://github.com/JesmonX/digiworld/actions/runs/1/jobs/2', steps: [{ name: 'Checkout', status: 'completed', conclusion: 'success', number: 1, started_at: '2026-09-05T04:01:00Z', completed_at: '2026-09-05T04:01:05Z' }, { name: 'Build', status: 'in_progress', conclusion: null, number: 2, started_at: '2026-09-05T04:01:06Z', completed_at: null }] }] },
+      { id: 2, repository: 'JesmonX/digiworld', name: 'CI', title: 'Previous CI', branch: 'main', sha: 'aabbccddeeff', status: 'completed', conclusion: 'success', url: 'https://github.com', createdAt: '2026-09-04T04:00:00Z', jobsLoaded: false, jobs: [] },
+    ],
+  }
+  if (method === 'git.run.jobs') return { repository: (payload as { repository?: string })?.repository, runId: (payload as { runId?: number })?.runId, jobs: [{ id: 3, name: 'Linux test', status: 'completed', conclusion: 'success', started_at: '2026-09-04T04:01:00Z', completed_at: '2026-09-04T04:04:00Z', html_url: 'https://github.com/JesmonX/digiworld/actions/runs/2/jobs/3', steps: [{ name: 'Checkout', status: 'completed', conclusion: 'success', number: 1, started_at: '2026-09-04T04:01:00Z', completed_at: '2026-09-04T04:01:05Z' }, { name: 'Test', status: 'completed', conclusion: 'success', number: 2, started_at: '2026-09-04T04:01:06Z', completed_at: '2026-09-04T04:04:00Z' }] }] }
+  if (method === 'servers.settings.get') return { devices: empty ? [] : [{ id: 'gpu1', label: 'GPU Server', host: 'gpu1', disks: ['/', '/data'], interfaces: ['eth0'], showCpu: true, showGpu: true, showGpuUtilization: true, showTraffic: true, showDiskDevice: true, showGpuLabels: true, showGpuPower: true, showGpuTemperature: true, gpuMemoryDisplay: 'both' }] }
+  if (method === 'servers.sample') return { devices: empty ? [] : [{ id: 'gpu1', label: 'GPU Server', hostname: 'compute-01', timestamp: 1788580800, uptimeSeconds: 864000, memory: { total: 68719476736, used: 34359738368 }, cpu: { logicalCores: 32, load1: 8.2, load5: 7.4 }, disks: [{ device: '/dev/nvme0n1p2', mount: '/', total: 1099511627776, used: 549755813888, percent: 50 }, { device: '/dev/sda1', mount: '/data', total: 4398046511104, used: 1099511627776, percent: 25 }], gpus: [{ index: 0, name: 'NVIDIA L40', utilization: 72, memoryUsedMiB: 30000, memoryTotalMiB: 46068, temperatureC: 61, powerDrawW: 180 }, { index: 1, name: 'NVIDIA RTX 4090', utilization: 15, memoryUsedMiB: 4096, memoryTotalMiB: 24576, temperatureC: 45, powerDrawW: null }], network: [{ name: 'eth0', receivedBytes: 42949672960, sentBytes: 10737418240 }], vnstat: {}, selection: { disks: ['/', '/data'], interfaces: ['eth0'], showCpu: true, showGpu: true, showGpuUtilization: true, showTraffic: true, showDiskDevice: true, showGpuLabels: true, showGpuPower: true, showGpuTemperature: true, gpuMemoryDisplay: 'both' } }] }
   if (method === 'calendar.account.get') return { username: 'hello@icloud.com', serverUrl: 'https://caldav.icloud.com', selectedCalendars: ['/demo/calendar/'] }
   if (method === 'calendar.cached' || method === 'calendar.sync') return {
     calendars: [{ id: '/demo/calendar/', name: '个人', href: 'https://caldav.icloud.com/demo/calendar/', readOnly: false }],
@@ -50,6 +63,9 @@ export function fixture(method: string, payload: unknown = {}): unknown {
   }
   if (method === 'calendar.event.save') return payload
   if (method === 'calendar.event.delete') return { deleted: true }
-  if (method === 'todo.list') return empty ? [] : [{ id: 'todo-1', title: '检查 Preview 构建', done: false, due: '2026-09-05', createdAt: '2026-09-04T00:00:00Z', updatedAt: '2026-09-04T00:00:00Z' }]
+  if (method === 'todo.list') return empty ? [] : [
+    { id: 'todo-1', title: '检查 Preview 构建', done: false, due: calendarDay(0), createdAt: '2026-09-04T00:00:00Z', updatedAt: '2026-09-04T00:00:00Z' },
+    { id: 'todo-2', title: '整理无日期任务', done: true, due: null, createdAt: '2026-09-04T00:00:00Z', updatedAt: '2026-09-04T00:00:00Z' },
+  ]
   throw new Error(`No design fixture for ${method}`)
 }

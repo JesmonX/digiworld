@@ -32,8 +32,10 @@ export default function App() {
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pauseBusy, setPauseBusy] = useState(false)
+  const [keyUnit, setKeyUnit] = useState(42)
   const layoutPickerRef = useRef<HTMLDivElement>(null)
   const layoutTriggerRef = useRef<HTMLButtonElement>(null)
+  const keyboardScrollRef = useRef<HTMLDivElement>(null)
 
   const refresh = useCallback(async () => {
     try {
@@ -90,6 +92,20 @@ export default function App() {
   const layout = getKeyboardLayout(layoutId)
   const visibleKeys = useMemo(() => layoutKeys(layout), [layout])
   const maxCount = useMemo(() => Math.max(0, ...visibleKeys.map(key => snapshot?.counts[key.id] ?? 0)), [snapshot, visibleKeys])
+
+  useEffect(() => {
+    const element = keyboardScrollRef.current
+    if (!element) return
+    const update = () => {
+      const available = Math.max(0, element.clientWidth - 24)
+      const next = Math.max(28, Math.min(46, available / (layout.boardUnits + layout.gapUnits * 0.1)))
+      setKeyUnit(next)
+    }
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [layout.boardUnits, layout.gapUnits])
 
   const selectLayout = async (next: KeyboardLayoutId) => {
     const previous = layoutId
@@ -170,12 +186,21 @@ export default function App() {
             </Button>)}
           </Menu>
         </div>
-        <div className="keyboard-scroll" tabIndex={0} aria-label={t('scrollAria', locale)} style={{ '--board-min-width': `${layout.minWidth}px` } as React.CSSProperties}>
+        <div ref={keyboardScrollRef} className="keyboard-scroll" tabIndex={0} aria-label={t('scrollAria', locale)}>
           <div className="board-toolbar">
             <div><h2><Keyboard />{t('keyDistribution', locale)}</h2></div>
             <div className="legend"><span>{t('low', locale)}</span>{[1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>{t('high', locale)}</span></div>
           </div>
-          <div onKeyDown={event => rovingDataKeyDown(event)} className={`keyboard-board layout-${layout.id}`}>
+          <div
+            onKeyDown={event => rovingDataKeyDown(event)}
+            className={`keyboard-board layout-${layout.id}`}
+            style={{
+              '--key-unit': `${keyUnit}px`,
+              '--key-gap': `${Math.max(3, Math.min(5, keyUnit * 0.1))}px`,
+              '--section-gap': `${Math.max(7, Math.min(12, keyUnit * 0.25))}px`,
+              '--board-width': `${layout.boardUnits * keyUnit + layout.gapUnits * Math.max(3, Math.min(5, keyUnit * 0.1)) + 24}px`,
+            } as React.CSSProperties}
+          >
             {layout.functionRow.length > 0 && <><div className="function-row-layout"><KeyboardRow keys={layout.functionRow} counts={snapshot?.counts ?? {}} max={maxCount} locale={locale} /></div><div className="keyboard-gap" /></>}
             <div className={`keyboard-sections ${layout.numpadKeys.length ? '' : 'without-numpad'} ${layout.navRows.length ? '' : 'without-nav'}`}>
               <div className="alpha-section">{layout.alphaRows.map((row, index) => <KeyboardRow key={index} keys={row} counts={snapshot?.counts ?? {}} max={maxCount} locale={locale} />)}</div>
@@ -205,14 +230,42 @@ function KeyboardRow({ keys, counts, max, className = '', locale = 'en' }: { key
 }
 
 function Keycap({ definition, count, max, grid = false, locale = 'en' }: { definition: KeyDefinition; count: number; max: number; grid?: boolean; locale?: Locale }) {
+  const [pressed, setPressed] = useState(false)
+  const releaseTimer = useRef<number | null>(null)
   const level = heatLevel(count, max)
   const style = grid
     ? { gridRow: `${definition.row} / span ${definition.rowSpan ?? 1}`, gridColumn: `${definition.column} / span ${definition.columnSpan ?? 1}` }
     : { '--width': definition.width ?? 1, '--spacer': definition.spacer ?? 0 }
   const label = formatKeyLabel(definition.id, locale)
   const countText = t('presses', locale).replace('{count}', count.toLocaleString())
+  const press = () => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    if (releaseTimer.current !== null) window.clearTimeout(releaseTimer.current)
+    setPressed(true)
+    releaseTimer.current = window.setTimeout(() => { setPressed(false); releaseTimer.current = null }, 130)
+  }
+  const release = () => {
+    if (releaseTimer.current !== null) window.clearTimeout(releaseTimer.current)
+    releaseTimer.current = null
+    setPressed(false)
+  }
+  useEffect(() => () => { if (releaseTimer.current !== null) window.clearTimeout(releaseTimer.current) }, [])
   return (
-    <div tabIndex={definition.id === 'Escape' ? 0 : -1} className={`key level-${level} ${count > 0 ? 'has-count' : ''} ${level >= 3 ? 'strong-heat' : ''}`} data-tooltip={`${definition.label || label} (${definition.id}): ${countText}`} aria-label={`${definition.label || label}, ${countText}`} style={style as React.CSSProperties}>
+    <div
+      tabIndex={definition.id === 'Escape' ? 0 : -1}
+      className={`key level-${level} ${count > 0 ? 'has-count' : ''} ${level >= 3 ? 'strong-heat' : ''} ${pressed ? 'is-pressing' : ''}`}
+      data-tooltip={`${definition.label || label} (${definition.id}): ${countText}`}
+      data-tooltip-pointer-only="true"
+      aria-label={`${definition.label || label}, ${countText}`}
+      onPointerDown={event => { if (event.button === 0) press() }}
+      onPointerUp={release}
+      onPointerCancel={release}
+      onPointerLeave={release}
+      onBlur={release}
+      onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); press() } }}
+      onKeyUp={event => { if (event.key === 'Enter' || event.key === ' ') release() }}
+      style={style as React.CSSProperties}
+    >
       <span>{definition.id === 'Backspace' ? 'Bksp' : definition.label || label}</span>
       {count > 0 && <small>{count > 999 ? `${(count / 1000).toFixed(1)}k` : count}</small>}
     </div>

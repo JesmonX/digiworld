@@ -1,6 +1,6 @@
 import { rovingDataKeyDown, PluginPage, PageToolbar, MetricGrid, Metric as MetricValue, EmptyState, Button, Input, Select, Textarea, Card, Dialog, Status } from '@digiworld/design-system/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Check, Clock3, Database, Gauge, HardDrive, PieChart, Plus, RefreshCw, Server, Settings2, Ticket, Trash2, X } from 'lucide-react'
+import { AlertTriangle, Check, Clock3, CreditCard, Database, Gauge, HardDrive, PieChart, Plus, RefreshCw, Server, Settings2, Ticket, Trash2, X } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import { cacheRateScale, calendarCells, formatTokens, heatLevel, weeklyModelCategories, weeklyUsage, type Metric, type UsageDay, type WeeklyUsagePoint } from './heatmap'
 import { t, type Locale } from './i18n'
@@ -68,6 +68,11 @@ interface CodexResetCreditsSummary {
   availableCount: number
   credits?: CodexResetCredit[] | null
 }
+interface CodexQuotaCredits {
+  balance?: string | null
+  hasCredits: boolean
+  unlimited: boolean
+}
 interface CodexQuotaSnapshot {
   status: 'ready' | 'stale' | 'unavailable' | 'unconfigured'
   sourceId: string | null
@@ -75,6 +80,7 @@ interface CodexQuotaSnapshot {
   fetchedAt: string | null
   planType: string | null
   windows: QuotaWindow[]
+  credits?: CodexQuotaCredits | null
   resetCredits?: CodexResetCreditsSummary | null
   error: string | null
 }
@@ -550,6 +556,9 @@ function QuotaCard({ quota, loading, configured, locale = 'en', onRefresh, onCon
   const resetSummary = quota?.resetCredits
   const availableResets = resetSummary?.availableCount ?? 0
   const credits = (resetSummary?.credits ?? []).filter(credit => credit.status !== 'redeemed')
+  const balance = quota?.credits?.unlimited
+    ? t('unlimited', locale)
+    : quota?.credits?.balance ?? t('unavailable', locale)
   return <Card className={`quota-card ${quota?.status ?? ''}`}>
     <div className="panel-heading"><div><h2>{t('codexQuota', locale)}</h2><p>{quota?.sourceLabel ?? (locale === 'zh' ? '指定账号设备' : 'Designated Device')}{quota?.planType ? ` · ${quota.planType}` : ''}</p></div><Button className="panel-action" title={locale === 'zh' ? '刷新 Codex 限额' : 'Refresh Codex Quota'} disabled={loading || !configured} onClick={onRefresh}><RefreshCw className={loading ? 'spin' : ''} /></Button></div>
     {!configured || quota?.status === 'unconfigured' ? <div className="quota-empty"><Gauge /><span>{locale === 'zh' ? '尚未选择限额查询设备' : 'No device configured for quota queries'}</span><Button onClick={onConfigure}>{t('settings', locale)}</Button></div>
@@ -559,6 +568,13 @@ function QuotaCard({ quota, loading, configured, locale = 'en', onRefresh, onCon
             const remaining = 100 - Math.max(0, Math.min(100, window.usedPercent))
             return <div key={`${window.windowDurationMins ?? index}-${window.resetsAt ?? index}`} className="quota-window"><div><strong>{formatDuration(window.windowDurationMins, locale)}</strong><span>{locale === 'zh' ? `剩余 ${remaining}%` : `Remaining ${remaining}%`}</span></div><div className="quota-track"><i style={{ width: `${remaining}%` }} /></div><small><Clock3 />{formatReset(window.resetsAt, locale)}</small></div>
           })}</div>
+          <div className="quota-credits" data-has-credits={quota.credits?.hasCredits === true}>
+            <div className="quota-credits-icon"><CreditCard /></div>
+            <div>
+              <span>{t('creditsBalance', locale)}</span>
+              <strong>{balance}</strong>
+            </div>
+          </div>
           <div className="quota-resets">
             <div className="quota-resets-header">
               <span className="quota-resets-title"><Ticket />{t('resetCards', locale)}</span>

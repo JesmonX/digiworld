@@ -192,6 +192,17 @@ pub struct CodexQuotaWindow {
     pub resets_at: Option<i64>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexQuotaCredits {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub balance: Option<String>,
+    #[serde(default)]
+    pub has_credits: bool,
+    #[serde(default)]
+    pub unlimited: bool,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CodexQuotaSnapshot {
@@ -201,6 +212,8 @@ pub struct CodexQuotaSnapshot {
     pub fetched_at: Option<String>,
     pub plan_type: Option<String>,
     pub windows: Vec<CodexQuotaWindow>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credits: Option<CodexQuotaCredits>,
     #[serde(default)]
     pub reset_credits: Option<CodexResetCreditsSummary>,
     pub error: Option<String>,
@@ -215,6 +228,7 @@ impl CodexQuotaSnapshot {
             fetched_at: None,
             plan_type: None,
             windows: Vec::new(),
+            credits: None,
             reset_credits: None,
             error: None,
         }
@@ -228,6 +242,7 @@ impl CodexQuotaSnapshot {
             fetched_at: None,
             plan_type: None,
             windows: Vec::new(),
+            credits: None,
             reset_credits: None,
             error: Some(error),
         }

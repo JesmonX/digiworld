@@ -69,6 +69,12 @@ button svg { width: 14px; height: 14px; }
 .quota-track i { display: block; height: 100%; border-radius: inherit; background: var(--dw-accent-secondary); }
 .quota-window small { display: flex; align-items: center; gap: 4px; color: var(--dw-text-muted); font-size: var(--type-caption); }
 .quota-window small svg { width: 11px; height: 11px; }
+.quota-credits { display: flex; align-items: center; gap: 10px; margin-top: 13px; padding: 10px; border: 1px solid color-mix(in srgb, var(--dw-accent) 24%, var(--dw-border)); border-radius: var(--dw-radius-md); background: var(--dw-accent-soft); }
+.quota-credits-icon { display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 auto; border-radius: var(--dw-radius-sm); color: var(--dw-accent-strong); background: color-mix(in srgb, var(--dw-accent) 15%, var(--dw-surface)); }
+.quota-credits-icon svg { width: 15px; height: 15px; }
+.quota-credits > div:last-child { display: grid; gap: 2px; min-width: 0; }
+.quota-credits span { color: var(--dw-text-muted); font-size: var(--type-caption); }
+.quota-credits strong { overflow-wrap: anywhere; color: var(--dw-text); font-size: var(--type-body); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
 .quota-resets { margin-top: 13px; padding-top: 9px; border-top: 1px solid var(--dw-border); display: flex; flex-direction: column; gap: 7px; }
 .quota-resets-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .quota-resets-title { display: inline-flex; align-items: center; gap: 5px; font-size: var(--type-caption); font-weight: var(--weight-medium); color: var(--dw-text); }

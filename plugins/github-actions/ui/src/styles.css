@@ -93,6 +93,14 @@ a:hover {
   font-size: var(--dw-type-caption);
 }
 
+.run-progress { display: grid; gap: 6px; margin: var(--dw-space-3) 0 0 34px; }
+.run-progress-head { display: flex; justify-content: space-between; gap: var(--dw-space-2); color: var(--dw-text-muted); font-size: var(--dw-type-caption); font-weight: var(--dw-weight-medium); }
+.run-progress-head strong { color: var(--dw-text); font-variant-numeric: tabular-nums; }
+.run-progress-track { height: 8px; overflow: hidden; border-radius: 999px; background: var(--dw-surface-subtle); }
+.run-progress-track > span { display: block; height: 100%; border-radius: inherit; background: var(--dw-accent-secondary); transition: width var(--dw-motion-normal) var(--dw-ease-out); }
+.run-progress > small { overflow: hidden; color: var(--dw-text-muted); font-size: var(--dw-type-caption); text-overflow: ellipsis; white-space: nowrap; }
+.run-details-toggle { margin: var(--dw-space-3) 0 0 34px; min-height: 32px; padding: 5px 10px; font-size: var(--dw-type-body-sm); }
+
 .jobs {
   display: grid;
   gap: var(--dw-space-1);
@@ -117,6 +125,27 @@ a:hover {
   font-size: var(--dw-type-caption);
   font-weight: var(--dw-weight-medium);
 }
+
+.jobs-detail { display: grid; gap: var(--dw-space-2); margin: var(--dw-space-3) 0 0 34px; padding-left: var(--dw-space-3); border-left: 2px solid color-mix(in srgb, var(--dw-accent) 24%, transparent); }
+.job-detail { overflow: hidden; border: 1px solid var(--dw-material-border); border-radius: var(--dw-radius-md); background: var(--dw-material-inset); }
+.job-detail summary { display: flex; align-items: center; justify-content: space-between; gap: var(--dw-space-2); min-height: 42px; padding: 7px 10px; cursor: pointer; list-style: none; }
+.job-detail summary::-webkit-details-marker { display: none; }
+.job-detail summary::before { content: '›'; color: var(--dw-text-muted); font-size: var(--dw-type-title); transition: transform var(--dw-motion-fast); }
+.job-detail[open] summary::before { transform: rotate(90deg); }
+.job-summary-main { display: grid; flex: 1; min-width: 0; gap: 2px; }
+.job-summary-main strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--dw-type-body-sm); }
+.job-summary-main small, .job-meta, .no-steps { color: var(--dw-text-muted); font-size: var(--dw-type-caption); }
+.job-status { flex: 0 0 auto; color: var(--dw-text-muted); font-size: var(--dw-type-caption); font-weight: var(--dw-weight-semibold); }
+.job-status.success, .steps .success { color: var(--dw-success); }
+.job-status.failure, .job-status.timed_out, .job-status.action_required, .steps .failure, .steps .timed_out, .steps .action_required { color: var(--dw-danger); }
+.job-status.cancelled, .job-status.skipped, .job-status.neutral, .steps .cancelled, .steps .skipped, .steps .neutral { color: var(--dw-text-muted); }
+.job-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--dw-space-2); padding: 0 10px 7px 32px; }
+.steps { display: grid; gap: 3px; margin: 0; padding: 0 10px 10px 32px; list-style: none; }
+.steps li { display: flex; align-items: center; justify-content: space-between; gap: var(--dw-space-2); min-width: 0; padding: 6px 8px; border-radius: var(--dw-radius-sm); background: var(--dw-material-card); color: var(--dw-text); }
+.steps li > span { display: grid; min-width: 0; gap: 2px; }
+.steps li strong { overflow: hidden; font-size: var(--dw-type-body-sm); font-weight: var(--dw-weight-medium); text-overflow: ellipsis; white-space: nowrap; }
+.steps li small, .steps li time { color: var(--dw-text-muted); font-size: var(--dw-type-caption); }
+.job-detail-status { margin-top: var(--dw-space-3) !important; }
 
 .settings {
   width: min(620px, calc(100vw - 40px));
@@ -172,7 +201,7 @@ a:hover {
   .run-head { flex-wrap: wrap; }
   .run-head > div { flex-basis: calc(100% - 44px); }
   .run-status { margin-left: 34px; }
-  .run-meta, .jobs { margin-left: 0; }
+  .run-meta, .jobs, .run-progress, .run-details-toggle, .jobs-detail { margin-left: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) { .spin { animation-duration: .01ms; } }

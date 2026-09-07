@@ -157,6 +157,8 @@ describe('token usage layout', () => {
     const quotaWindowText = container.querySelector<HTMLElement>('.quota-window span')!.textContent
     expect(quotaWindowText).toBe('剩余 68%')
     expect(quotaWindowText).not.toContain('已用')
+    expect(container.querySelector('.quota-credits')?.textContent).toContain('不可用')
+    expect(container.querySelector('.quota-credits')?.getAttribute('data-has-credits')).toBe('false')
 
     const quotaFill = container.querySelector<HTMLElement>('.quota-track i')!
     expect(quotaFill.style.width).toBe('68%')

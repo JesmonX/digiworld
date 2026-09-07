@@ -14,6 +14,7 @@ type Config = {
   interfaces: string[]
   showCpu: boolean
   showGpu: boolean
+  showGpuUtilization?: boolean
   showTraffic: boolean
   showDiskDevice?: boolean
   showGpuLabels?: boolean
@@ -68,6 +69,11 @@ type Device = {
 
 type LayoutMode = 'auto' | 'compact' | 'double' | 'single'
 
+const normalizeConfig = (config: Config): Config => ({
+  ...config,
+  showGpuUtilization: config.showGpuUtilization ?? true,
+})
+
 const previous = new Map<string, { at: number; rx: number; tx: number }>()
 const size = (v: number) => `${(v / 1024 ** 3).toFixed(1)} GB`
 const rate = (v: number) => v < 1024 ? `${v.toFixed(0)} B/s` : v < 1024 ** 2 ? `${(v / 1024).toFixed(1)} KB/s` : `${(v / 1024 ** 2).toFixed(1)} MB/s`
@@ -120,9 +126,11 @@ export default function App() {
       if (sampleGenerationRef.current !== currentGen) return
 
       setDevices(sampleRes.devices.map(d => {
-        if (!d.network || !d.timestamp) return d
+        const selection = normalizeConfig(d.selection)
+        if (!d.network || !d.timestamp) return { ...d, selection }
         return {
           ...d,
+          selection,
           network: d.network.map(n => {
             const key = `${d.id}:${n.name}`
             const p = previous.get(key)
@@ -149,8 +157,9 @@ export default function App() {
     setBusy(true)
     try {
       const s = await bridge.request<{ devices: Config[] }>('servers.settings.get')
-      setConfigs(s.devices)
-      await refreshSamples(s.devices)
+      const normalized = s.devices.map(normalizeConfig)
+      setConfigs(normalized)
+      await refreshSamples(normalized)
     } catch (e) {
       setError(String(e))
     } finally {
@@ -195,6 +204,7 @@ export default function App() {
     setDraft(c ? {
       showDiskDevice: c.showDiskDevice ?? true,
       showGpuLabels: c.showGpuLabels ?? false,
+      showGpuUtilization: c.showGpuUtilization ?? true,
       showGpuPower: c.showGpuPower ?? false,
       showGpuTemperature: c.showGpuTemperature ?? true,
       gpuMemoryDisplay: c.gpuMemoryDisplay ?? 'both',
@@ -207,6 +217,7 @@ export default function App() {
       interfaces: [],
       showCpu: true,
       showGpu: true,
+      showGpuUtilization: true,
       showTraffic: true,
       showDiskDevice: true,
       showGpuLabels: false,
@@ -382,7 +393,7 @@ export default function App() {
                                 ? memoryValue
                                 : `${memoryValue} (${memoryPercent}%)`
                             const details = [
-                              d.selection.showGpuLabels ? `${t('gpuUtil', locale)}: ${g.utilization}%` : `${g.utilization}%`,
+                              d.selection.showGpuUtilization !== false ? (d.selection.showGpuLabels ? `${t('gpuUtil', locale)}: ${g.utilization}%` : `${g.utilization}%`) : null,
                               d.selection.showGpuLabels ? `${t('gpuVram', locale)}: ${memoryDisplay}` : memoryDisplay,
                               d.selection.showGpuTemperature !== false && g.temperatureC != null ? (d.selection.showGpuLabels ? `${t('gpuTemp', locale)}: ${g.temperatureC}°C` : `${g.temperatureC}°C`) : null,
                               (d.selection.showGpuPower && g.powerDrawW != null) ? (d.selection.showGpuLabels ? `${t('gpuPower', locale)}: ${Math.round(g.powerDrawW)}W` : `${Math.round(g.powerDrawW)}W`) : null,
@@ -393,7 +404,7 @@ export default function App() {
                                 icon={<Gauge size={15} />}
                                 title={`GPU ${g.index} · ${cleanName}`}
                                 value={details}
-                                percent={g.utilization}
+                                percent={memoryPercent}
                                 showPercent={false}
                               />
                             )
@@ -476,6 +487,14 @@ export default function App() {
             ))}
           </div>
           <div className="toggles sub-toggles">
+            <label>
+              <input
+                type="checkbox"
+                checked={draft.showGpuUtilization !== false}
+                onChange={e => setDraft({ ...draft, showGpuUtilization: e.target.checked })}
+              />
+              {t('showGpuUtilization', locale)}
+            </label>
             <label>
               <input
                 type="checkbox"

@@ -35,6 +35,17 @@ export const DICTIONARY = {
   timed_out: { en: 'Timed out', zh: '超时' },
   action_required: { en: 'Action required', zh: '需要操作' },
   unknown: { en: 'Unknown', zh: '状态未知' },
+  progress: { en: 'Progress', zh: '流程进度' },
+  currentStep: { en: 'Running: {step}', zh: '当前步骤：{step}' },
+  waitingForStep: { en: 'Waiting for a step', zh: '等待步骤开始' },
+  allStepsComplete: { en: 'All steps ended', zh: '所有步骤已结束' },
+  showJobs: { en: 'Show jobs and steps', zh: '展开 Job 与步骤' },
+  hideJobs: { en: 'Hide jobs and steps', zh: '收起 Job 与步骤' },
+  loadingJobs: { en: 'Loading job details...', zh: '正在加载 Job 详情…' },
+  jobsLoadFailed: { en: 'Job details unavailable: {error}', zh: 'Job 详情加载失败：{error}' },
+  noJobs: { en: 'No jobs returned for this run', zh: '该运行没有返回 Job' },
+  noSteps: { en: 'No steps returned for this job', zh: '该 Job 没有返回步骤' },
+  jobLink: { en: 'Open job', zh: '打开 Job' },
 } as const
 
 export function t(key: keyof typeof DICTIONARY, locale: Locale): string {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PluginPage, PageToolbar, SplitPane, Button, Input, Card, Status, Textarea, Select, Dialog } from '@digiworld/design-system/react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
-import { CalendarDays, CheckSquare, Plus, RefreshCw, Settings, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CalendarDays, Plus, RefreshCw, Settings, Trash2, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   DateKey,
   dateKey,
@@ -50,10 +50,14 @@ type Todo = {
   id: string
   title: string
   done: boolean
-  due?: string
+  due?: string | null
   createdAt: string
   updatedAt: string
 }
+
+type AgendaItem =
+  | { kind: 'event'; event: Event }
+  | { kind: 'todo'; todo: Todo }
 
 const blank = (cal = '', dk?: DateKey): Event => {
   const targetDay = dk || todayKey()
@@ -85,7 +89,6 @@ export default function App() {
   const [cals, setCals] = useState<Cal[]>([])
   const [events, setEvents] = useState<Event[]>([])
   const [todos, setTodos] = useState<Todo[]>([])
-  const [tab, setTab] = useState<'calendar' | 'todo'>('calendar')
   const [edit, setEdit] = useState<Event | null>(null)
   const [todoText, setTodoText] = useState('')
   const [todoDue, setTodoDue] = useState('')
@@ -120,12 +123,18 @@ export default function App() {
     const t = todayKey()
     setViewYear(Number(t.slice(0, 4)))
     setViewMonth(Number(t.slice(5, 7)))
-    setSelectedDate(t)
+    selectDate(t)
   }
 
   const createEventForDate = (dk: DateKey) => {
     setSelectedDate(dk)
+    setTodoDue(dk)
     setEdit(blank(cals[0]?.id, dk))
+  }
+
+  const selectDate = (dk: DateKey) => {
+    setSelectedDate(dk)
+    setTodoDue(dk)
   }
 
   const load = async (sync = false) => {
@@ -182,20 +191,50 @@ export default function App() {
     return m
   }, [events])
 
+  const todoMap = useMemo(() => {
+    const m = new Map<DateKey, Todo[]>()
+    for (const todo of todos) {
+      if (!todo.due) continue
+      const list = m.get(todo.due) || []
+      list.push(todo)
+      m.set(todo.due, list)
+    }
+    return m
+  }, [todos])
+
+  const agendaMap = useMemo(() => {
+    const m = new Map<DateKey, AgendaItem[]>()
+    for (const [day, list] of eventMap) m.set(day, list.map(event => ({ kind: 'event' as const, event })))
+    for (const [day, list] of todoMap) {
+      const existing = m.get(day) || []
+      m.set(day, [...existing, ...list.map(todo => ({ kind: 'todo' as const, todo }))])
+    }
+    for (const list of m.values()) {
+      list.sort((left, right) => {
+        const leftKey = left.kind === 'event' ? left.event.start : `${left.todo.due}T23:59`
+        const rightKey = right.kind === 'event' ? right.event.start : `${right.todo.due}T23:59`
+        return leftKey.localeCompare(rightKey)
+      })
+    }
+    return m
+  }, [eventMap, todoMap])
+
+  const unscheduledTodos = useMemo(() => todos.filter(todo => !todo.due), [todos])
+
   const upcomingDays = useMemo(() => {
     const currentDay = todayKey()
-    return [...eventMap.entries()]
-      .filter(([d]) => d >= currentDay)
+    return [...agendaMap.entries()]
+      .filter(([day, list]) => day >= currentDay || list.some(item => item.kind === 'todo' && item.todo.due != null && item.todo.due < currentDay))
       .sort((a, b) => a[0].localeCompare(b[0]))
-  }, [eventMap])
+  }, [agendaMap])
 
   const displayDays = useMemo(() => {
     if (selectedDate) {
-      const list = eventMap.get(selectedDate)
-      return list && list.length > 0 ? [[selectedDate, list] as [DateKey, Event[]]] : []
+      const list = agendaMap.get(selectedDate)
+      return list && list.length > 0 ? [[selectedDate, list] as [DateKey, AgendaItem[]]] : []
     }
     return upcomingDays
-  }, [eventMap, selectedDate, upcomingDays])
+  }, [agendaMap, selectedDate, upcomingDays])
 
   const connect = async () => {
     setBusy(true)
@@ -249,7 +288,7 @@ export default function App() {
   const saveTodo = async () => {
     if (!todoText.trim()) return
     setBusy(true); setError('')
-    try { await bridge.request('todo.save', { todo: { id: '', title: todoText, done: false, due: todoDue || null, createdAt: '', updatedAt: '' } }); setTodoText(''); setTodoDue(''); await load() }
+    try { await bridge.request('todo.save', { todo: { id: '', title: todoText, done: false, due: todoDue || null, createdAt: '', updatedAt: '' } }); setTodoText(''); setTodoDue(selectedDate ?? ''); await load() }
     catch (reason) { setError(String(reason)) } finally { setBusy(false) }
   }
 
@@ -294,14 +333,7 @@ export default function App() {
   return (
     <PluginPage>
       <PageToolbar className="">
-        <div className="tabs">
-          <Button aria-pressed={tab === 'calendar'} onClick={() => setTab('calendar')}>
-            <CalendarDays size={15} />{t('calendarTab', locale)}
-          </Button>
-          <Button aria-pressed={tab === 'todo'} onClick={() => setTab('todo')}>
-            <CheckSquare size={15} />{t('todoTab', locale)}
-          </Button>
-        </div>
+        <div className="calendar-toolbar-title"><CalendarDays size={17} /><strong>{t('calendarTab', locale)}</strong></div>
         <Button onClick={() => void load(true)} disabled={busy}>
           <RefreshCw size={15} />{t('sync', locale)}
         </Button>
@@ -312,8 +344,7 @@ export default function App() {
 
       {error && <Status tone="error">{error}</Status>}
 
-      {tab === 'calendar' ? (
-        <SplitPane aside={<div className="calendar-sidebar">
+      <SplitPane aside={<div className="calendar-sidebar">
             <Card className="month-card">
               <header className="month-header">
                 <h3>{formatDisplayMonth(viewYear, viewMonth, locale)}</h3>
@@ -334,23 +365,22 @@ export default function App() {
               <div className="calendar-grid" role="grid" aria-label={t('monthCalendarAria', locale)}>
                 {monthDays(viewYear, viewMonth).map(cell => {
                   const dayEvents = eventMap.get(cell.key) || []
-                  const dotCount = Math.min(3, dayEvents.length)
+                  const dayTodos = todoMap.get(cell.key) || []
                   const isSelected = selectedDate === cell.key
                   return (
                     <button
                       type="button"
                       key={cell.key}
                       className={`calendar-cell ${cell.inMonth ? '' : 'other-month'} ${cell.isToday ? 'is-today' : ''} ${isSelected ? 'is-selected' : ''}`}
-                      onClick={() => setSelectedDate(cell.key)}
+                      onClick={() => selectDate(cell.key)}
                       onDoubleClick={() => createEventForDate(cell.key)}
-                      aria-label={`${cell.key}${dayEvents.length ? ` (${dayEvents.length})` : ''}`}
+                      aria-label={`${cell.key}${dayEvents.length ? ` · ${dayEvents.length} ${t('eventMarker', locale)}` : ''}${dayTodos.length ? ` · ${dayTodos.length} ${t('todoMarker', locale)}` : ''}`}
                       aria-selected={isSelected}
                     >
                       <span className="cell-day">{cell.dayNum}</span>
                       <span className="cell-dots">
-                        {Array.from({ length: dotCount }).map((_, i) => (
-                          <span key={i} className="event-dot" />
-                        ))}
+                        {dayEvents.length > 0 && <span className="event-dot" title={t('eventMarker', locale)} />}
+                        {dayTodos.length > 0 && <span className="todo-dot" title={t('todoMarker', locale)} />}
                       </span>
                     </button>
                   )
@@ -360,7 +390,7 @@ export default function App() {
 
             <div className="calendar-meta-card">
               <div className="meta-head">
-                <small>{t('eventsCount', locale).replace('{events}', String(events.length)).replace('{cals}', String(cals.length))}</small>
+                <small>{t('eventsCount', locale).replace('{events}', String(events.length)).replace('{todos}', String(todos.length)).replace('{cals}', String(cals.length))}</small>
               </div>
               <div className="calendar-picker">
                 {cals.map(c => (
@@ -380,11 +410,11 @@ export default function App() {
             <header className="agenda-header">
               <div>
                 <strong>{selectedDate ? `${formatDisplayDate(selectedDate, locale)}${selectedDate === today ? ` (${t('todayLabel', locale)})` : ''}` : t('upcomingEvents', locale)}</strong>
-                <small>{t('totalEventsCount', locale).replace('{count}', String(displayDays.reduce((acc, [, list]) => acc + list.length, 0)))}</small>
+                <small>{t('totalEventsCount', locale).replace('{count}', String(displayDays.reduce((acc, [, list]) => acc + list.length, 0) + (!selectedDate ? unscheduledTodos.length : 0)))}</small>
               </div>
               <div className="agenda-actions">
                 {selectedDate && (
-                  <Button onClick={() => setSelectedDate(null)}>
+                  <Button onClick={() => { setSelectedDate(null); setTodoDue('') }}>
                     {t('viewAllUpcoming', locale)}
                   </Button>
                 )}
@@ -398,53 +428,65 @@ export default function App() {
               </div>
             </header>
 
+            <Card className="todo-add">
+              <Input
+                value={todoText}
+                onChange={e => setTodoText(e.target.value)}
+                placeholder={t('addTodoPlaceholder', locale)}
+                onKeyDown={e => { if (e.key === 'Enter') void saveTodo() }}
+              />
+              <Input type="date" aria-label={t('dueDateAria', locale)} value={todoDue} onChange={e => setTodoDue(e.target.value)} />
+              <Button variant="primary" aria-label={t('addTodo', locale)} onClick={() => void saveTodo()}><Plus size={15} /></Button>
+            </Card>
+
             <section className="agenda">
-              {displayDays.length ? (
-                displayDays.map(([day, list]) => (
-                  <Card key={day} className="agenda-day-card">
-                    <time>{formatDisplayDate(day, locale)}</time>
-                    <div className="agenda-day-events">
-                      {list.map(e => (
-                        <Button key={`${e.href}-${e.id}`} className="event" onClick={() => setEdit(e)}>
-                          <span>
-                            <strong>{e.title || t('untitled', locale)}</strong>
-                            <small>{e.allDay ? t('allDay', locale) : formatTime(e.start, locale)}{e.location ? ` · ${e.location}` : ''}</small>
-                          </span>
-                          {e.recurring && <small>{t('recurring', locale)}</small>}
-                        </Button>
-                      ))}
-                    </div>
-                  </Card>
-                ))
-              ) : (
+              {displayDays.map(([day, list]) => (
+                <Card key={day} className="agenda-day-card">
+                  <time>{formatDisplayDate(day, locale)}</time>
+                  <div className="agenda-day-events">
+                    {list.map(item => item.kind === 'event' ? (
+                      <Button key={`event-${item.event.href}-${item.event.id}`} className="event agenda-item" onClick={() => setEdit(item.event)}>
+                        <span>
+                          <strong>{item.event.title || t('untitled', locale)}</strong>
+                          <small>{item.event.allDay ? t('allDay', locale) : formatTime(item.event.start, locale)}{item.event.location ? ` · ${item.event.location}` : ''}</small>
+                        </span>
+                        <small className="item-kind">{item.event.recurring ? t('recurring', locale) : t('eventMarker', locale)}</small>
+                      </Button>
+                    ) : (
+                      <div key={`todo-${item.todo.id}`} className={`todo-item agenda-item ${item.todo.done ? 'done' : ''}`}>
+                        <input type="checkbox" aria-label={item.todo.title} checked={item.todo.done} onChange={() => void toggle(item.todo)} />
+                        <span>
+                          <strong>{item.todo.title}</strong>
+                          <small>{t('todoMarker', locale)}{item.todo.due ? ` · ${t('dueLabel', locale).replace('{date}', item.todo.due)}` : ''}</small>
+                        </span>
+                        <Button aria-label={`${t('deleteTodo', locale)}: ${item.todo.title}`} onClick={() => void removeTodo(item.todo.id)}><Trash2 size={15} /></Button>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              ))}
+              {!selectedDate && unscheduledTodos.length > 0 && (
+                <Card className="agenda-day-card agenda-unscheduled">
+                  <time>{t('unscheduled', locale)}</time>
+                  <div className="agenda-day-events">
+                    {unscheduledTodos.map(item => (
+                      <div key={item.id} className={`todo-item agenda-item ${item.done ? 'done' : ''}`}>
+                        <input type="checkbox" aria-label={item.title} checked={item.done} onChange={() => void toggle(item)} />
+                        <span><strong>{item.title}</strong><small>{t('todoMarker', locale)}</small></span>
+                        <Button aria-label={`${t('deleteTodo', locale)}: ${item.title}`} onClick={() => void removeTodo(item.id)}><Trash2 size={15} /></Button>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+              {!displayDays.length && (selectedDate || unscheduledTodos.length === 0) && (
                 <Status>
-                  {selectedDate ? t('noEventsOnDate', locale).replace('{date}', formatDisplayDate(selectedDate, locale)) : t('noUpcomingEvents', locale)}
+                  {selectedDate ? t('noItemsOnDate', locale).replace('{date}', formatDisplayDate(selectedDate, locale)) : t('noUpcomingEvents', locale)}
                 </Status>
               )}
             </section>
           </div>
         </SplitPane>
-      ) : (
-        <section className="todo">
-          <Card className="todo-add">
-            <Input
-              value={todoText}
-              onChange={e => setTodoText(e.target.value)}
-              placeholder={t('addTodoPlaceholder', locale)}
-              onKeyDown={e => { if (e.key === 'Enter') void saveTodo() }}
-            />
-            <Input type="date" aria-label={t('dueDateAria', locale)} value={todoDue} onChange={e => setTodoDue(e.target.value)} />
-            <Button variant="primary" onClick={() => void saveTodo()}><Plus size={15} /></Button>
-          </Card>
-          {todos.map(tItem => (
-            <Card key={tItem.id} className={tItem.done ? 'done' : ''}>
-              <input type="checkbox" checked={tItem.done} onChange={() => void toggle(tItem)} />
-              <span>{tItem.title}{tItem.due && <small>{t('dueLabel', locale).replace('{date}', tItem.due)}</small>}</span>
-              <Button onClick={() => void removeTodo(tItem.id)}><Trash2 size={15} /></Button>
-            </Card>
-          ))}
-        </section>
-      )}
 
       {edit && (
         <Dialog open onClose={() => !busy && setEdit(null)} className="editor" aria-label={edit.href ? t('editEvent', locale) : t('newEventHeading', locale)}>

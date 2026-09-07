@@ -122,20 +122,36 @@ impl App {
                     continue;
                 }
                 let id = run["id"].as_u64().unwrap_or(0);
-                let jobs = if run["status"].as_str() == Some("completed") {
-                    json!({"value":{"jobs":[]}})
+                let jobs_loaded = run["status"].as_str() != Some("completed");
+                let jobs = if jobs_loaded {
+                    let path = jobs_path(&repo, id)?;
+                    workflow_jobs(&self.get(&path)?["value"])
                 } else {
-                    self.get(&format!(
-                        "/repos/{repo}/actions/runs/{id}/jobs?per_page=100"
-                    ))?
+                    json!([])
                 };
-                runs.push(json!({"id":id,"repository":repo,"name":run["name"],"title":run["display_title"],"branch":run["head_branch"],"sha":run["head_sha"],"status":run["status"],"conclusion":run["conclusion"],"event":run["event"],"attempt":run["run_attempt"],"createdAt":run["created_at"],"startedAt":run["run_started_at"],"updatedAt":run["updated_at"],"url":run["html_url"],"jobs":jobs["value"]["jobs"]}));
+                runs.push(json!({"id":id,"repository":repo,"name":run["name"],"title":run["display_title"],"branch":run["head_branch"],"sha":run["head_sha"],"status":run["status"],"conclusion":run["conclusion"],"event":run["event"],"attempt":run["run_attempt"],"createdAt":run["created_at"],"startedAt":run["run_started_at"],"updatedAt":run["updated_at"],"url":run["html_url"],"jobs":jobs,"jobsLoaded":jobs_loaded}));
             }
         }
         runs.sort_by(|a, b| b["createdAt"].as_str().cmp(&a["createdAt"].as_str()));
         Ok(json!({"login":login,"updatedAt":chrono_like_now(),"runs":runs}))
     }
+
+    fn run_jobs(&self, repository: &str, run_id: u64) -> Result<Value> {
+        let path = jobs_path(repository, run_id)?;
+        let data = self.get(&path)?;
+        Ok(json!({
+            "repository": repository,
+            "runId": run_id,
+            "jobs": workflow_jobs(&data["value"]),
+            "rateLimitRemaining": data["remaining"],
+        }))
+    }
 }
+
+fn workflow_jobs(value: &Value) -> Value {
+    value.get("jobs").cloned().unwrap_or_else(|| json!([]))
+}
+
 fn valid_repo(v: &str) -> Result<()> {
     let mut p = v.split('/');
     let good = |s: &str| {
@@ -148,6 +164,16 @@ fn valid_repo(v: &str) -> Result<()> {
         bail!("仓库必须使用 owner/repo 格式")
     }
     Ok(())
+}
+
+fn jobs_path(repository: &str, run_id: u64) -> Result<String> {
+    valid_repo(repository)?;
+    if run_id == 0 {
+        bail!("运行 ID 无效")
+    }
+    Ok(format!(
+        "/repos/{repository}/actions/runs/{run_id}/jobs?per_page=100"
+    ))
 }
 fn chrono_like_now() -> String {
     std::time::SystemTime::now()
@@ -217,6 +243,10 @@ fn handle(a: &App, m: &str, p: Value) -> Result<Value> {
             Ok(serde_json::to_value(s)?)
         }
         "git.runs.snapshot" => a.runs(),
+        "git.run.jobs" => a.run_jobs(
+            p["repository"].as_str().context("缺少 repository")?,
+            p["runId"].as_u64().context("缺少有效的 runId")?,
+        ),
         _ => bail!("unknown method: {m}"),
     }
 }
@@ -241,5 +271,46 @@ mod tests {
         assert!(valid_repo("openai/codex").is_ok());
         assert!(valid_repo("-o/ProxyCommand=x").is_err());
         assert!(valid_repo("owner/too/many").is_err());
+    }
+
+    #[test]
+    fn jobs_path_rejects_invalid_repository_parameters() {
+        assert_eq!(
+            jobs_path("openai/codex", 42).unwrap(),
+            "/repos/openai/codex/actions/runs/42/jobs?per_page=100"
+        );
+        assert!(jobs_path("owner/../../secret", 42).is_err());
+        assert!(jobs_path("owner/repo", 0).is_err());
+    }
+
+    #[test]
+    fn preserves_workflow_job_steps_times_and_links() {
+        let jobs = workflow_jobs(&json!({
+            "jobs": [{
+                "id": 7,
+                "status": "completed",
+                "conclusion": "failure",
+                "started_at": "2026-09-07T01:00:00Z",
+                "completed_at": "2026-09-07T01:05:00Z",
+                "html_url": "https://github.com/o/r/actions/runs/1/jobs/7",
+                "steps": [{
+                    "name": "Build",
+                    "status": "completed",
+                    "conclusion": "failure",
+                    "number": 3,
+                    "started_at": "2026-09-07T01:02:00Z",
+                    "completed_at": "2026-09-07T01:05:00Z"
+                }]
+            }]
+        }));
+        assert_eq!(jobs[0]["id"], 7);
+        assert_eq!(jobs[0]["steps"][0]["name"], "Build");
+        assert_eq!(jobs[0]["steps"][0]["conclusion"], "failure");
+        assert_eq!(jobs[0]["started_at"], "2026-09-07T01:00:00Z");
+        assert_eq!(jobs[0]["completed_at"], "2026-09-07T01:05:00Z");
+        assert_eq!(
+            jobs[0]["html_url"],
+            "https://github.com/o/r/actions/runs/1/jobs/7"
+        );
     }
 }
