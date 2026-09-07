@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import App from './App'
+import App, { formatCreditBalance } from './App'
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -23,6 +23,7 @@ const settings = {
   sshSources: [],
   autoRefreshIntervalSeconds: 300,
   codexQuota: { sourceId: 'local', shellPreset: 'auto', preCommand: '', refreshIntervalSeconds: null },
+  agyQuota: { sourceId: 'local', shellPreset: 'auto', preCommand: '', refreshIntervalSeconds: 60 },
 }
 
 const snapshot = {
@@ -81,6 +82,87 @@ const quota = {
   error: null,
 }
 
+const agyQuota = {
+  status: 'ready',
+  sourceId: 'local',
+  sourceLabel: '本机',
+  fetchedAt: '2026-09-03T06:00:00Z',
+  planType: 'Pro tier',
+  description: 'Gemini models and Claude/GPT models have separate quotas.',
+  groups: [
+    {
+      name: 'Gemini Models',
+      description: 'Gemini 2.5 Pro & Flash',
+      buckets: [
+        {
+          id: 'gemini-5h',
+          name: 'Gemini 5h Limit',
+          window: '5h',
+          windowDurationMins: 300,
+          usedPercent: 15,
+          remainingPercent: 85,
+          remainingFraction: 0.85,
+          resetTime: '2026-09-03T11:00:00Z',
+          resetsAt: 1788433200,
+        },
+        {
+          id: 'gemini-weekly',
+          name: 'Gemini Weekly Limit',
+          window: 'weekly',
+          windowDurationMins: 10080,
+          usedPercent: 63,
+          remainingPercent: 37,
+          remainingFraction: 0.37,
+          resetTime: '2026-09-10T00:00:00Z',
+          resetsAt: 1789000000,
+        },
+      ],
+    },
+    {
+      name: 'Claude and GPT models',
+      description: 'Claude and GPT models share a weekly quota.',
+      buckets: [
+        {
+          id: 'claude-weekly',
+          name: 'Claude and GPT Weekly Limit',
+          window: 'weekly',
+          windowDurationMins: 10080,
+          usedPercent: 50,
+          remainingPercent: 50,
+          remainingFraction: 0.5,
+          resetTime: '2026-09-10T00:00:00Z',
+          resetsAt: 1789000000,
+        },
+      ],
+    },
+  ],
+  windows: [
+    {
+      id: 'gemini-5h',
+      name: 'Gemini 5h Limit',
+      window: '5h',
+      windowDurationMins: 300,
+      usedPercent: 15,
+      remainingPercent: 85,
+      remainingFraction: 0.85,
+      resetTime: '2026-09-03T11:00:00Z',
+      resetsAt: 1788433200,
+    },
+    {
+      id: 'gemini-weekly',
+      name: 'Gemini Weekly Limit',
+      window: 'weekly',
+      windowDurationMins: 10080,
+      usedPercent: 63,
+      remainingPercent: 37,
+      remainingFraction: 0.37,
+      resetTime: '2026-09-10T00:00:00Z',
+      resetsAt: 1789000000,
+    },
+  ],
+  error: null,
+}
+
 async function flush() {
   await new Promise(resolve => setTimeout(resolve, 0))
 }
@@ -103,6 +185,9 @@ describe('token usage layout', () => {
       if (method === 'usage.getSettings') return settings
       if (method === 'usage.snapshot') return snapshot
       if (method === 'usage.getCodexQuota') return quota
+      if (method === 'usage.getAgyQuota') return agyQuota
+      if (method === 'usage.testAgyQuota') return agyQuota
+      if (method === 'usage.testCodexQuota') return quota
       if (method === 'usage.saveFilters') return { ...settings, ...params }
       throw new Error(`unexpected method: ${method}`)
     })
@@ -235,6 +320,7 @@ describe('token usage layout', () => {
       if (method === 'usage.getSettings') return customSettings
       if (method === 'usage.snapshot') return snapshot
       if (method === 'usage.getCodexQuota') return quota
+      if (method === 'usage.getAgyQuota') return agyQuota
       if (method === 'usage.saveFilters') return { ...customSettings, ...params }
       throw new Error(`unexpected method: ${method}`)
     })
@@ -250,6 +336,160 @@ describe('token usage layout', () => {
     const activeChips = Array.from(filterBar.querySelectorAll('.filter-chip.active')).map(c => c.textContent?.trim())
     expect(activeChips).toContain('Claude Code')
     expect(activeChips).not.toContain('Codex')
+
+    await act(async () => root.unmount())
+  })
+
+  it('formats credit balance to keep exactly 1 decimal place', () => {
+    expect(formatCreditBalance('$12.50')).toBe('$12.5')
+    expect(formatCreditBalance('$12.5')).toBe('$12.5')
+    expect(formatCreditBalance('$12')).toBe('$12.0')
+    expect(formatCreditBalance('15.260 USD')).toBe('15.3 USD')
+    expect(formatCreditBalance('¥100.89')).toBe('¥100.9')
+    expect(formatCreditBalance(null, 'zh')).toBe('不可用')
+    expect(formatCreditBalance(null, 'en')).toBe('Unavailable')
+    expect(formatCreditBalance('不限', 'zh')).toBe('不限')
+  })
+
+  it('displays Codex balance formatted to 1 decimal place when credits exist', async () => {
+    const quotaWithBalance = {
+      ...quota,
+      credits: {
+        balance: '$12.50',
+        hasCredits: true,
+        unlimited: false,
+      },
+    }
+    mocks.request.mockImplementation(async (method: string, _params?: any) => {
+      if (method === 'usage.getSettings') return settings
+      if (method === 'usage.snapshot') return snapshot
+      if (method === 'usage.getCodexQuota') return quotaWithBalance
+      if (method === 'usage.getAgyQuota') return agyQuota
+      throw new Error(`unexpected method: ${method}`)
+    })
+
+    const root = createRoot(container)
+    await act(async () => {
+      root.render(<App />)
+      await flush()
+      await flush()
+    })
+
+    const balanceEl = container.querySelector('.quota-credits strong')
+    expect(balanceEl?.textContent).toBe('$12.5')
+    expect(balanceEl?.textContent).not.toBe('$12.50')
+
+    await act(async () => root.unmount())
+  })
+
+  it('switches between Codex and Antigravity quota cards via carousel paging', async () => {
+    const root = createRoot(container)
+    await act(async () => {
+      root.render(<App />)
+      await flush()
+      await flush()
+    })
+
+    // Initially only ONE quota card is displayed and it is Codex
+    const quotaCards = container.querySelectorAll('.quota-card')
+    expect(quotaCards).toHaveLength(1)
+    expect(container.querySelector('.quota-card h2')?.textContent).toBe('Codex 限额')
+    expect(container.querySelector('.quota-page-badge')?.textContent).toBe('1/2')
+    const dots = container.querySelectorAll('.quota-dot')
+    expect(dots).toHaveLength(2)
+    expect(dots[0]?.classList.contains('active')).toBe(true)
+    expect(dots[1]?.classList.contains('active')).toBe(false)
+
+    // Click next button to flip to Antigravity
+    const nextBtn = container.querySelector<HTMLButtonElement>('.quota-nav-btn[aria-label="下一个限额卡片"]')!
+    expect(nextBtn).not.toBeNull()
+    await act(async () => {
+      nextBtn.click()
+      await flush()
+    })
+
+    // Still only ONE quota card is displayed, now Antigravity
+    expect(container.querySelectorAll('.quota-card')).toHaveLength(1)
+    expect(container.querySelector('.quota-card h2')?.textContent).toBe('Antigravity 限额')
+    expect(container.querySelector('.quota-page-badge')?.textContent).toBe('2/2')
+    expect(dots[0]?.classList.contains('active')).toBe(false)
+    expect(dots[1]?.classList.contains('active')).toBe(true)
+
+    // Verify 5h and weekly limit bars in AGY card
+    const windows = container.querySelectorAll('.quota-window')
+    expect(windows).toHaveLength(2)
+    expect(windows[0]?.textContent).toContain('Gemini 5h Limit')
+    expect(windows[0]?.textContent).toContain('剩余 85%')
+    expect(windows[0]?.querySelector<HTMLElement>('.quota-track i')?.style.width).toBe('85%')
+    expect(windows[1]?.textContent).toContain('Gemini Weekly Limit')
+    expect(windows[1]?.textContent).toContain('剩余 37%')
+    expect(windows[1]?.querySelector<HTMLElement>('.quota-track i')?.style.width).toBe('37%')
+
+    // Verify model group selector
+    const groupPills = container.querySelectorAll('.quota-group-pill')
+    expect(groupPills).toHaveLength(2)
+    expect(groupPills[0]?.textContent).toBe('Gemini 模型')
+    expect(groupPills[1]?.textContent).toBe('Claude 与 GPT 模型')
+    expect(groupPills[0]?.classList.contains('active')).toBe(true)
+
+    // Click on Claude & GPT group pill
+    await act(async () => {
+      (groupPills[1] as HTMLButtonElement).click()
+      await flush()
+    })
+    expect(groupPills[1]?.classList.contains('active')).toBe(true)
+    const claudeWindows = container.querySelectorAll('.quota-window')
+    expect(claudeWindows).toHaveLength(1)
+    expect(claudeWindows[0]?.textContent).toContain('Claude and GPT Weekly Limit')
+    expect(claudeWindows[0]?.textContent).toContain('剩余 50%')
+
+    // Test refreshing AGY quota
+    mocks.request.mockClear()
+    const agyRefreshBtn = container.querySelector<HTMLButtonElement>('.quota-card .panel-action')!
+    await act(async () => {
+      agyRefreshBtn.click()
+      await flush()
+    })
+    expect(mocks.request).toHaveBeenCalledWith('usage.getAgyQuota', { force: true })
+
+    // Click on dot 0 to flip back to Codex
+    await act(async () => {
+      (dots[0] as HTMLButtonElement).click()
+      await flush()
+    })
+    expect(container.querySelector('.quota-card h2')?.textContent).toBe('Codex 限额')
+    expect(container.querySelector('.quota-page-badge')?.textContent).toBe('1/2')
+
+    await act(async () => root.unmount())
+  })
+
+  it('supports Antigravity quota settings and test query in settings dialog', async () => {
+    const root = createRoot(container)
+    await act(async () => {
+      root.render(<App />)
+      await flush()
+      await flush()
+    })
+
+    const settingsButton = Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('设置'))!
+    await act(async () => {
+      settingsButton.click()
+      await flush()
+    })
+
+    const agySection = container.querySelector('.agy-quota-settings')
+    expect(agySection).not.toBeNull()
+    expect(agySection?.textContent).toContain('Antigravity 限额查询')
+
+    // Click test AGY quota button
+    mocks.request.mockClear()
+    const testAgyBtn = Array.from(agySection!.querySelectorAll('button')).find(b => b.textContent?.includes('测试 Antigravity 限额'))!
+    expect(testAgyBtn).not.toBeNull()
+    await act(async () => {
+      testAgyBtn.click()
+      await flush()
+    })
+    expect(mocks.request).toHaveBeenCalledWith('usage.testAgyQuota', expect.anything())
 
     await act(async () => root.unmount())
   })

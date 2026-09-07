@@ -98,6 +98,8 @@ pub struct UsageSettings {
     #[serde(default)]
     pub codex_quota: CodexQuotaSettings,
     #[serde(default)]
+    pub agy_quota: AgyQuotaSettings,
+    #[serde(default)]
     pub selected_agents: Option<Vec<AgentKind>>,
     #[serde(default)]
     pub selected_sources: Option<Vec<String>>,
@@ -111,6 +113,7 @@ impl Default for UsageSettings {
             ssh_sources: Vec::new(),
             auto_refresh_interval_seconds: None,
             codex_quota: CodexQuotaSettings::default(),
+            agy_quota: AgyQuotaSettings::default(),
             selected_agents: None,
             selected_sources: None,
         }
@@ -141,6 +144,30 @@ pub struct CodexQuotaSettings {
 }
 
 impl Default for CodexQuotaSettings {
+    fn default() -> Self {
+        Self {
+            source_id: default_quota_source(),
+            shell_preset: ShellPreset::Auto,
+            pre_command: String::new(),
+            refresh_interval_seconds: default_quota_refresh_interval(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgyQuotaSettings {
+    #[serde(default = "default_quota_source")]
+    pub source_id: Option<String>,
+    #[serde(default)]
+    pub shell_preset: ShellPreset,
+    #[serde(default)]
+    pub pre_command: String,
+    #[serde(default = "default_quota_refresh_interval")]
+    pub refresh_interval_seconds: Option<u64>,
+}
+
+impl Default for AgyQuotaSettings {
     fn default() -> Self {
         Self {
             source_id: default_quota_source(),
@@ -244,6 +271,79 @@ impl CodexQuotaSnapshot {
             windows: Vec::new(),
             credits: None,
             reset_credits: None,
+            error: Some(error),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgyQuotaBucket {
+    pub id: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub window: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub window_duration_mins: Option<i64>,
+    pub used_percent: u32,
+    pub remaining_percent: u32,
+    pub remaining_fraction: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reset_time: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resets_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgyQuotaGroup {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub buckets: Vec<AgyQuotaBucket>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgyQuotaSnapshot {
+    pub status: String,
+    pub source_id: Option<String>,
+    pub source_label: Option<String>,
+    pub fetched_at: Option<String>,
+    pub plan_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub groups: Vec<AgyQuotaGroup>,
+    pub windows: Vec<AgyQuotaBucket>,
+    pub error: Option<String>,
+}
+
+impl AgyQuotaSnapshot {
+    pub fn unconfigured() -> Self {
+        Self {
+            status: "unconfigured".into(),
+            source_id: None,
+            source_label: None,
+            fetched_at: None,
+            plan_type: None,
+            description: None,
+            groups: Vec::new(),
+            windows: Vec::new(),
+            error: None,
+        }
+    }
+
+    pub fn unavailable(source_id: String, source_label: String, error: String) -> Self {
+        Self {
+            status: "unavailable".into(),
+            source_id: Some(source_id),
+            source_label: Some(source_label),
+            fetched_at: None,
+            plan_type: None,
+            description: None,
+            groups: Vec::new(),
+            windows: Vec::new(),
             error: Some(error),
         }
     }

@@ -90,6 +90,19 @@ export const DICTIONARY = {
   justNow: { en: 'Just now', zh: '刚刚' },
   unknownModel: { en: 'Unknown Model', zh: '未知模型' },
   otherModel: { en: 'Other', zh: '其他' },
+  agyQuota: { en: 'Antigravity Quota', zh: 'Antigravity 限额' },
+  agyQuotaSettings: { en: 'Antigravity Quota Query', zh: 'Antigravity 限额查询' },
+  agyQuotaSubtitle: { en: 'Queries weekly and 5-hour quota for Antigravity (agy) on the selected device', zh: '查询所选设备上 Antigravity (agy) 的每周和 5 小时限额' },
+  agyQuotaFailed: { en: 'Unable to query Antigravity quota', zh: '无法获取 Antigravity 限额' },
+  agyQuotaSharedDesc: { en: 'Weekly and 5-hour limits are shared across models in each group.', zh: '各模型组共享每周与 5 小时限额，短任务或选用高性价比模型可延长额度。' },
+  quotaTierInfo: { en: 'Quota & Tier Info', zh: '限额与等级说明' },
+  prevCard: { en: 'Previous quota card', zh: '上一个限额卡片' },
+  nextCard: { en: 'Next quota card', zh: '下一个限额卡片' },
+  quotaCardPagination: { en: 'Quota card pagination', zh: '限额卡片分页' },
+  geminiModels: { en: 'Gemini Models', zh: 'Gemini 模型' },
+  claudeGptModels: { en: 'Claude & GPT Models', zh: 'Claude 与 GPT 模型' },
+  planTier: { en: 'Plan Tier', zh: '账号计划' },
+  testAgyQuota: { en: 'Test Antigravity Quota', zh: '测试 Antigravity 限额' },
 } as const
 
 export function t(key: keyof typeof DICTIONARY, locale: Locale): string {

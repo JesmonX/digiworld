@@ -1,3 +1,4 @@
+mod agy_quota;
 mod database;
 mod engine;
 mod model;
@@ -102,6 +103,19 @@ fn handle(engine: &UsageEngine, method: &str, params: Value) -> Result<Value> {
                 serde_json::from_value(params.get("settings").cloned().unwrap_or(params))
                     .context("invalid usage settings")?;
             Ok(serde_json::to_value(engine.test_codex_quota(settings)?)?)
+        }
+        "usage.getAgyQuota" => {
+            let force = params
+                .get("force")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            Ok(serde_json::to_value(engine.agy_quota(force)?)?)
+        }
+        "usage.testAgyQuota" => {
+            let settings: UsageSettings =
+                serde_json::from_value(params.get("settings").cloned().unwrap_or(params))
+                    .context("invalid usage settings")?;
+            Ok(serde_json::to_value(engine.test_agy_quota(settings)?)?)
         }
         "usage.snapshot" => {
             let request: SnapshotRequest =

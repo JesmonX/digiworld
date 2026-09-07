@@ -1,6 +1,6 @@
 import { rovingDataKeyDown, PluginPage, PageToolbar, MetricGrid, Metric as MetricValue, EmptyState, Button, Input, Select, Textarea, Card, Dialog, Status } from '@digiworld/design-system/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Check, Clock3, CreditCard, Database, Gauge, HardDrive, PieChart, Plus, RefreshCw, Server, Settings2, Ticket, Trash2, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronLeft, ChevronRight, Clock3, CreditCard, Database, Gauge, HardDrive, PieChart, Plus, RefreshCw, Server, Settings2, Ticket, Trash2, X } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import { cacheRateScale, calendarCells, formatTokens, heatLevel, weeklyModelCategories, weeklyUsage, type Metric, type UsageDay, type WeeklyUsagePoint } from './heatmap'
 import { t, type Locale } from './i18n'
@@ -25,11 +25,18 @@ interface UsageSettings {
   sshSources: SshSource[]
   autoRefreshIntervalSeconds?: number | null
   codexQuota: CodexQuotaSettings
+  agyQuota: AgyQuotaSettings
   selectedAgents?: Agent[]
   selectedSources?: string[]
 }
 type ShellPreset = 'auto' | 'powershell' | 'zsh' | 'bash'
 interface CodexQuotaSettings {
+  sourceId: string | null
+  shellPreset: ShellPreset
+  preCommand: string
+  refreshIntervalSeconds: number | null
+}
+interface AgyQuotaSettings {
   sourceId: string | null
   shellPreset: ShellPreset
   preCommand: string
@@ -83,6 +90,50 @@ interface CodexQuotaSnapshot {
   credits?: CodexQuotaCredits | null
   resetCredits?: CodexResetCreditsSummary | null
   error: string | null
+}
+interface AgyQuotaBucket {
+  id: string
+  name: string
+  description?: string | null
+  window: string
+  windowDurationMins: number | null
+  usedPercent: number
+  remainingPercent: number
+  remainingFraction: number
+  resetTime?: string | null
+  resetsAt?: number | null
+}
+interface AgyQuotaGroup {
+  name: string
+  description?: string | null
+  buckets: AgyQuotaBucket[]
+}
+interface AgyQuotaSnapshot {
+  status: 'ready' | 'stale' | 'unavailable' | 'unconfigured'
+  sourceId: string | null
+  sourceLabel: string | null
+  fetchedAt: string | null
+  planType: string | null
+  description?: string | null
+  groups: AgyQuotaGroup[]
+  windows: AgyQuotaBucket[]
+  error: string | null
+}
+
+export function formatCreditBalance(balance: string | null | undefined, locale: Locale = 'en'): string {
+  if (!balance) return t('unavailable', locale)
+  const trimmed = balance.trim()
+  if (trimmed === t('unlimited', locale) || trimmed === t('unavailable', locale) || trimmed === '不可用' || trimmed === 'Unavailable' || trimmed === '不限' || trimmed === 'Unlimited') {
+    return trimmed
+  }
+  const match = trimmed.match(/^([^0-9.-]*)(-?\d+(?:\.\d+)?)(.*)$/)
+  if (!match || !match[2]) return trimmed
+  const prefix = match[1] ?? ''
+  const numStr = match[2]
+  const suffix = match[3] ?? ''
+  const num = parseFloat(numStr)
+  if (Number.isNaN(num)) return trimmed
+  return `${prefix}${num.toFixed(1)}${suffix}`
 }
 interface RefreshStatus {
   running: boolean
@@ -162,6 +213,9 @@ export default function App() {
   const [refresh, setRefresh] = useState<RefreshStatus>({ running: false, completed: 0, total: 0, errors: [] })
   const [quota, setQuota] = useState<CodexQuotaSnapshot | null>(null)
   const [quotaLoading, setQuotaLoading] = useState(false)
+  const [agyQuota, setAgyQuota] = useState<AgyQuotaSnapshot | null>(null)
+  const [agyQuotaLoading, setAgyQuotaLoading] = useState(false)
+  const [activeQuotaAgent, setActiveQuotaAgent] = useState<'codex' | 'agy'>('codex')
   const [error, setError] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
@@ -235,7 +289,7 @@ export default function App() {
   }, [watchRefresh])
 
   const loadQuota = useCallback(async (force = false) => {
-    const sourceId = settings?.codexQuota.sourceId ?? null
+    const sourceId = settings?.codexQuota?.sourceId ?? null
     setQuotaLoading(true)
     setQuota(current => current?.sourceId === sourceId ? current : null)
     try {
@@ -250,12 +304,31 @@ export default function App() {
     } finally {
       setQuotaLoading(false)
     }
-  }, [settings?.codexQuota.sourceId])
+  }, [settings?.codexQuota?.sourceId])
+
+  const loadAgyQuota = useCallback(async (force = false) => {
+    const sourceId = settings?.agyQuota?.sourceId ?? null
+    setAgyQuotaLoading(true)
+    setAgyQuota(current => current?.sourceId === sourceId ? current : null)
+    try {
+      const next = await bridge.request<AgyQuotaSnapshot>('usage.getAgyQuota', { force })
+      setAgyQuota(current => next.status === 'unavailable' && current?.sourceId === next.sourceId && (current.status === 'ready' || current.status === 'stale')
+        ? { ...current, status: 'stale', error: next.error }
+        : next)
+    } catch (reason) {
+      setAgyQuota(current => current?.sourceId === sourceId && (current.status === 'ready' || current.status === 'stale')
+        ? { ...current, status: 'stale', error: String(reason) }
+        : { status: 'unavailable', sourceId, sourceLabel: null, fetchedAt: null, planType: null, description: null, groups: [], windows: [], error: String(reason) })
+    } finally {
+      setAgyQuotaLoading(false)
+    }
+  }, [settings?.agyQuota?.sourceId])
 
   useEffect(() => {
     if (!settings) return
     void loadQuota()
-  }, [loadQuota, settings])
+    void loadAgyQuota()
+  }, [loadAgyQuota, loadQuota, settings])
 
   const autoRefreshRunningRef = useRef(false)
   const lastRefreshedAtRef = useRef<number>(Date.now())
@@ -270,12 +343,12 @@ export default function App() {
       if (!status.running) {
         await startRefresh()
       }
-      await loadQuota(true)
+      await Promise.allSettled([loadQuota(true), loadAgyQuota(true)])
       lastRefreshedAtRef.current = Date.now()
     } finally {
       autoRefreshRunningRef.current = false
     }
-  }, [loadQuota, startRefresh])
+  }, [loadAgyQuota, loadQuota, startRefresh])
 
   useEffect(() => {
     if (!autoRefreshInterval || autoRefreshInterval <= 0) return
@@ -300,11 +373,18 @@ export default function App() {
   }, [autoRefreshInterval, refreshAll])
 
   useEffect(() => {
-    const seconds = settings?.codexQuota.refreshIntervalSeconds
+    const seconds = settings?.codexQuota?.refreshIntervalSeconds
     if (!seconds) return
     const timer = window.setInterval(() => void loadQuota(), seconds * 1000)
     return () => window.clearInterval(timer)
-  }, [loadQuota, settings?.codexQuota.refreshIntervalSeconds])
+  }, [loadQuota, settings?.codexQuota?.refreshIntervalSeconds])
+
+  useEffect(() => {
+    const seconds = settings?.agyQuota?.refreshIntervalSeconds
+    if (!seconds) return
+    const timer = window.setInterval(() => void loadAgyQuota(), seconds * 1000)
+    return () => window.clearInterval(timer)
+  }, [loadAgyQuota, settings?.agyQuota?.refreshIntervalSeconds])
 
   const testSource = async (source: SshSource) => {
     setError(null)
@@ -371,7 +451,20 @@ export default function App() {
 
       <section className="insights-grid">
         <WeeklyChart points={weekly} locale={locale} />
-        <QuotaCard quota={quota} loading={quotaLoading} configured={Boolean(settings?.codexQuota.sourceId)} locale={locale} onRefresh={() => void loadQuota(true)} onConfigure={() => setSettingsOpen(true)} />
+        <QuotaCard
+          activeAgent={activeQuotaAgent}
+          onSwitchAgent={setActiveQuotaAgent}
+          codexQuota={quota}
+          codexLoading={quotaLoading}
+          codexConfigured={Boolean(settings?.codexQuota?.sourceId)}
+          agyQuota={agyQuota}
+          agyLoading={agyQuotaLoading}
+          agyConfigured={Boolean(settings?.agyQuota?.sourceId)}
+          locale={locale}
+          onRefreshCodex={() => void loadQuota(true)}
+          onRefreshAgy={() => void loadAgyQuota(true)}
+          onConfigure={() => setSettingsOpen(true)}
+        />
       </section>
 
       <section className="dw-card heatmap-card">
@@ -417,7 +510,8 @@ export default function App() {
         setSources(effectiveSources)
         setSettingsOpen(false)
         await loadSnapshot(saved, agents, effectiveSources)
-      }} onScan={testSource} onQuotaTest={async value => bridge.request<CodexQuotaSnapshot>('usage.testCodexQuota', { settings: value })} />}
+      }} onScan={testSource} onQuotaTest={async value => bridge.request<CodexQuotaSnapshot>('usage.testCodexQuota', { settings: value })}
+      onAgyQuotaTest={async value => bridge.request<AgyQuotaSnapshot>('usage.testAgyQuota', { settings: value })} />}
     </PluginPage>
   )
 }
@@ -551,56 +645,332 @@ function modelDisplayName(model: string, locale: Locale = 'en'): string {
   return model === 'unknown' ? t('unknownModel', locale) : model
 }
 
-function QuotaCard({ quota, loading, configured, locale = 'en', onRefresh, onConfigure }: { quota: CodexQuotaSnapshot | null; loading: boolean; configured: boolean; locale?: Locale; onRefresh(): void; onConfigure(): void }) {
-  const available = quota && (quota.status === 'ready' || quota.status === 'stale') && quota.windows.length > 0
-  const resetSummary = quota?.resetCredits
+interface QuotaCardProps {
+  quota?: CodexQuotaSnapshot | null
+  loading?: boolean
+  configured?: boolean
+  onRefresh?(): void
+
+  activeAgent?: 'codex' | 'agy'
+  onSwitchAgent?: (agent: 'codex' | 'agy') => void
+  codexQuota?: CodexQuotaSnapshot | null
+  codexLoading?: boolean
+  codexConfigured?: boolean
+  agyQuota?: AgyQuotaSnapshot | null
+  agyLoading?: boolean
+  agyConfigured?: boolean
+  locale?: Locale
+  onRefreshCodex?: () => void
+  onRefreshAgy?: () => void
+  onConfigure(): void
+}
+
+function QuotaCard(props: QuotaCardProps) {
+  const {
+    quota,
+    loading = false,
+    configured = true,
+    onRefresh,
+    activeAgent = 'codex',
+    onSwitchAgent,
+    codexQuota,
+    codexLoading,
+    codexConfigured,
+    agyQuota,
+    agyLoading = false,
+    agyConfigured = true,
+    locale = 'en',
+    onRefreshCodex,
+    onRefreshAgy,
+    onConfigure,
+  } = props
+
+  const [internalAgent, setInternalAgent] = useState<'codex' | 'agy'>('codex')
+  const effectiveAgent = onSwitchAgent ? activeAgent : internalAgent
+  const handleSwitch = (agent: 'codex' | 'agy') => {
+    if (onSwitchAgent) {
+      onSwitchAgent(agent)
+    } else {
+      setInternalAgent(agent)
+    }
+  }
+
+  const effectiveCodexQuota = codexQuota ?? quota ?? null
+  const effectiveCodexLoading = codexLoading ?? loading
+  const effectiveCodexConfigured = codexConfigured ?? configured
+  const effectiveCodexRefresh = onRefreshCodex ?? onRefresh ?? (() => {})
+
+  const [selectedAgyGroupIndex, setSelectedAgyGroupIndex] = useState(0)
+
+  const isCodex = effectiveAgent === 'codex'
+  const currentStatus = isCodex ? effectiveCodexQuota?.status : agyQuota?.status
+  const currentLoading = isCodex ? effectiveCodexLoading : agyLoading
+  const currentConfigured = isCodex ? effectiveCodexConfigured : agyConfigured
+  const currentSourceLabel = isCodex
+    ? (effectiveCodexQuota?.sourceLabel ?? (locale === 'zh' ? '指定账号设备' : 'Designated Device'))
+    : (agyQuota?.sourceLabel ?? (locale === 'zh' ? '指定账号设备' : 'Designated Device'))
+  const currentPlanType = isCodex ? effectiveCodexQuota?.planType : agyQuota?.planType
+  const currentFetchedAt = isCodex ? effectiveCodexQuota?.fetchedAt : agyQuota?.fetchedAt
+  const currentError = isCodex ? effectiveCodexQuota?.error : agyQuota?.error
+
+  const codexAvailable = effectiveCodexQuota && (effectiveCodexQuota.status === 'ready' || effectiveCodexQuota.status === 'stale') && effectiveCodexQuota.windows.length > 0
+  const resetSummary = effectiveCodexQuota?.resetCredits
   const availableResets = resetSummary?.availableCount ?? 0
   const credits = (resetSummary?.credits ?? []).filter(credit => credit.status !== 'redeemed')
-  const balance = quota?.credits?.unlimited
+  const codexBalance = effectiveCodexQuota?.credits?.unlimited
     ? t('unlimited', locale)
-    : quota?.credits?.balance ?? t('unavailable', locale)
-  return <Card className={`quota-card ${quota?.status ?? ''}`}>
-    <div className="panel-heading"><div><h2>{t('codexQuota', locale)}</h2><p>{quota?.sourceLabel ?? (locale === 'zh' ? '指定账号设备' : 'Designated Device')}{quota?.planType ? ` · ${quota.planType}` : ''}</p></div><Button className="panel-action" title={locale === 'zh' ? '刷新 Codex 限额' : 'Refresh Codex Quota'} disabled={loading || !configured} onClick={onRefresh}><RefreshCw className={loading ? 'spin' : ''} /></Button></div>
-    {!configured || quota?.status === 'unconfigured' ? <div className="quota-empty"><Gauge /><span>{locale === 'zh' ? '尚未选择限额查询设备' : 'No device configured for quota queries'}</span><Button onClick={onConfigure}>{t('settings', locale)}</Button></div>
-      : loading && !quota ? <div className="quota-empty"><RefreshCw className="spin" /><span>{locale === 'zh' ? '正在获取最新限额…' : 'Fetching latest quota...'}</span></div>
-        : available ? <>
-          <div className="quota-windows">{quota.windows.map((window, index) => {
-            const remaining = 100 - Math.max(0, Math.min(100, window.usedPercent))
-            return <div key={`${window.windowDurationMins ?? index}-${window.resetsAt ?? index}`} className="quota-window"><div><strong>{formatDuration(window.windowDurationMins, locale)}</strong><span>{locale === 'zh' ? `剩余 ${remaining}%` : `Remaining ${remaining}%`}</span></div><div className="quota-track"><i style={{ width: `${remaining}%` }} /></div><small><Clock3 />{formatReset(window.resetsAt, locale)}</small></div>
-          })}</div>
-          <div className="quota-credits" data-has-credits={quota.credits?.hasCredits === true}>
-            <div className="quota-credits-icon"><CreditCard /></div>
-            <div>
-              <span>{t('creditsBalance', locale)}</span>
-              <strong>{balance}</strong>
-            </div>
+    : formatCreditBalance(effectiveCodexQuota?.credits?.balance, locale)
+
+  const agyAvailable = agyQuota && (agyQuota.status === 'ready' || agyQuota.status === 'stale') && (agyQuota.windows.length > 0 || (agyQuota.groups && agyQuota.groups.length > 0))
+  const agyGroups = agyQuota?.groups ?? []
+  const activeGroup = agyGroups.length > 0 ? agyGroups[Math.min(selectedAgyGroupIndex, agyGroups.length - 1)] : null
+  const agyBuckets = activeGroup?.buckets?.length ? activeGroup.buckets : (agyQuota?.windows ?? [])
+
+  const handlePrev = () => handleSwitch(isCodex ? 'agy' : 'codex')
+  const handleNext = () => handleSwitch(isCodex ? 'agy' : 'codex')
+  const handleRefresh = () => {
+    if (isCodex) {
+      effectiveCodexRefresh()
+    } else {
+      onRefreshAgy?.()
+    }
+  }
+
+  return (
+    <Card className={`quota-card ${currentStatus ?? ''}`}>
+      <div className="panel-heading">
+        <div>
+          <h2>{isCodex ? t('codexQuota', locale) : t('agyQuota', locale)}</h2>
+          <p>{currentSourceLabel}{currentPlanType ? ` · ${currentPlanType}` : ''}</p>
+        </div>
+        <div className="quota-header-actions">
+          <div className="quota-carousel-nav" role="navigation" aria-label={t('quotaCardPagination', locale)}>
+            <button
+              type="button"
+              className="quota-nav-btn"
+              title={t('prevCard', locale)}
+              aria-label={t('prevCard', locale)}
+              onClick={handlePrev}
+            >
+              <ChevronLeft />
+            </button>
+            <span className="quota-page-badge">{isCodex ? '1/2' : '2/2'}</span>
+            <button
+              type="button"
+              className="quota-nav-btn"
+              title={t('nextCard', locale)}
+              aria-label={t('nextCard', locale)}
+              onClick={handleNext}
+            >
+              <ChevronRight />
+            </button>
           </div>
-          <div className="quota-resets">
-            <div className="quota-resets-header">
-              <span className="quota-resets-title"><Ticket />{t('resetCards', locale)}</span>
-              <span className={`quota-resets-badge ${availableResets > 0 ? 'active' : 'zero'}`}>
-                {t('availableResets', locale).replace('{count}', String(availableResets))}
-              </span>
-            </div>
-            {credits.length > 0 && (
-              <div className="quota-reset-items">
-                {credits.map((credit, index) => (
-                  <div key={credit.id || index} className="quota-reset-item">
-                    <div className="quota-reset-item-name">
-                      <span>{credit.title || t('defaultResetCard', locale)}</span>
+          <Button
+            className="panel-action"
+            title={isCodex ? (locale === 'zh' ? '刷新 Codex 限额' : 'Refresh Codex Quota') : (locale === 'zh' ? '刷新 AGY 限额' : 'Refresh AGY Quota')}
+            disabled={currentLoading || !currentConfigured}
+            onClick={handleRefresh}
+          >
+            <RefreshCw className={currentLoading ? 'spin' : ''} />
+          </Button>
+        </div>
+      </div>
+
+      {isCodex ? (
+        !effectiveCodexConfigured || effectiveCodexQuota?.status === 'unconfigured' ? (
+          <div className="quota-empty">
+            <Gauge />
+            <span>{locale === 'zh' ? '尚未选择限额查询设备' : 'No device configured for quota queries'}</span>
+            <Button onClick={onConfigure}>{t('settings', locale)}</Button>
+          </div>
+        ) : effectiveCodexLoading && !effectiveCodexQuota ? (
+          <div className="quota-empty">
+            <RefreshCw className="spin" />
+            <span>{locale === 'zh' ? '正在获取最新限额…' : 'Fetching latest quota...'}</span>
+          </div>
+        ) : codexAvailable ? (
+          <>
+            <div className="quota-windows">
+              {effectiveCodexQuota.windows.map((window, index) => {
+                const remaining = 100 - Math.max(0, Math.min(100, window.usedPercent))
+                return (
+                  <div key={`${window.windowDurationMins ?? index}-${window.resetsAt ?? index}`} className="quota-window">
+                    <div>
+                      <strong>{formatDuration(window.windowDurationMins, locale)}</strong>
+                      <span>{locale === 'zh' ? `剩余 ${remaining}%` : `Remaining ${remaining}%`}</span>
                     </div>
-                    <div className="quota-reset-item-dates">
-                      <span>{t('granted', locale)} {formatCardDate(credit.grantedAt, locale)}</span>
-                      <span>{t('expires', locale)} {formatCardDate(credit.expiresAt, locale)}</span>
+                    <div className="quota-track">
+                      <i style={{ width: `${remaining}%` }} />
                     </div>
+                    <small>
+                      <Clock3 />
+                      {formatReset(window.resetsAt, locale)}
+                    </small>
                   </div>
+                )
+              })}
+            </div>
+            <div className="quota-credits" data-has-credits={effectiveCodexQuota.credits?.hasCredits === true}>
+              <div className="quota-credits-icon"><CreditCard /></div>
+              <div>
+                <span>{t('creditsBalance', locale)}</span>
+                <strong>{codexBalance}</strong>
+              </div>
+            </div>
+            <div className="quota-resets">
+              <div className="quota-resets-header">
+                <span className="quota-resets-title"><Ticket />{t('resetCards', locale)}</span>
+                <span className={`quota-resets-badge ${availableResets > 0 ? 'active' : 'zero'}`}>
+                  {t('availableResets', locale).replace('{count}', String(availableResets))}
+                </span>
+              </div>
+              {credits.length > 0 && (
+                <div className="quota-reset-items">
+                  {credits.map((credit, index) => (
+                    <div key={credit.id || index} className="quota-reset-item">
+                      <div className="quota-reset-item-name">
+                        <span>{credit.title || t('defaultResetCard', locale)}</span>
+                      </div>
+                      <div className="quota-reset-item-dates">
+                        <span>{t('granted', locale)} {formatCardDate(credit.grantedAt, locale)}</span>
+                        <span>{t('expires', locale)} {formatCardDate(credit.expiresAt, locale)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="quota-empty error">
+            <AlertTriangle />
+            <span>{effectiveCodexQuota?.error ?? (locale === 'zh' ? '当前设备无法获取 Codex 限额' : 'Unable to query Codex quota from device')}</span>
+            <Button onClick={onConfigure}>{t('settings', locale)}</Button>
+          </div>
+        )
+      ) : (
+        !currentConfigured || agyQuota?.status === 'unconfigured' ? (
+          <div className="quota-empty">
+            <Gauge />
+            <span>{locale === 'zh' ? '尚未选择限额查询设备' : 'No device configured for quota queries'}</span>
+            <Button onClick={onConfigure}>{t('settings', locale)}</Button>
+          </div>
+        ) : agyLoading && !agyQuota ? (
+          <div className="quota-empty">
+            <RefreshCw className="spin" />
+            <span>{locale === 'zh' ? '正在获取最新限额…' : 'Fetching latest quota...'}</span>
+          </div>
+        ) : agyAvailable ? (
+          <>
+            {agyGroups.length > 1 && (
+              <div className="quota-group-selector" role="tablist">
+                {agyGroups.map((group, idx) => (
+                  <button
+                    key={group.name || idx}
+                    type="button"
+                    role="tab"
+                    aria-selected={selectedAgyGroupIndex === idx}
+                    className={`quota-group-pill ${selectedAgyGroupIndex === idx ? 'active' : ''}`}
+                    onClick={() => setSelectedAgyGroupIndex(idx)}
+                  >
+                    {group.name === 'Gemini Models' ? t('geminiModels', locale) : group.name === 'Claude and GPT models' ? t('claudeGptModels', locale) : group.name}
+                  </button>
                 ))}
               </div>
             )}
+            <div className="quota-windows">
+              {agyBuckets.map((bucket, index) => {
+                const remaining = Math.max(0, Math.min(100, Math.round(bucket.remainingPercent)))
+                return (
+                  <div key={bucket.id || `${bucket.window}-${index}`} className="quota-window">
+                    <div>
+                      <strong>{bucket.name || formatDuration(bucket.windowDurationMins, locale)}</strong>
+                      <span>{locale === 'zh' ? `剩余 ${remaining}%` : `Remaining ${remaining}%`}</span>
+                    </div>
+                    <div className="quota-track">
+                      <i style={{ width: `${remaining}%` }} />
+                    </div>
+                    <small>
+                      <Clock3 />
+                      {formatAgyReset(bucket.resetsAt, bucket.resetTime, locale)}
+                    </small>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="quota-credits" data-has-credits={true}>
+              <div className="quota-credits-icon"><AgentIcon agent="agy" /></div>
+              <div>
+                <span>{t('planTier', locale)}</span>
+                <strong>{agyQuota.planType || t('quotaTierInfo', locale)}</strong>
+              </div>
+            </div>
+            <div className="quota-resets">
+              <div className="quota-resets-header">
+                <span className="quota-resets-title">
+                  <Gauge />
+                  {activeGroup?.name === 'Gemini Models'
+                    ? t('geminiModels', locale)
+                    : activeGroup?.name === 'Claude and GPT models'
+                      ? t('claudeGptModels', locale)
+                      : (activeGroup?.name || t('agyQuota', locale))}
+                </span>
+                {agyQuota.planType && (
+                  <span className="quota-resets-badge active">
+                    {agyQuota.planType}
+                  </span>
+                )}
+              </div>
+              <div className="quota-reset-items">
+                <div className="quota-reset-item">
+                  <div className="quota-reset-item-name">
+                    <span>{activeGroup?.description || agyQuota.description || t('agyQuotaSharedDesc', locale)}</span>
+                  </div>
+                  <div className="quota-reset-item-dates">
+                    <span>{locale === 'zh' ? '5 小时与每周双周期滚动限额' : '5h and weekly rolling window quota'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="quota-empty error">
+            <AlertTriangle />
+            <span>{agyQuota?.error ?? (locale === 'zh' ? '当前设备无法获取 Antigravity 限额' : 'Unable to query Antigravity quota from device')}</span>
+            <Button onClick={onConfigure}>{t('settings', locale)}</Button>
           </div>
-          <div className={`quota-meta ${quota.status === 'stale' ? 'warning' : ''}`}>{quota.status === 'stale' ? (locale === 'zh' ? `刷新失败，显示上次结果：${quota.error ?? '未知错误'}` : `Failed to refresh, showing last result: ${quota.error ?? 'Unknown'}`) : (locale === 'zh' ? `更新于 ${formatFetchedAt(quota.fetchedAt, locale)}` : `Updated at ${formatFetchedAt(quota.fetchedAt, locale)}`)}</div>
-        </> : <div className="quota-empty error"><AlertTriangle /><span>{quota?.error ?? (locale === 'zh' ? '当前设备无法获取 Codex 限额' : 'Unable to query Codex quota from device')}</span><Button onClick={onConfigure}>{t('settings', locale)}</Button></div>}
-  </Card>
+        )
+      )}
+
+      <div className="quota-footer">
+        <div className={`quota-meta ${currentStatus === 'stale' ? 'warning' : ''}`}>
+          {currentStatus === 'stale'
+            ? (locale === 'zh' ? `刷新失败，显示上次结果：${currentError ?? '未知错误'}` : `Failed to refresh, showing last result: ${currentError ?? 'Unknown'}`)
+            : currentFetchedAt
+              ? (locale === 'zh' ? `更新于 ${formatFetchedAt(currentFetchedAt, locale)}` : `Updated at ${formatFetchedAt(currentFetchedAt, locale)}`)
+              : (locale === 'zh' ? '未同步' : 'Not synced')}
+        </div>
+        <div className="quota-dots" role="tablist" aria-label={t('quotaCardPagination', locale)}>
+          <button
+            type="button"
+            className={`quota-dot ${isCodex ? 'active' : ''}`}
+            aria-label="Codex Quota"
+            title="Codex"
+            aria-selected={isCodex}
+            onClick={() => handleSwitch('codex')}
+          />
+          <button
+            type="button"
+            className={`quota-dot ${!isCodex ? 'active' : ''}`}
+            aria-label="Antigravity Quota"
+            title="Antigravity (agy)"
+            aria-selected={!isCodex}
+            onClick={() => handleSwitch('agy')}
+          />
+        </div>
+      </div>
+    </Card>
+  )
 }
 
 function formatDuration(minutes: number | null, locale: Locale = 'en'): string {
@@ -616,6 +986,21 @@ function formatReset(seconds: number | null, locale: Locale = 'en'): string {
   const ms = seconds > 100_000_000_000 ? seconds : seconds * 1000
   const dateStr = new Date(ms).toLocaleString(locale === 'zh' ? 'zh-CN' : 'en-US', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
   return locale === 'zh' ? `${dateStr} 重置` : `Resets ${dateStr}`
+}
+
+function formatAgyReset(seconds: number | null | undefined, resetTimeStr: string | null | undefined, locale: Locale = 'en'): string {
+  if (seconds) {
+    return formatReset(seconds, locale)
+  }
+  if (resetTimeStr) {
+    const d = new Date(resetTimeStr)
+    if (!Number.isNaN(d.getTime())) {
+      const dateStr = d.toLocaleString(locale === 'zh' ? 'zh-CN' : 'en-US', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+      return locale === 'zh' ? `${dateStr} 重置` : `Resets ${dateStr}`
+    }
+    return resetTimeStr
+  }
+  return locale === 'zh' ? '未提供重置时间' : 'No reset time'
 }
 
 function formatCardDate(seconds: number | null | undefined, locale: Locale = 'en'): string {
@@ -634,12 +1019,26 @@ function FilterChip({ active, label, icon, onClick }: { active: boolean; label: 
 function Summary({ label, value, text }: { label: string; value?: number | undefined; text?: string }) { return <MetricValue label={label} value={text ?? (value == null ? '—' : formatTokens(value))} /> }
 function Empty({ locale = 'en' }: { locale?: Locale }) { return <EmptyState icon={<Database />} title={t('noData', locale)} description={t('noDataDesc', locale)} /> }
 
-function SourceDialog({ settings, refreshRunning, locale = 'en', onClose, onSave, onScan, onQuotaTest }: { settings: UsageSettings; refreshRunning: boolean; locale?: Locale; onClose(): void; onSave(value: UsageSettings): Promise<void>; onScan(source: SshSource): Promise<void>; onQuotaTest(value: UsageSettings): Promise<CodexQuotaSnapshot> }) {
-  const [draft, setDraft] = useState<UsageSettings>(structuredClone(settings))
+const defaultAgyQuota: AgyQuotaSettings = {
+  sourceId: 'local',
+  shellPreset: 'auto',
+  preCommand: '',
+  refreshIntervalSeconds: 60,
+}
+
+function SourceDialog({ settings, refreshRunning, locale = 'en', onClose, onSave, onScan, onQuotaTest, onAgyQuotaTest }: { settings: UsageSettings; refreshRunning: boolean; locale?: Locale; onClose(): void; onSave(value: UsageSettings): Promise<void>; onScan(source: SshSource): Promise<void>; onQuotaTest(value: UsageSettings): Promise<CodexQuotaSnapshot>; onAgyQuotaTest(value: UsageSettings): Promise<AgyQuotaSnapshot> }) {
+  const [draft, setDraft] = useState<UsageSettings>(() => {
+    const cloned = structuredClone(settings)
+    if (!cloned.agyQuota) {
+      cloned.agyQuota = { ...defaultAgyQuota }
+    }
+    return cloned
+  })
   const [adding, setAdding] = useState(false)
   const [busy, setBusy] = useState(false)
   const [scanning, setScanning] = useState<string | null>(null)
   const [quotaTesting, setQuotaTesting] = useState(false)
+  const [agyQuotaTesting, setAgyQuotaTesting] = useState(false)
   const [scanMessage, setScanMessage] = useState<string | null>(null)
   const [dialogError, setDialogError] = useState<string | null>(null)
   const updateSource = (index: number, source: SshSource) => setDraft(current => ({ ...current, sshSources: current.sshSources.map((value, item) => item === index ? source : value) }))
@@ -649,11 +1048,13 @@ function SourceDialog({ settings, refreshRunning, locale = 'en', onClose, onSave
   }
   const interval = draft.codexQuota.refreshIntervalSeconds
   const intervalMode = interval == null ? 'off' : [30, 60, 300, 900].includes(interval) ? String(interval) : 'custom'
+  const agyInterval = draft.agyQuota.refreshIntervalSeconds
+  const agyIntervalMode = agyInterval == null ? 'off' : [30, 60, 300, 900].includes(agyInterval) ? String(agyInterval) : 'custom'
   const sourceOptions = [{ id: 'local', label: t('localDevice', locale) }, ...draft.sshSources]
   return <Dialog open onClose={() => { if (!busy) onClose() }} className="source-modal" aria-label={t('settings', locale)}><header><div><h2>{t('settings', locale)}</h2><p>{t('settingsDialogSubtitle', locale)}</p></div><Button className="close" onClick={onClose}><X /></Button></header>
     {dialogError && <Status tone="error" className="dialog-error">{dialogError}</Status>}
     <section className="source-block"><div className="source-heading"><div><HardDrive /><span><strong>{t('localDevice', locale)}</strong><small>{t('localDeviceDefault', locale)}</small></span></div><div className="agent-checks">{AGENTS.map(agent => <label key={agent}><Input type="checkbox" checked={draft.localAgents.includes(agent)} onChange={() => setDraft(current => ({ ...current, localAgents: toggleRequired(current.localAgents, agent) }))} /><AgentIcon agent={agent} /><span>{agentLabel[agent]}</span></label>)}</div></div><div className="root-grid">{AGENTS.map(agent => <label key={agent}>{agentLabel[agent]}<Input value={draft.localRoots[agent] ?? ''} onChange={event => setDraft(current => ({ ...current, localRoots: { ...current.localRoots, [agent]: event.target.value } }))} placeholder={defaultRoot[agent]} /></label>)}</div></section>
-    {draft.sshSources.map((source, index) => <section className="source-block" key={source.id}><div className="source-heading"><div><Server /><span><strong>{source.label || t('remoteDevice', locale)}</strong><small>{source.host || t('unspecifiedHost', locale)}</small></span></div><Button className="icon danger" title={t('removeDevice', locale)} onClick={() => setDraft(current => ({ ...current, sshSources: current.sshSources.filter((_, item) => item !== index), codexQuota: current.codexQuota.sourceId === source.id ? { ...current.codexQuota, sourceId: null } : current.codexQuota }))}><Trash2 /></Button></div><div className="ssh-fields"><label>{t('deviceName', locale)}<Input value={source.label} onChange={event => updateSource(index, { ...source, label: event.target.value })} /></label><label>{t('sshHost', locale)}<Input value={source.host} onChange={event => updateSource(index, { ...source, host: event.target.value })} placeholder="gpu-server" /></label></div><div className="agent-checks">{AGENTS.map(agent => <label key={agent}><Input type="checkbox" checked={source.enabledAgents.includes(agent)} onChange={() => updateSource(index, { ...source, enabledAgents: toggleRequired(source.enabledAgents, agent) })} /><AgentIcon agent={agent} /><span>{agentLabel[agent]}</span></label>)}</div><div className="root-grid">{AGENTS.map(agent => <label key={agent}>{agentLabel[agent]}<Input value={source.roots[agent] ?? ''} onChange={event => updateSource(index, { ...source, roots: { ...source.roots, [agent]: event.target.value } })} placeholder={defaultRoot[agent]} /></label>)}</div><Button className="secondary scan-source" disabled={refreshRunning || !source.host} onClick={async () => { setScanning(source.id); setScanMessage(null); setDialogError(null); try { await onScan(source); setScanMessage(t('scanSuccess', locale).replace('{label}', source.label || source.host)) } catch (reason) { setDialogError(String(reason)) } finally { setScanning(null) } }}><RefreshCw className={scanning === source.id ? 'spin' : ''} />{scanning === source.id ? t('scanning', locale) : t('testAndScan', locale)}</Button></section>)}
+    {draft.sshSources.map((source, index) => <section className="source-block" key={source.id}><div className="source-heading"><div><Server /><span><strong>{source.label || t('remoteDevice', locale)}</strong><small>{source.host || t('unspecifiedHost', locale)}</small></span></div><Button className="icon danger" title={t('removeDevice', locale)} onClick={() => setDraft(current => ({ ...current, sshSources: current.sshSources.filter((_, item) => item !== index), codexQuota: current.codexQuota.sourceId === source.id ? { ...current.codexQuota, sourceId: null } : current.codexQuota, agyQuota: current.agyQuota.sourceId === source.id ? { ...current.agyQuota, sourceId: null } : current.agyQuota }))}><Trash2 /></Button></div><div className="ssh-fields"><label>{t('deviceName', locale)}<Input value={source.label} onChange={event => updateSource(index, { ...source, label: event.target.value })} /></label><label>{t('sshHost', locale)}<Input value={source.host} onChange={event => updateSource(index, { ...source, host: event.target.value })} placeholder="gpu-server" /></label></div><div className="agent-checks">{AGENTS.map(agent => <label key={agent}><Input type="checkbox" checked={source.enabledAgents.includes(agent)} onChange={() => updateSource(index, { ...source, enabledAgents: toggleRequired(source.enabledAgents, agent) })} /><AgentIcon agent={agent} /><span>{agentLabel[agent]}</span></label>)}</div><div className="root-grid">{AGENTS.map(agent => <label key={agent}>{agentLabel[agent]}<Input value={source.roots[agent] ?? ''} onChange={event => updateSource(index, { ...source, roots: { ...source.roots, [agent]: event.target.value } })} placeholder={defaultRoot[agent]} /></label>)}</div><Button className="secondary scan-source" disabled={refreshRunning || !source.host} onClick={async () => { setScanning(source.id); setScanMessage(null); setDialogError(null); try { await onScan(source); setScanMessage(t('scanSuccess', locale).replace('{label}', source.label || source.host)) } catch (reason) { setDialogError(String(reason)) } finally { setScanning(null) } }}><RefreshCw className={scanning === source.id ? 'spin' : ''} />{scanning === source.id ? t('scanning', locale) : t('testAndScan', locale)}</Button></section>)}
     {scanMessage && <Status tone="success" className="dialog-success">{scanMessage}</Status>}
     {adding ? <div className="add-confirm"><span>{t('addSshConfirm', locale)}</span><Button className="primary" onClick={addSource}>{t('continueBtn', locale)}</Button><Button className="secondary" onClick={() => setAdding(false)}>{t('cancelBtn', locale)}</Button></div> : <Button className="add-source" onClick={() => setAdding(true)}><Plus />{t('addSshDevice', locale)}</Button>}
     <section className="source-block session-refresh-settings">
@@ -688,6 +1089,16 @@ function SourceDialog({ settings, refreshRunning, locale = 'en', onClose, onSave
       </div>
       <label className="pre-command">{t('preCommand', locale)}<Textarea rows={3} value={draft.codexQuota.preCommand} onChange={event => setDraft(current => ({ ...current, codexQuota: { ...current.codexQuota, preCommand: event.target.value } }))} placeholder="例如：source ~/awsproxy" /><small>{t('preCommandDesc', locale)}</small></label>
       <Button className="secondary scan-source" disabled={quotaTesting || !draft.codexQuota.sourceId} onClick={async () => { setQuotaTesting(true); setScanMessage(null); setDialogError(null); try { const result = await onQuotaTest(draft); if (result.status !== 'ready') throw new Error(result.error ?? t('quotaQueryFailed', locale)); setScanMessage(t('quotaQuerySuccess', locale).replace('{label}', result.sourceLabel ?? t('devices', locale))) } catch (reason) { setDialogError(String(reason)) } finally { setQuotaTesting(false) } }}><RefreshCw className={quotaTesting ? 'spin' : ''} />{quotaTesting ? t('querying', locale) : t('testQuota', locale)}</Button>
+    </section>
+    <section className="source-block quota-settings agy-quota-settings"><div className="source-heading"><div><AgentIcon agent="agy" /><span><strong>{t('agyQuotaSettings', locale)}</strong><small>{t('agyQuotaSubtitle', locale)}</small></span></div></div>
+      <div className="quota-setting-grid">
+        <label>{t('queryDevice', locale)}<Select value={draft.agyQuota.sourceId ?? ''} onChange={event => setDraft(current => ({ ...current, agyQuota: { ...current.agyQuota, sourceId: event.target.value || null } }))}><option value="">{t('noQuery', locale)}</option>{sourceOptions.map(source => <option key={source.id} value={source.id}>{source.label}</option>)}</Select></label>
+        <label>Shell<Select value={draft.agyQuota.shellPreset} onChange={event => setDraft(current => ({ ...current, agyQuota: { ...current.agyQuota, shellPreset: event.target.value as ShellPreset } }))}><option value="auto">{t('autoShell', locale)}</option><option value="powershell">PowerShell</option><option value="zsh">zsh</option><option value="bash">bash</option></Select></label>
+        <label>{t('autoRefreshMode', locale)}<Select value={agyIntervalMode} onChange={event => { const value = event.target.value; setDraft(current => ({ ...current, agyQuota: { ...current.agyQuota, refreshIntervalSeconds: value === 'off' ? null : value === 'custom' ? 120 : Number(value) } })) }}><option value="off">{t('off', locale)}</option><option value="30">{t('thirtySec', locale)}</option><option value="60">{t('sixtySec', locale)}</option><option value="300">{t('fiveMin', locale)}</option><option value="900">{t('fifteenMin', locale)}</option><option value="custom">{t('customMode', locale)}</option></Select></label>
+        {agyIntervalMode === 'custom' && <label>{t('customSeconds', locale)}<Input type="number" min="30" max="3600" value={agyInterval ?? 120} onChange={event => setDraft(current => ({ ...current, agyQuota: { ...current.agyQuota, refreshIntervalSeconds: Number(event.target.value) } }))} /></label>}
+      </div>
+      <label className="pre-command">{t('preCommand', locale)}<Textarea rows={3} value={draft.agyQuota.preCommand} onChange={event => setDraft(current => ({ ...current, agyQuota: { ...current.agyQuota, preCommand: event.target.value } }))} placeholder="例如：source ~/.bashrc" /><small>{t('preCommandDesc', locale)}</small></label>
+      <Button className="secondary scan-source" disabled={agyQuotaTesting || !draft.agyQuota.sourceId} onClick={async () => { setAgyQuotaTesting(true); setScanMessage(null); setDialogError(null); try { const result = await onAgyQuotaTest(draft); if (result.status !== 'ready') throw new Error(result.error ?? t('agyQuotaFailed', locale)); setScanMessage(t('quotaQuerySuccess', locale).replace('{label}', result.sourceLabel ?? t('devices', locale))) } catch (reason) { setDialogError(String(reason)) } finally { setAgyQuotaTesting(false) } }}><RefreshCw className={agyQuotaTesting ? 'spin' : ''} />{agyQuotaTesting ? t('querying', locale) : t('testAgyQuota', locale)}</Button>
     </section>
     <footer><Button className="secondary" onClick={onClose}>{t('cancelBtn', locale)}</Button><Button className="primary" disabled={busy} onClick={async () => { setBusy(true); setDialogError(null); try { await onSave(draft) } catch (reason) { setDialogError(String(reason)); setBusy(false) } }}>{busy ? t('savingSettings', locale) : t('saveSettings', locale)}</Button></footer>
   </Dialog>

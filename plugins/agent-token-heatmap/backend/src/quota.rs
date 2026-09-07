@@ -85,7 +85,7 @@ fn build_command(settings: &CodexQuotaSettings, source: Option<&SshSource>) -> R
     Ok(command)
 }
 
-fn local_shell(preset: ShellPreset) -> Result<(String, Vec<&'static str>)> {
+pub(crate) fn local_shell(preset: ShellPreset) -> Result<(String, Vec<&'static str>)> {
     match preset {
         ShellPreset::Zsh => Ok(("zsh".into(), vec!["-lic"])),
         ShellPreset::Bash => Ok(("bash".into(), vec!["-lc"])),
@@ -130,7 +130,7 @@ fn shell_script(pre_command: &str, powershell: bool) -> String {
     }
 }
 
-fn remote_shell_invocation(preset: ShellPreset, script: &str) -> String {
+pub(crate) fn remote_shell_invocation(preset: ShellPreset, script: &str) -> String {
     let quoted = shell_quote(script);
     match preset {
         ShellPreset::Auto => format!("exec \"${{SHELL:-sh}}\" -lc {quoted}"),
@@ -142,7 +142,7 @@ fn remote_shell_invocation(preset: ShellPreset, script: &str) -> String {
     }
 }
 
-fn shell_quote(value: &str) -> String {
+pub(crate) fn shell_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\"'\"'"))
 }
 
@@ -294,6 +294,50 @@ fn wait_for_response(
     }
 }
 
+pub fn format_credit_balance(balance: &str) -> String {
+    let trimmed = balance.trim();
+    let mut num_start = None;
+    let chars: Vec<(usize, char)> = trimmed.char_indices().collect();
+    for (i, &(idx, c)) in chars.iter().enumerate() {
+        if c.is_ascii_digit() {
+            let start = if i > 0 && chars[i - 1].1 == '-' {
+                chars[i - 1].0
+            } else {
+                idx
+            };
+            num_start = Some(start);
+            break;
+        }
+    }
+
+    if let Some(start) = num_start {
+        let after_start = &trimmed[start..];
+        let mut seen_dot = false;
+        let mut len = 0;
+        for (i, c) in after_start.char_indices() {
+            if i == 0 && c == '-' {
+                len = c.len_utf8();
+            } else if c.is_ascii_digit() {
+                len = i + c.len_utf8();
+            } else if c == '.' && !seen_dot {
+                seen_dot = true;
+                len = i + c.len_utf8();
+            } else {
+                break;
+            }
+        }
+        let end = start + len;
+        let prefix = &trimmed[..start];
+        let num_str = &trimmed[start..end];
+        let suffix = &trimmed[end..];
+        if let Ok(num) = num_str.parse::<f64>() {
+            return format!("{}{:.1}{}", prefix, num, suffix);
+        }
+    }
+
+    trimmed.to_string()
+}
+
 fn parse_response(
     value: Value,
     source_id: String,
@@ -322,6 +366,12 @@ fn parse_response(
     if windows.is_empty() {
         bail!("Codex account did not return any rate-limit windows");
     }
+    let mut credits = rate_limits.credits.clone();
+    if let Some(ref mut c) = credits {
+        if let Some(ref b) = c.balance {
+            c.balance = Some(format_credit_balance(b));
+        }
+    }
     Ok(CodexQuotaSnapshot {
         status: "ready".into(),
         source_id: Some(source_id),
@@ -329,7 +379,7 @@ fn parse_response(
         fetched_at: Some(Utc::now().to_rfc3339()),
         plan_type: rate_limits.plan_type.clone(),
         windows,
-        credits: rate_limits.credits.clone(),
+        credits,
         reset_credits: response.rate_limit_reset_credits,
         error: None,
     })
@@ -375,7 +425,7 @@ mod tests {
         assert_eq!(credits[0].granted_at, 1788500000);
         assert_eq!(credits[0].expires_at, Some(1789500000));
         let quota_credits = parsed.credits.unwrap();
-        assert_eq!(quota_credits.balance.as_deref(), Some("$12.50"));
+        assert_eq!(quota_credits.balance.as_deref(), Some("$12.5"));
         assert!(quota_credits.has_credits);
         assert!(!quota_credits.unlimited);
     }
@@ -421,6 +471,17 @@ mod tests {
         assert!(command.starts_with("exec zsh -lic '"));
         assert!(command.contains("'\"'\"'"));
         assert!(command.ends_with('\''));
+    }
+
+    #[test]
+    fn formats_credit_balance_to_one_decimal_place() {
+        assert_eq!(format_credit_balance("$12.50"), "$12.5");
+        assert_eq!(format_credit_balance("$12.00"), "$12.0");
+        assert_eq!(format_credit_balance("$12"), "$12.0");
+        assert_eq!(format_credit_balance("12.55"), "12.6");
+        assert_eq!(format_credit_balance("$0.00"), "$0.0");
+        assert_eq!(format_credit_balance("€15.260"), "€15.3");
+        assert_eq!(format_credit_balance("non-numeric"), "non-numeric");
     }
 
     #[test]

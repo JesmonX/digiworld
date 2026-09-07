@@ -2,9 +2,10 @@ use crate::database::Database;
 #[cfg(test)]
 use crate::model::AgentKind;
 use crate::model::{
-    CodexQuotaSnapshot, RefreshStatus, SnapshotRequest, SshSource, UsageSettings, UsageSnapshot,
+    AgyQuotaSnapshot, CodexQuotaSnapshot, RefreshStatus, SnapshotRequest, SshSource, UsageSettings,
+    UsageSnapshot,
 };
-use crate::{quota, remote, scanner};
+use crate::{agy_quota, quota, remote, scanner};
 use anyhow::{Result, bail};
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -16,6 +17,7 @@ pub struct UsageEngine {
     database: Arc<Mutex<Database>>,
     refresh: Arc<Mutex<RefreshStatus>>,
     quota_cache: Arc<Mutex<Option<CachedCodexQuota>>>,
+    agy_quota_cache: Arc<Mutex<Option<CachedAgyQuota>>>,
 }
 
 #[derive(Clone)]
@@ -25,6 +27,20 @@ struct CachedCodexQuota {
 }
 
 impl CachedCodexQuota {
+    fn is_fresh(&self, refresh_interval_seconds: Option<u64>, now: Instant) -> bool {
+        refresh_interval_seconds.is_none_or(|seconds| {
+            now.saturating_duration_since(self.cached_at) < Duration::from_secs(seconds)
+        })
+    }
+}
+
+#[derive(Clone)]
+struct CachedAgyQuota {
+    snapshot: AgyQuotaSnapshot,
+    cached_at: Instant,
+}
+
+impl CachedAgyQuota {
     fn is_fresh(&self, refresh_interval_seconds: Option<u64>, now: Instant) -> bool {
         refresh_interval_seconds.is_none_or(|seconds| {
             now.saturating_duration_since(self.cached_at) < Duration::from_secs(seconds)
@@ -43,6 +59,7 @@ impl UsageEngine {
             database: Arc::new(Mutex::new(Database::open(path)?)),
             refresh: Arc::new(Mutex::new(RefreshStatus::default())),
             quota_cache: Arc::new(Mutex::new(None)),
+            agy_quota_cache: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -60,6 +77,7 @@ impl UsageEngine {
             .expect("database lock poisoned")
             .save_settings(&settings)?;
         *self.quota_cache.lock().expect("quota cache lock poisoned") = None;
+        *self.agy_quota_cache.lock().expect("agy quota cache lock poisoned") = None;
         Ok(settings)
     }
 
@@ -152,6 +170,66 @@ impl UsageEngine {
         )
         .unwrap_or_else(|error| {
             CodexQuotaSnapshot::unavailable(
+                source_id,
+                label,
+                error.to_string().chars().take(500).collect(),
+            )
+        }))
+    }
+
+    pub fn agy_quota(&self, force: bool) -> Result<AgyQuotaSnapshot> {
+        let settings = self.settings()?;
+        if !force {
+            let cached = self
+                .agy_quota_cache
+                .lock()
+                .expect("agy quota cache lock poisoned")
+                .clone();
+            if let Some(cached) = cached
+                && cached.is_fresh(
+                    settings.agy_quota.refresh_interval_seconds,
+                    Instant::now(),
+                )
+            {
+                return Ok(cached.snapshot);
+            }
+        }
+        let snapshot = self.query_agy_quota(settings)?;
+        *self.agy_quota_cache.lock().expect("agy quota cache lock poisoned") = Some(CachedAgyQuota {
+            snapshot: snapshot.clone(),
+            cached_at: Instant::now(),
+        });
+        Ok(snapshot)
+    }
+
+    pub fn test_agy_quota(&self, mut settings: UsageSettings) -> Result<AgyQuotaSnapshot> {
+        normalize_settings(&mut settings)?;
+        self.query_agy_quota(settings)
+    }
+
+    fn query_agy_quota(&self, settings: UsageSettings) -> Result<AgyQuotaSnapshot> {
+        let Some(source_id) = settings.agy_quota.source_id.clone() else {
+            return Ok(AgyQuotaSnapshot::unconfigured());
+        };
+        let (source, label) = if source_id == "local" {
+            (None, "本机".to_string())
+        } else if let Some(source) = settings
+            .ssh_sources
+            .iter()
+            .find(|source| source.id == source_id)
+        {
+            (Some(source), source.label.clone())
+        } else {
+            return Ok(AgyQuotaSnapshot::unconfigured());
+        };
+        Ok(agy_quota::query(
+            &settings.agy_quota,
+            source,
+            source_id.clone(),
+            label.clone(),
+        )
+        .unwrap_or_else(|error| {
+            AgyQuotaSnapshot::unavailable(
                 source_id,
                 label,
                 error.to_string().chars().take(500).collect(),
@@ -338,6 +416,27 @@ fn normalize_settings(settings: &mut UsageSettings) -> Result<()> {
     {
         settings.codex_quota.source_id = None;
     }
+    settings.agy_quota.pre_command = settings.agy_quota.pre_command.trim().to_string();
+    if settings.agy_quota.pre_command.len() > 8192
+        || settings.agy_quota.pre_command.contains('\0')
+    {
+        bail!("Antigravity quota pre-command is invalid");
+    }
+    if settings
+        .agy_quota
+        .refresh_interval_seconds
+        .is_some_and(|seconds| !(30..=3600).contains(&seconds))
+    {
+        bail!("Antigravity quota refresh interval must be between 30 and 3600 seconds");
+    }
+    if settings
+        .agy_quota
+        .source_id
+        .as_ref()
+        .is_some_and(|source_id| !ids.contains(source_id))
+    {
+        settings.agy_quota.source_id = None;
+    }
     if let Some(ref mut agents) = settings.selected_agents {
         let mut unique = BTreeSet::new();
         agents.retain(|a| unique.insert(*a));
@@ -423,6 +522,8 @@ mod tests {
         .unwrap();
         assert_eq!(settings.codex_quota.source_id.as_deref(), Some("local"));
         assert_eq!(settings.codex_quota.refresh_interval_seconds, Some(60));
+        assert_eq!(settings.agy_quota.source_id.as_deref(), Some("local"));
+        assert_eq!(settings.agy_quota.refresh_interval_seconds, Some(60));
     }
 
     #[test]
