@@ -1,4 +1,4 @@
-import {  PluginPage, PageToolbar, Button, Card, Menu, Status } from '@digiworld/design-system/react'
+import { rovingDataKeyDown,  PluginPage, PageToolbar, Button, Card, Menu, Status } from '@digiworld/design-system/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronDown, Flame, Keyboard, Pause, Play } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
@@ -175,7 +175,7 @@ export default function App() {
             <div><h2><Keyboard />{t('keyDistribution', locale)}</h2></div>
             <div className="legend"><span>{t('low', locale)}</span>{[1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>{t('high', locale)}</span></div>
           </div>
-          <div className={`keyboard-board layout-${layout.id}`}>
+          <div onKeyDown={event => rovingDataKeyDown(event)} className={`keyboard-board layout-${layout.id}`}>
             {layout.functionRow.length > 0 && <><div className="function-row-layout"><KeyboardRow keys={layout.functionRow} counts={snapshot?.counts ?? {}} max={maxCount} locale={locale} /></div><div className="keyboard-gap" /></>}
             <div className={`keyboard-sections ${layout.numpadKeys.length ? '' : 'without-numpad'} ${layout.navRows.length ? '' : 'without-nav'}`}>
               <div className="alpha-section">{layout.alphaRows.map((row, index) => <KeyboardRow key={index} keys={row} counts={snapshot?.counts ?? {}} max={maxCount} locale={locale} />)}</div>
@@ -212,8 +212,8 @@ function Keycap({ definition, count, max, grid = false, locale = 'en' }: { defin
   const label = formatKeyLabel(definition.id, locale)
   const countText = t('presses', locale).replace('{count}', count.toLocaleString())
   return (
-    <div tabIndex={0} className={`key level-${level} ${count > 0 ? 'has-count' : ''} ${level >= 3 ? 'strong-heat' : ''}`} title={`${definition.id}: ${countText}`} aria-label={`${definition.label || label}, ${countText}`} style={style as React.CSSProperties}>
-      <span>{definition.label || label}</span>
+    <div tabIndex={definition.id === 'Escape' ? 0 : -1} className={`key level-${level} ${count > 0 ? 'has-count' : ''} ${level >= 3 ? 'strong-heat' : ''}`} data-tooltip={`${definition.label || label} (${definition.id}): ${countText}`} aria-label={`${definition.label || label}, ${countText}`} style={style as React.CSSProperties}>
+      <span>{definition.id === 'Backspace' ? 'Bksp' : definition.label || label}</span>
       {count > 0 && <small>{count > 999 ? `${(count / 1000).toFixed(1)}k` : count}</small>}
     </div>
   )

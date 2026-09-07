@@ -234,22 +234,22 @@ export default function App() {
       <Button className="primary" onClick={() => editAccount()}><Plus size={16} />{t('addAccount', locale)}</Button>
     </PageToolbar>
 
-    {error && <Status tone="error" className="error"><AlertCircle size={16} /><span>{error}</span><Button onClick={() => setError('')}><X size={15} /></Button></Status>}
+    {error && <Status tone="error" className="error"><AlertCircle size={16} /><span>{error}</span><Button aria-label={locale === 'zh' ? '关闭错误提示' : 'Dismiss error'} onClick={() => setError('')}><X size={15} /></Button></Status>}
     {actionNotice && <div className="notice" role="status">{actionNotice}</div>}
     <section className={`workspace ${selected ? 'reading' : ''}`}>
       <aside className="dw-card accounts">
         <Button className={!accountId ? 'active' : ''} onClick={() => setAccountId('')}><Inbox size={17} /><span>{t('allInboxes', locale)}</span></Button>
-        {accounts.map(account => <Button key={account.id} className={accountId === account.id ? 'active' : ''} onClick={() => { setAccountId(account.id); setActionNotice('') }} onDoubleClick={() => editAccount(account)}>
-          <Mail size={17} /><span><strong>{account.label}</strong><small title={account.lastError}>{syncing.includes(account.id) ? `${account.syncPhase === 'indexing' ? t('indexing', locale) : t('bodyPhase', locale)} ${account.indexed}/${account.total}` : account.lastError || account.email}</small></span>
-          {syncing.includes(account.id) ? <LoaderCircle className="spin" size={14} /> : account.lastError ? <span aria-label={t('syncFailed', locale)} title={account.lastError}><AlertCircle className="warn" size={14} /></span> : null}
+        {accounts.map(account => <Button key={account.id} title={`${account.label} · ${account.email}${account.lastError ? ` · ${account.lastError}` : ''}`} className={accountId === account.id ? 'active' : ''} onClick={() => { setAccountId(account.id); setActionNotice('') }} onDoubleClick={() => editAccount(account)}>
+          <Mail size={17} /><span><strong data-tooltip={account.label}>{account.label}</strong><small data-tooltip={account.lastError || account.email}>{syncing.includes(account.id) ? `${account.syncPhase === 'indexing' ? t('indexing', locale) : t('bodyPhase', locale)} ${account.indexed}/${account.total}` : account.lastError || account.email}</small></span>
+          {syncing.includes(account.id) ? <LoaderCircle className="spin" size={14} /> : account.lastError ? <span aria-label={t('syncFailed', locale)} data-tooltip={account.lastError || account.email}><AlertCircle className="warn" size={14} /></span> : null}
         </Button>)}
         {currentAccount && <Button className="manage" onClick={() => editAccount(currentAccount)}><Settings size={15} />{t('accountSettings', locale)}</Button>}
       </aside>
 
       <MasterDetail selected={Boolean(selected)} onBack={() => setSelected(null)} backLabel={t('backToList', locale)} list={<section className="dw-card message-list" aria-label={t('messageListAria', locale)} aria-busy={listBusy}>
         {listBusy && messages.length === 0 ? <Empty icon={<LoaderCircle className="spin" />} title={t('loadingMessages', locale)} text={t('readingCache', locale)} /> : accounts.length === 0 ? <Empty icon={<Mail />} title={t('addEmailAccount', locale)} text={t('supportedProviders', locale)} action={() => editAccount()} actionLabel={t('addAccount', locale)} /> : messages.length === 0 ? <Empty icon={<Inbox />} title={syncing.length ? t('syncingInbox', locale) : t('noMessages', locale)} text={syncing.length ? t('syncBackgroundNotice', locale) : t('tryRefreshNotice', locale)} /> : <>
-          {messages.map(message => <Button key={message.id} className={`mail-row ${selected?.id === message.id ? 'selected' : ''} ${(!message.serverSeen && !message.locallyViewed) ? 'new' : ''}`} aria-busy={detailBusy === message.id} onClick={() => void openMessage(message)}>
-            <span className="row-top"><strong>{message.sender || t('unknownSender', locale)}</strong><time>{fmtDate(message.receivedAt, locale)}</time></span>
+          {messages.map(message => <Button key={message.id} title={`${message.sender} · ${message.subject}`} className={`mail-row ${selected?.id === message.id ? 'selected' : ''} ${(!message.serverSeen && !message.locallyViewed) ? 'new' : ''}`} aria-busy={detailBusy === message.id} onClick={() => void openMessage(message)}>
+            <span className="row-top"><strong data-tooltip={message.sender}>{message.sender || t('unknownSender', locale)}</strong><time>{fmtDate(message.receivedAt, locale)}</time></span>
             <span className="subject">{message.subject || t('noSubject', locale)}</span>
             <span className="snippet">{message.hasBody ? message.snippet : t('bodySyncing', locale)}</span>
             <small>{message.accountLabel}{message.size ? ` · ${fmtSize(message.size)}` : ''}</small>
@@ -257,7 +257,7 @@ export default function App() {
           {nextCursor !== undefined && <Button className="load-more" onClick={() => void loadMessages(true, nextCursor)}>{t('loadMore', locale)}<ChevronDown size={15} /></Button>}
         </>}
       </section>} detail={<Card className="dw-card detail">
-        {!selected ? <Empty icon={<Mail />} title={t('selectEmail', locale)} text={t('plainTextNotice', locale)} /> : (() => {
+        {!selected ? <Empty icon={<Mail />} title={t('selectEmail', locale)}  /> : (() => {
           const hasHtml = isHtmlContent(selected.body)
           return <>
             <div className="detail-head">
@@ -293,7 +293,7 @@ export default function App() {
     </section>
 
     {draft && <Dialog open onClose={() => { if (!busy) setDraft(null) }} className="modal" aria-label={t('dialogAria', locale)}>
-      <header><div><h2>{draft.id ? t('dialogTitleEdit', locale) : t('dialogTitleAdd', locale)}</h2><p>{t('dialogSubtitle', locale)}</p></div><Button className="icon" onClick={() => setDraft(null)}><X size={18} /></Button></header>
+      <header><div><h2>{draft.id ? t('dialogTitleEdit', locale) : t('dialogTitleAdd', locale)}</h2><p>{t('dialogSubtitle', locale)}</p></div><Button className="icon" aria-label={locale === 'zh' ? '关闭' : 'Close'} onClick={() => setDraft(null)}><X size={18} /></Button></header>
       <div className="dw-segmented provider-tabs">{(Object.keys(providers) as Provider[]).map(provider => <Button key={provider} className={draft.provider === provider ? 'active' : ''} onClick={() => applyProvider(provider)}>{providers[provider].label[locale]}</Button>)}</div>
       <div className="form-grid">
         <FormField label={t('displayName', locale)}><Input value={draft.label} onChange={event => setDraft({ ...draft, label: event.target.value })} /></FormField>
@@ -311,7 +311,7 @@ export default function App() {
   </PluginPage>
 }
 
-function Empty({ icon, title, text, action, actionLabel }: { icon: React.ReactNode; title: string; text: string; action?: () => void; actionLabel?: string }) {
+function Empty({ icon, title, text, action, actionLabel }: { icon: React.ReactNode; title: string; text?: string; action?: () => void; actionLabel?: string }) {
   return <EmptyState icon={icon} title={title} description={text} action={action && <Button className="primary" onClick={action}><Plus size={15} />{actionLabel || 'Add Account'}</Button>} />
 }
 

@@ -53,3 +53,13 @@
   white-space: nowrap;
   border-width: 0;
 }
+
+/* Let controls wrap as a group before squeezing their labels. */
+.settings-card { flex-wrap: wrap; }
+.settings-card .theme-copy { flex: 0 0 auto; }
+.settings-card .theme-copy h3 { white-space: nowrap; }
+.scheme-options, .font-options { flex-wrap: wrap; min-width: 0; }
+.scheme-options button.active, .font-options button.active, .language-options button.active { border-color: var(--dw-accent-secondary); background: var(--dw-accent-soft); }
+
+.setting-label-help { display: flex; align-items: center; gap: var(--dw-space-2); }
+.setting-label-help .dw-button { min-height: 28px; width: 28px; padding: 0; border-color: transparent; background: transparent; color: var(--dw-text-muted); }

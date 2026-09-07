@@ -89,6 +89,11 @@ describe('token usage layout', () => {
   let container: HTMLDivElement
 
   beforeEach(() => {
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(private callback: ResizeObserverCallback) {}
+      observe() { this.callback([{ contentRect: { width: 640 } } as ResizeObserverEntry], this as unknown as ResizeObserver) }
+      disconnect() {}
+    })
     document.documentElement.lang = 'zh'
     container = document.createElement('div')
     document.body.append(container)
@@ -104,6 +109,7 @@ describe('token usage layout', () => {
   })
 
   afterEach(() => {
+    vi.unstubAllGlobals()
     document.documentElement.lang = ''
     container.remove()
   })
@@ -141,9 +147,9 @@ describe('token usage layout', () => {
     expect(container.querySelector('.model-pie-legend')?.textContent).not.toContain('Codex')
     expect(container.querySelector('.model-pie-legend')?.textContent).not.toContain('本机')
     expect(container.querySelector('.weekly-card')?.textContent).not.toContain('按模型堆叠 Token 与缓存读取率')
-    expect(container.querySelector('.weekly-chart')?.getAttribute('viewBox')).toBe('0 0 820 300')
+    expect(container.querySelector('.weekly-chart')?.getAttribute('viewBox')).toBe('0 0 640 300')
     expect(container.querySelectorAll('.token-segment')).toHaveLength(2)
-    expect(container.querySelector('.token-segment')?.textContent).toContain('Token')
+    expect(container.querySelector('.token-segment')?.getAttribute('data-tooltip')).toContain('Token')
     expect(container.querySelector('.token-segment')?.getAttribute('rx')).toBe('5')
     expect(container.querySelector('.model-key-0')).not.toBeNull()
     expect(container.querySelector('.token-segment.model-0')).not.toBeNull()

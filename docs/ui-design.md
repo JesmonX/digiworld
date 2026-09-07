@@ -18,9 +18,9 @@ The host uses a fixed 72px navigation rail within a 96px slot on desktop (64px w
 
 ## Theme and compatibility
 
-The host offers Catppuccin Latte (default), Mocha, Rosé Pine Dawn/Moon, Tokyo Night/Day, Nord, GitHub Light and Dracula, with classic/ocean/pine/amber/rose color schemes. Colors are adapted for readable product semantics. New preferences use `digiworld.theme.v2`; old accent choices fall back to Latte on first load and do not overwrite a subsequently saved theme. Font/weight preferences are preserved. Glass defaults off unless explicitly enabled. Typography uses standard 100% scale (14px base font size).
+The host offers Light (default) and Dark, with classic/ocean/violet/amber/rose color schemes. Legacy preset IDs map to the corresponding light or dark appearance. Primary actions remain neutral black/white; selection, focus and visualizations use the chosen color scheme. Colors are adapted for readable product semantics. New preferences use `digiworld.theme.v2`; old accent choices fall back to Light on first load and do not overwrite a subsequently saved theme. Font/weight preferences are preserved. Glass defaults off unless explicitly enabled. Typography uses standard 100% scale (14px base font size).
 
-The resolved theme is applied to the host root and sent through the existing `theme` message. Plugin HTML receives fonts, fallback tokens, baseline and initial theme before rendering. Later changes update root properties through the SDK without changing `srcDoc`. A plugin manifest and catalog entry declare `uiDesignVersion: 1`; installed summaries propagate it. Older plugins remain usable with a Latte compatibility theme and an adaptation label in the installed list. Unsupported/newer design versions also use compatibility mode.
+The resolved theme is applied to the host root and sent through the existing `theme` message. Plugin HTML receives fonts, fallback tokens, baseline and initial theme before rendering. Later changes update root properties through the SDK without changing `srcDoc`. A plugin manifest and catalog entry declare `uiDesignVersion: 1`; installed summaries propagate it. Older plugins remain usable with a Light compatibility theme and an adaptation label in the installed list. Unsupported/newer design versions also use compatibility mode.
 
 ## Admission and evidence
 
@@ -32,8 +32,14 @@ Registered domain layout exceptions: keyboard keys may specify physical row/colu
 
 ## Review and validation
 
-Run `pnpm build`, `pnpm check:ui`, `pnpm test:ui`. Run `pnpm design:preview` and open `/design.html` for the actual shell with synthetic data and the built plugin HTML; `/design.html?gallery&theme=catppuccin-mocha` shows common controls. This development-only entry is excluded from the production entry graph. It never reads a user's mail or usage data.
+Run `pnpm build`, `pnpm check:ui`, `pnpm test:ui`. Run `pnpm design:preview` and open `/design.html` for the actual shell with synthetic data and the built plugin HTML; `/design.html?gallery&theme=dark` shows common controls. This development-only entry is excluded from the production entry graph. It never reads a user's mail or usage data.
 
 The matrix covers the supported theme presets and 900x600 / 1280x800 / 1600x1000 windows. Screenshots and traces are in `dist/ui-results`, the browsable report in `dist/ui-report/index.html`, and artifact evidence in `dist/ui-validation.json`. Empty/error states and live plugin updates have separate tests. Partial filtered runs cannot authorize packaging.
 
 Browser fixtures validate rendering, not real IMAP, quota services or native Windows runtime behavior. Windows CI builds the installer and runs the same UI checks; manual acceptance of the installed WebView2 app at Windows 125% and 150% display scaling remains a separate release check. Do not describe headless Chromium screenshots as native WebView2 screenshots.
+
+## Tooltips and readable data
+
+Mount `TooltipLayer` once beside each application root, including preview entries. `Tooltip` adds `data-tooltip` to a single child without changing layout; plain markup may use the attribute directly. Shared Button maps an explicit title or an icon-only accessible label to the same tooltip. Do not add redundant native titles. The layer uses the Popover top layer within its own document, clamps to the viewport, updates while its anchor moves, and closes on Escape or anchor removal. Data regions use `rovingDataKeyDown` with one initial Tab stop; remaining points are reached with arrows, Home and End.
+
+SVG text must remain at least 12 rendered CSS pixels after transforms. Weekly charts measure their container and compute geometry in CSS pixels instead of shrinking a fixed viewBox. `Progress showValue={false}` hides the repeated visual header but preserves its accessible label. Keep units, errors and consequential configuration information available; remove duplicate status prose and generic introductions.

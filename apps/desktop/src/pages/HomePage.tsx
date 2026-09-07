@@ -42,7 +42,6 @@ export function HomePage({
             <span className="metric-icon mint"><Boxes /></span>
             <div className="metric-details">
               <Metric label={t('installedCount', locale)} value={plugins.length} unit={t('installedUnit', locale)} />
-              <div className="metric-trend neutral"><span>{running}/{plugins.length} {t('activeUnit', locale)}</span></div>
             </div>
           </div>
           <div className="workspace-metric metric-card">
@@ -51,9 +50,7 @@ export function HomePage({
               <Metric
                 label={t('runningCount', locale)}
                 value={running}
-                hint={running === plugins.length ? t('allRunning', locale) : t('someRunning', locale)}
               />
-              <div className="metric-trend neutral"><span>{running}/{plugins.length}</span></div>
             </div>
           </div>
           <div className="workspace-metric metric-card">
@@ -64,11 +61,7 @@ export function HomePage({
               <Metric
                 label={t('needsAttention', locale)}
                 value={attention}
-                hint={attention ? t('issuesFound', locale) : t('noIssues', locale)}
               />
-              <div className={`metric-trend ${attention ? 'negative' : 'positive'}`}>
-                <span>{attention ? t('needsCheck', locale) : t('operational', locale)}</span>
-              </div>
             </div>
           </div>
         </MetricGrid>
@@ -77,7 +70,6 @@ export function HomePage({
       <Panel padding="lg" className="workspace-tools">
         <Section
           title={t('installedTools', locale)}
-          description={t('installedToolsDesc', locale)}
           actions={
             <>
               <Button onClick={onRefresh} aria-label={t('refresh', locale)}>

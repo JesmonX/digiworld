@@ -107,10 +107,10 @@ describe('workspace redesign', () => {
     expect(container.querySelector('[aria-label="Installed plugins"]')).not.toBeNull()
     expect(container.querySelector('[aria-label="System navigation"]')).not.toBeNull()
     expect(container.querySelector('.rail-divider')).not.toBeNull()
-    expect(container.textContent).toContain('Digital Workspace')
+    expect(container.textContent).not.toContain('Digital Workspace')
     expect(container.textContent).toContain('Installed Tools')
     expect(container.textContent).not.toContain('快捷操作')
-    expect(container.textContent).toContain('All systems normal')
+    expect(container.textContent).not.toContain('All systems normal')
     expect(container.querySelectorAll('.workspace-metric')).toHaveLength(3)
     expect(container.querySelectorAll('.plugin-row')).toHaveLength(1)
 

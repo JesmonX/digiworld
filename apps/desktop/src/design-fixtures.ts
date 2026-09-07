@@ -16,6 +16,7 @@ const calendarDate = (offset: number, time: string) => {
 }
 export function fixture(method: string, payload: unknown = {}): unknown {
   if (new URLSearchParams(location.search).get('state') === 'error') throw new Error('演示：暂时无法加载，请重试')
+  const longText = new URLSearchParams(location.search).has('long')
   const empty = new URLSearchParams(location.search).get('state') === 'empty'
   if (method === 'heatmap.getLayout') return { layout: 'full' }
   if (method === 'heatmap.setLayout') return {}
@@ -33,7 +34,7 @@ export function fixture(method: string, payload: unknown = {}): unknown {
   if (method === 'git.auth.status') return { connected: true, account: { login: 'jesmonx' } }
   if (method === 'git.settings.get') return { repositories: ['JesmonX/digiworld'], pollSeconds: 30 }
   if (method === 'git.repositories.list') return { items: [{ fullName: 'JesmonX/digiworld', private: false }] }
-  if (method === 'git.runs.snapshot') return { login: 'jesmonx', runs: empty ? [] : [{ id: 1, repository: 'JesmonX/digiworld', name: 'Preview', title: 'Build three plugins', branch: 'main', sha: '548f11f1234', status: 'in_progress', url: 'https://github.com', createdAt: '2026-09-05T04:00:00Z', jobs: [{ id: 2, name: 'Windows build', status: 'in_progress' }] }] }
+  if (method === 'git.runs.snapshot') return { login: 'jesmonx', runs: empty ? [] : [{ id: 1, repository: longText ? 'organization/' + 'long-repository-name-'.repeat(10) : 'JesmonX/digiworld', name: 'Preview', title: longText ? 'Release validation — ' + 'VeryLongWorkflowName'.repeat(12) : 'Build three plugins', branch: 'main', sha: '548f11f1234', status: 'in_progress', url: 'https://github.com', createdAt: '2026-09-05T04:00:00Z', jobs: [{ id: 2, name: 'Windows build', status: 'in_progress' }] }] }
   if (method === 'servers.settings.get') return { devices: empty ? [] : [{ id: 'gpu1', label: 'GPU Server', host: 'gpu1', disks: ['/', '/data'], interfaces: ['eth0'], showCpu: true, showGpu: true, showTraffic: true, showDiskDevice: true, showGpuLabels: true, showGpuPower: true, showGpuTemperature: true, gpuMemoryDisplay: 'both' }] }
   if (method === 'servers.sample') return { devices: empty ? [] : [{ id: 'gpu1', label: 'GPU Server', hostname: 'compute-01', timestamp: 1788580800, uptimeSeconds: 864000, memory: { total: 68719476736, used: 34359738368 }, cpu: { logicalCores: 32, load1: 8.2, load5: 7.4 }, disks: [{ device: '/dev/nvme0n1p2', mount: '/', total: 1099511627776, used: 549755813888, percent: 50 }, { device: '/dev/sda1', mount: '/data', total: 4398046511104, used: 1099511627776, percent: 25 }], gpus: [{ index: 0, name: 'NVIDIA L40', utilization: 72, memoryUsedMiB: 30000, memoryTotalMiB: 46068, temperatureC: 61, powerDrawW: 180 }, { index: 1, name: 'NVIDIA RTX 4090', utilization: 15, memoryUsedMiB: 4096, memoryTotalMiB: 24576, temperatureC: 45, powerDrawW: null }], network: [{ name: 'eth0', receivedBytes: 42949672960, sentBytes: 10737418240 }], vnstat: {}, selection: { disks: ['/', '/data'], interfaces: ['eth0'], showCpu: true, showGpu: true, showTraffic: true, showDiskDevice: true, showGpuLabels: true, showGpuPower: true, showGpuTemperature: true, gpuMemoryDisplay: 'both' } }] }
   if (method === 'calendar.account.get') return { username: 'hello@icloud.com', serverUrl: 'https://caldav.icloud.com', selectedCalendars: ['/demo/calendar/'] }

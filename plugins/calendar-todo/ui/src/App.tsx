@@ -321,15 +321,7 @@ export default function App() {
                   <Button aria-label={t('prevMonth', locale)} onClick={prevMonth}><ChevronLeft size={15} /></Button>
                   <Button onClick={jumpToToday}>{t('today', locale)}</Button>
                   <Button aria-label={t('nextMonth', locale)} onClick={nextMonth}><ChevronRight size={15} /></Button>
-                  <Button
-                    variant="primary"
-                    aria-label={t('newEvent', locale)}
-                    title={t('newEventTitle', locale)}
-                    disabled={!cals.length}
-                    onClick={() => createEventForDate(selectedDate || today)}
-                  >
-                    <Plus size={15} />
-                  </Button>
+
                 </div>
               </header>
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { PluginPage, PageToolbar, Button, Input, Card, Progress, Status, Select } from '@digiworld/design-system/react'
+import { Dialog, PluginPage, PageToolbar, Button, Input, Card, Progress, Status, Select } from '@digiworld/design-system/react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import { Server, Plus, RefreshCw, HardDrive, MemoryStick, Cpu, Gauge, Network, Settings, X, LoaderCircle, AlertCircle } from 'lucide-react'
 import { t, type Locale } from './i18n'
@@ -394,6 +394,7 @@ export default function App() {
                                 title={`GPU ${g.index} · ${cleanName}`}
                                 value={details}
                                 percent={g.utilization}
+                                showPercent={false}
                               />
                             )
                           })
@@ -449,7 +450,7 @@ export default function App() {
       </section>
 
       {draft && (
-        <Card className="editor">
+        <Dialog open onClose={() => { if (!actionBusy) setDraft(null) }} className="editor" aria-label={t('serverSettings', locale)}>
           <header>
             <h2>{t('serverSettings', locale)}</h2>
             <Button aria-label={t('close', locale)} onClick={() => setDraft(null)}><X size={16} /></Button>
@@ -575,24 +576,24 @@ export default function App() {
               {actionBusy === 'save' ? <><LoaderCircle className="spin" size={14} /> {t('saving', locale)}</> : t('save', locale)}
             </Button>
           </footer>
-        </Card>
+        </Dialog>
       )}
     </PluginPage>
   )
 }
 
-function Metric({ icon, title, value, percent }: { icon: React.ReactNode; title: string; value: string; percent: number }) {
+function Metric({ icon, title, value, percent, showPercent = true }: { icon: React.ReactNode; title: string; value: string; percent: number; showPercent?: boolean }) {
   return (
     <div className="metric">
       <div className="metric-header">
         <span className="metric-icon-wrap">{icon}</span>
         <div className="metric-info">
-          <small>{title}</small>
-          <strong>{value}</strong>
+          <small tabIndex={0} data-tooltip={title}>{title}</small>
+          <strong className="metric-value">{value.split(" · ").map((part, index) => <span key={index}>{part}</span>)}</strong>
         </div>
-        <span className="metric-badge">{Math.round(percent)}%</span>
+        {showPercent && <span className="metric-badge">{Math.round(percent)}%</span>}
       </div>
-      <Progress value={percent} max={100} emphasized />
+      <Progress value={percent} max={100} label={title} showValue={false} emphasized />
     </div>
   )
 }

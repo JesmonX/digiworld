@@ -89,6 +89,7 @@ label {
 }
 
 .month-card {
+  min-width: 0;
   display: grid;
   gap: var(--dw-space-3);
   padding: var(--dw-space-4);
@@ -100,6 +101,7 @@ label {
 
 .month-header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: var(--dw-space-2);

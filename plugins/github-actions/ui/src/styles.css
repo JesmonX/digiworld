@@ -72,7 +72,7 @@ a:hover {
 }
 .run-status.success {
   color: var(--dw-success);
-  background: var(--dw-accent-soft);
+  background: var(--dw-success-soft);
   border-color: color-mix(in srgb, var(--dw-success) 30%, transparent);
 }
 .run-status.failure, .run-status.timed_out, .run-status.action_required {
@@ -176,3 +176,7 @@ a:hover {
 }
 
 @media (prefers-reduced-motion: reduce) { .spin { animation-duration: .01ms; } }
+
+.jobs span { min-width: 0; overflow-wrap: anywhere; }
+.jobs small { flex-shrink: 0; }
+.run-head { flex-wrap: wrap; }

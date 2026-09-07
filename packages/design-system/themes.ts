@@ -273,6 +273,7 @@ export function getTheme(id: string, schemeId: ColorSchemeId = DEFAULT_COLOR_SCH
     colors: {
       ...base.colors,
       'accent-secondary': config.secondary,
+      focus: config.secondary,
       'accent-border': config.border,
       'accent-soft': config.soft,
       'chart-1': config.chart1,

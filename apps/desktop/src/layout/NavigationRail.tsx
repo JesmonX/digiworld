@@ -1,5 +1,4 @@
-import { useState, type ReactNode, type SyntheticEvent } from 'react'
-import { createPortal } from 'react-dom'
+import type { ReactNode } from 'react'
 import { Button } from '@digiworld/design-system/react'
 import { t, type Locale } from '../lib/i18n'
 
@@ -21,12 +20,6 @@ function localizedState(status: string | undefined, locale: Locale): string | un
 }
 
 function RailButton({ item, collapsed, locale }: { item: NavigationRailItem; collapsed?: boolean; locale: Locale }) {
-  const [tooltip, setTooltip] = useState<{ top: number; left: number } | null>(null)
-  const show = (event: SyntheticEvent<HTMLButtonElement>) => {
-    if (!collapsed) return
-    const rect = event.currentTarget.getBoundingClientRect()
-    setTooltip({ top: rect.top + rect.height / 2, left: rect.right + 12 })
-  }
   const status = localizedState(item.status, locale)
   const accessibleLabel = status ? `${item.label}, ${status}` : item.label
   const statusId = status ? `nav-status-${item.id}` : undefined
@@ -40,18 +33,12 @@ function RailButton({ item, collapsed, locale }: { item: NavigationRailItem; col
       aria-current={item.active ? 'page' : undefined}
       className={`nav-item ${item.active ? 'active' : ''} ${collapsed ? 'collapsed' : ''}`}
       onClick={item.onClick}
-      onMouseEnter={show}
-      onFocus={show}
-      onMouseLeave={() => setTooltip(null)}
-      onBlur={() => setTooltip(null)}
-      onKeyDown={event => { if (event.key === 'Escape') setTooltip(null) }}
     >
       <span className="nav-icon">{item.icon}</span>
       {!collapsed && <span className="nav-label">{item.label}</span>}
       {item.status && <i className={`state-dot ${item.status}`} aria-hidden="true" />}
       {status && <span id={statusId} className="dw-sr-only">{status}</span>}
     </Button>
-    {tooltip && createPortal(<span role="tooltip" className="rail-tooltip" style={tooltip}>{accessibleLabel}</span>, document.body)}
     </>
   )
 }
@@ -80,7 +67,7 @@ export function NavigationRail({
             className="rail-logo collapse-trigger"
             onClick={onToggleCollapse}
             aria-label={collapsed ? t('expandSidebar', locale) : t('collapseSidebar', locale)}
-            title={collapsed ? t('expandSidebar', locale) : t('collapseSidebar', locale)}
+            data-tooltip={collapsed ? t('expandSidebar', locale) : t('collapseSidebar', locale)}
           >
             <span aria-hidden="true" />
           </button>

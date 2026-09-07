@@ -205,8 +205,8 @@ export default function App() {
               <div className="run-head">
                 <RunIcon run={run} />
                 <div>
-                  <strong>{run.title || run.name}</strong>
-                  <small>{run.repository} · {run.branch} · {run.sha?.slice(0, 7)}</small>
+                  <strong tabIndex={0} data-tooltip={run.title || run.name}>{run.title || run.name}</strong>
+                  <small tabIndex={0} data-tooltip={`${run.repository} · ${run.branch} · ${run.sha ?? ''}`}>{run.repository} · {run.branch} · {run.sha?.slice(0, 7)}</small>
                 </div>
                 <span className={`run-status ${run.conclusion ?? run.status}`}>
                   {statusText(run.status, run.conclusion, locale)}

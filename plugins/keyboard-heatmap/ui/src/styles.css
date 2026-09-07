@@ -205,7 +205,7 @@ button { font: inherit; }
 }
 .key:hover {
   box-shadow: 0 2px 4px color-mix(in srgb, var(--dw-material-border) 40%, transparent);
-  transform: translateY(-1px);
+  transform: none;
 }
 .key.level-0 { background: var(--dw-material-card); color: var(--dw-text-muted); }
 .key.level-1 { background: color-mix(in srgb, var(--dw-accent-secondary) 16%, var(--dw-material-card)); border-color: color-mix(in srgb, var(--dw-accent-secondary) 30%, var(--dw-material-border)); color: var(--dw-text); }
@@ -267,7 +267,7 @@ button { font: inherit; }
 .ranking-list b { color: var(--dw-text-muted); font-size: var(--dw-type-caption); font-weight: var(--dw-weight-semibold); }
 .ranking-list span { min-width: 0; overflow: hidden; color: var(--dw-text); font-weight: var(--dw-weight-medium); text-overflow: ellipsis; white-space: nowrap; }
 .ranking-list i { height: 6px; border-radius: var(--dw-radius-full); background: var(--dw-material-inset); overflow: hidden; }
-.ranking-list em { display: block; height: 100%; border-radius: inherit; background: var(--dw-accent); }
+.ranking-list em { display: block; height: 100%; border-radius: inherit; background: var(--dw-accent-secondary); }
 .ranking-list strong { color: var(--dw-text); text-align: right; font-size: var(--dw-type-body-sm); font-weight: var(--dw-weight-semibold); font-variant-numeric: tabular-nums; }
 .no-data { margin: 4px 0; color: var(--dw-text-muted); font-size: var(--dw-type-body-sm); }
 

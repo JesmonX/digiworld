@@ -67,7 +67,7 @@ describe('mail assistant status and search', () => {
     await act(async () => { root.render(<App />); await flush(); await flush() })
 
     expect(container.textContent).toContain('IMAP 认证失败，请更新授权码')
-    expect(container.querySelector('[aria-label="同步失败"]')?.getAttribute('title')).toBe('IMAP 认证失败，请更新授权码')
+    expect(container.querySelector('[aria-label="同步失败"]')?.getAttribute('data-tooltip')).toBe('IMAP 认证失败，请更新授权码')
     await act(async () => root.unmount())
   })
 

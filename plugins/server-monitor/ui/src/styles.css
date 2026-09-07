@@ -63,6 +63,7 @@ body { background: transparent; color: var(--dw-text); font-family: var(--dw-fon
 
 .metric {
   display: grid;
+  grid-template-rows: 1fr auto;
   gap: var(--dw-space-2);
   min-width: 0;
   padding: var(--dw-space-3);
@@ -106,9 +107,7 @@ body { background: transparent; color: var(--dw-text); font-family: var(--dw-fon
 }
 
 .metric-info strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
   font-size: var(--dw-type-body-sm);
   font-weight: var(--dw-weight-semibold);
   font-variant-numeric: tabular-nums;
@@ -209,3 +208,6 @@ body { background: transparent; color: var(--dw-text); font-family: var(--dw-fon
 @media (prefers-reduced-motion: reduce) {
   .spin { animation-duration: .01ms; }
 }
+
+.metric-value { display: grid; gap: var(--dw-space-1); }
+.metric-header { align-items: start; }

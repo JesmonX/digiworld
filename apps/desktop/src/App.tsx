@@ -1,7 +1,7 @@
 import { Button, Input, Card, Panel, Dialog, Switch, Status, RadioGroup, Menu } from '@digiworld/design-system/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { Check, CircleAlert, Download, Gauge, MoreHorizontal, Library, LoaderCircle, Network, Palette, Pause, Settings, ShieldCheck, Type, Languages, Moon, Sun } from 'lucide-react'
+import { Check, CircleAlert, Download, Gauge, MoreHorizontal, Library, LoaderCircle, Palette, Pause, Settings, ShieldCheck, Type, Languages, Moon, Sun } from 'lucide-react'
 import { suppressContextMenu, type CatalogIndex, type CatalogPlugin, type PluginSummary } from '@digiworld/plugin-sdk'
 import { PluginFrame } from './components/PluginFrame'
 import { WindowChrome } from './components/WindowChrome'
@@ -224,7 +224,6 @@ function App() {
     ? { home: t('workspace', locale), catalog: t('catalog', locale), settings: t('settingsTitle', locale) }[page]
     : selectedPlugin?.name ?? (locale === 'en' ? 'Plugin' : '插件')
   const pluginOpen = typeof page !== 'string'
-  const pageSubtitle = page === 'home' ? t('subtitle', locale) : undefined
 
   const primaryNavigation = [
     { id: 'home', label: t('overview', locale), icon: <Gauge />, active: page === 'home', onClick: () => setPage('home') },
@@ -250,7 +249,7 @@ function App() {
         plugins={pluginNavigation}
         settings={settingsNavigation}
         title={pageTitle}
-        subtitle={pageSubtitle}
+        subtitle={undefined}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(c => !c)}
         locale={locale}
@@ -285,7 +284,7 @@ function App() {
                 type="button"
                 className="header-pill-toggle lang-pill"
                 onClick={() => setLocale(l => l === 'en' ? 'zh' : 'en')}
-                title={locale === 'en' ? t('switchToChinese', locale) : t('switchToEnglish', locale)}
+                data-tooltip={locale === 'en' ? t('switchToChinese', locale) : t('switchToEnglish', locale)}
                 aria-label={t('toggleLanguage', locale)}
               >
                 <Languages size={13} />
@@ -295,7 +294,7 @@ function App() {
                 type="button"
                 className="header-pill-toggle theme-pill"
                 onClick={() => setAccentThemeId(id => id === 'light' ? 'dark' : 'light')}
-                title={accentThemeId === 'light' ? t('switchToDarkMode', locale) : t('switchToLightMode', locale)}
+                data-tooltip={accentThemeId === 'light' ? t('switchToDarkMode', locale) : t('switchToLightMode', locale)}
                 aria-label={t('toggleTheme', locale)}
               >
                 {accentThemeId === 'light' ? <Moon size={13} /> : <Sun size={13} />}
@@ -562,13 +561,13 @@ function SettingsPage({
     <div className="settings-stack">
       <Panel className="settings-section appearance-section" padding="none">
         <div className="settings-section-header">
-          <div><strong>{t('appearanceTitle', locale)}</strong><span>{t('appearanceDesc', locale)}</span></div>
+          <div><strong>{t('appearanceTitle', locale)}</strong></div>
         </div>
         <div className="settings-section-body">
           {/* Appearance & Theme card */}
           <Card className={`settings-card theme-card ${themeDropdownOpen ? 'dropdown-open' : ''}`}>
             <div className="theme-copy">
-              <h3><Palette />{t('appearanceTitle', locale)}</h3>
+              <h3><Palette />{locale === 'zh' ? '明暗模式' : 'Appearance'}</h3>
             </div>
             <ThemeDropdown
               value={accentThemeId}
@@ -673,13 +672,12 @@ function SettingsPage({
 
       <Panel className="settings-section behavior-section" padding="none">
         <div className="settings-section-header">
-          <div><strong>{t('generalTitle', locale)}</strong><span>{t('generalDesc', locale)}</span></div>
+          <div><strong>{t('generalTitle', locale)}</strong></div>
         </div>
         <div className="settings-section-body">
           <Card className="settings-card appearance-card">
             <div>
-              <h3>{t('glassTitle', locale)}</h3>
-              <p>{t('glassDesc', locale)}</p>
+              <h3 className="setting-label-help">{t('glassTitle', locale)}<Button className="icon" aria-label={locale === 'zh' ? '毛玻璃说明' : 'About glass'} title={t('glassDesc', locale)}>?</Button></h3>
             </div>
             <Switch aria-label={t('glassTitle', locale)} checked={glassMode === 'enabled'} onCheckedChange={enabled => onGlassModeChange(enabled ? 'enabled' : 'disabled')} />
           </Card>
@@ -694,12 +692,11 @@ function SettingsPage({
 
       <Panel className="settings-section network-section" padding="none">
         <div className="settings-section-header">
-          <div><strong>{t('proxyTitle', locale)}</strong><span>{t('proxyDesc', locale)}</span></div>
+          <div><strong>{t('proxyTitle', locale)}</strong></div>
         </div>
         <div className="settings-section-body">
           <Card className="settings-card proxy-card">
             <div className="proxy-copy">
-              <h3><Network />{t('proxyTitle', locale)}</h3>
               <div className="dw-segmented proxy-modes" role="group" aria-label={locale === 'zh' ? '代理模式' : 'Proxy Mode'}>
                 {([['system', locale === 'zh' ? '系统代理' : 'System'], ['custom', locale === 'zh' ? '自定义' : 'Custom'], ['direct', locale === 'zh' ? '直连' : 'Direct']] as const).map(([mode, label]) => (
                   <Button key={mode} className={proxy.mode === mode ? 'active' : ''} aria-pressed={proxy.mode === mode} onClick={() => updateMode(mode)}>{label}</Button>
@@ -722,7 +719,7 @@ function SettingsPage({
 
       <Panel className="settings-section updates-section" padding="none">
         <div className="settings-section-header">
-          <div><strong>{t('updatesTitle', locale)}</strong><span>{t('updatesDesc', locale)}</span></div>
+          <div><strong>{t('updatesTitle', locale)}</strong></div>
         </div>
         <div className="settings-section-body">
           <Card className="settings-card update-card">

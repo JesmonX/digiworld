@@ -1,4 +1,4 @@
-import { PluginPage, PageToolbar, MetricGrid, Metric as MetricValue, EmptyState, Button, Input, Select, Textarea, Card, Dialog, Status } from '@digiworld/design-system/react'
+import { rovingDataKeyDown, PluginPage, PageToolbar, MetricGrid, Metric as MetricValue, EmptyState, Button, Input, Select, Textarea, Card, Dialog, Status } from '@digiworld/design-system/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Check, Clock3, Database, Gauge, HardDrive, PieChart, Plus, RefreshCw, Server, Settings2, Ticket, Trash2, X } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
@@ -151,7 +151,6 @@ export default function App() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const [agents, setAgents] = useState<Agent[]>([...AGENTS])
   const [sources, setSources] = useState<string[]>(['local'])
-  const [hoveredCell, setHoveredCell] = useState<{ day: string; value: number; x: number; y: number } | null>(null)
   const [range, setRange] = useState<Range>('365')
   const [metric, setMetric] = useState<Metric>('totalTokens')
   const [refresh, setRefresh] = useState<RefreshStatus>({ running: false, completed: 0, total: 0, errors: [] })
@@ -357,7 +356,7 @@ export default function App() {
         </div>
       </PageToolbar>
 
-      {(error || refresh.errors.length > 0) && <Status tone="error" className="error-banner"><AlertTriangle /><span>{error ?? refresh.errors.join('；')}</span><Button onClick={() => { setError(null); setRefresh(current => ({ ...current, errors: [] })) }}><X /></Button></Status>}
+      {(error || refresh.errors.length > 0) && <Status tone="error" className="error-banner"><AlertTriangle /><span>{error ?? refresh.errors.join('；')}</span><Button aria-label={locale === 'zh' ? '关闭错误提示' : 'Dismiss error'} onClick={() => { setError(null); setRefresh(current => ({ ...current, errors: [] })) }}><X /></Button></Status>}
 
       <section className="filter-bar">
         <FilterGroup label={t('agents', locale)}>{AGENTS.map(agent => <FilterChip key={agent} active={agents.includes(agent)} label={agentLabel[agent]} icon={<AgentIcon agent={agent} />} onClick={() => toggleAgent(agent)} />)}</FilterGroup>
@@ -384,7 +383,7 @@ export default function App() {
           <Summary label={t('cacheReadTokens', locale)} value={snapshot?.totals.cacheReadTokens} />
           <Summary label={t('cacheRate', locale)} text={snapshot?.totals.cacheRate == null ? '—' : `${(snapshot.totals.cacheRate * 100).toFixed(1)}%`} />
         </MetricGrid>
-        {snapshot && cells.length ? <div className="calendar-wrap"><div className="weekday-labels">{locale === 'zh' ? <><span>一</span><span>三</span><span>五</span><span>日</span></> : <><span>M</span><span>W</span><span>F</span><span>S</span></>}</div><div className="calendar-grid">{cells.map((cell, index) => <i key={cell.day ?? `blank-${index}`} tabIndex={cell.day ? 0 : undefined} aria-label={cell.day ? `${cell.day}，${formatTokens(cell.value)}` : undefined} className={`level-${heatLevel(cell.value, max)} ${cell.day ? '' : 'blank'}`} title={cell.day ? `${cell.day} · ${formatTokens(cell.value)}` : undefined} onMouseEnter={e => { if (cell.day) { const target = e.currentTarget; setHoveredCell({ day: cell.day, value: cell.value, x: target.offsetLeft + target.offsetWidth / 2, y: target.offsetTop }) } }} onMouseLeave={() => setHoveredCell(null)} onFocus={e => { if (cell.day) { const target = e.currentTarget; setHoveredCell({ day: cell.day, value: cell.value, x: target.offsetLeft + target.offsetWidth / 2, y: target.offsetTop }) } }} onBlur={() => setHoveredCell(null)} />)}</div>{hoveredCell && <div className="calendar-tooltip" style={{ left: `${hoveredCell.x}px`, top: `${hoveredCell.y}px` }}><strong>{hoveredCell.day}</strong><span>{formatTokens(hoveredCell.value)} Tokens</span></div>}<div className="legend"><span>{t('low', locale)}</span>{[0, 1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>{t('high', locale)}</span></div></div> : <Empty locale={locale} />}
+        {snapshot && cells.length ? <div className="calendar-wrap"><div className="weekday-labels">{locale === 'zh' ? <><span>一</span><span>三</span><span>五</span><span>日</span></> : <><span>M</span><span>W</span><span>F</span><span>S</span></>}</div><div className="calendar-grid" onKeyDown={event => rovingDataKeyDown(event)}>{cells.map((cell, index) => <i key={cell.day ?? `blank-${index}`} tabIndex={cell.day ? (index === cells.findIndex(item => item.day) ? 0 : -1) : undefined} aria-label={cell.day ? `${cell.day}，${formatTokens(cell.value)}` : undefined} className={`level-${heatLevel(cell.value, max)} ${cell.day ? '' : 'blank'}`} data-tooltip={cell.day ? `${cell.day} · ${formatTokens(cell.value)} Tokens` : undefined} />)}</div><div className="legend"><span>{t('low', locale)}</span>{[0, 1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>{t('high', locale)}</span></div></div> : <Empty locale={locale} />}
       </section>
 
       <section className="lower-grid">
@@ -418,7 +417,15 @@ export default function App() {
 }
 
 function WeeklyChart({ points, locale = 'en' }: { points: WeeklyUsagePoint[]; locale?: Locale }) {
-  const width = 820
+  const chartRef = useRef<SVGSVGElement>(null)
+  const [width, setWidth] = useState(600)
+  useEffect(() => {
+    const chart = chartRef.current
+    if (!chart) return
+    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(280, entry!.contentRect.width)))
+    observer.observe(chart)
+    return () => observer.disconnect()
+  }, [points.length > 0])
   const height = 300
   const left = 68
   const right = 68
@@ -446,8 +453,8 @@ function WeeklyChart({ points, locale = 'en' }: { points: WeeklyUsagePoint[]; lo
   const yForRate = (rate: number) => top + (cacheAxisMaximum - Math.max(cacheAxisMinimum, Math.min(cacheAxisMaximum, rate))) / cacheAxisRange * plotHeight
 
   return <Card className="dw-card weekly-card">
-    <div className="panel-heading"><div><h2>{t('last7Days', locale)}</h2></div><div className="chart-legend" aria-label={t('chartLegendAria', locale)}>{modelCategories.length ? modelCategories.map((category, index) => <span className="legend-item" key={category.key} title={`${category.label} · ${formatTokens(category.totalTokens)}`}><i className={`model-key model-key-${index % 8}`} /><b>{category.label}</b><small>{formatTokens(category.totalTokens)}</small></span>) : <span className="legend-item"><i className="bar-key" /><b>Token</b></span>}<span className="legend-item" title={t('cacheRateLine', locale)}><i className="cache-key" /><b>{t('cacheRate', locale)}</b></span></div></div>
-    {points.length ? <svg className="weekly-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={t('chartAria', locale)}>
+    <div className="panel-heading"><div><h2>{t('last7Days', locale)}</h2></div><div className="chart-legend" aria-label={t('chartLegendAria', locale)}>{modelCategories.length ? modelCategories.map((category, index) => <span className="legend-item" key={category.key} tabIndex={0} data-tooltip={`${category.label} · ${formatTokens(category.totalTokens)}`}><i className={`model-key model-key-${index % 8}`} /><b>{category.label}</b><small>{formatTokens(category.totalTokens)}</small></span>) : <span className="legend-item"><i className="bar-key" /><b>Token</b></span>}<span className="legend-item" tabIndex={0} data-tooltip={t('cacheRateLine', locale)}><i className="cache-key" /><b>{t('cacheRate', locale)}</b></span></div></div>
+    {points.length ? <svg ref={chartRef} onKeyDown={event => rovingDataKeyDown(event)} className="weekly-chart" viewBox={`0 0 ${width} ${height}`} role="group" aria-label={t('chartAria', locale)}>
       {ticks.map(ratio => {
         const y = top + ratio * plotHeight
         return <g key={ratio}><line x1={left} x2={width - right} y1={y} y2={y} className="chart-grid-line" /><text x={left - 10} y={y + 4} textAnchor="end" className="chart-axis-label">{formatTokens(maximum * (1 - ratio))}</text><text x={width - right + 10} y={y + 4} className="chart-axis-label">{Math.round((cacheAxisMaximum - cacheAxisRange * ratio) * 100)}%</text></g>
@@ -465,13 +472,13 @@ function WeeklyChart({ points, locale = 'en' }: { points: WeeklyUsagePoint[]; lo
           })
           .filter(Boolean)
           .join('、')
-        return <g key={point.day}><title>{`${point.day} · ${formatTokens(point.totalTokens)} Token${modelSummary ? ` · ${modelSummary}` : ''} · ${t('cacheRate', locale)} ${cache}`}</title><rect x={x - barWidth / 2} y={top} width={barWidth} height={plotHeight} rx="5" className="chart-bar-track" /><g className="token-bar">{modelCategories.map((category, categoryIndex) => {
+        return <g key={point.day} tabIndex={index === 0 ? 0 : -1} data-tooltip={`${point.day} · ${formatTokens(point.totalTokens)} Token${modelSummary ? ` · ${modelSummary}` : ''} · ${t('cacheRate', locale)} ${cache}`} aria-label={`${point.day} · ${formatTokens(point.totalTokens)} Token`}><rect x={x - barWidth / 2} y={top} width={barWidth} height={plotHeight} rx="5" className="chart-bar-track" /><g className="token-bar">{modelCategories.map((category, categoryIndex) => {
           const value = category.values[index] ?? 0
           if (value <= 0) return null
           const segmentHeight = value * scale
           const y = top + plotHeight - offset - segmentHeight
           offset += segmentHeight
-          return <rect key={`${point.day}-${category.key}`} x={x - barWidth / 2} y={y} width={barWidth} height={segmentHeight} rx="5" className={`token-segment model-${categoryIndex % 8}`}><title>{`${point.day} · ${category.label} · ${formatTokens(value)} Token (${point.totalTokens > 0 ? (value / point.totalTokens * 100).toFixed(1) : '0.0'}%)`}</title></rect>
+          return <rect key={`${point.day}-${category.key}`} x={x - barWidth / 2} y={y} width={barWidth} height={segmentHeight} rx="5" className={`token-segment model-${categoryIndex % 8}`} data-tooltip={`${point.day} · ${category.label} · ${formatTokens(value)} Token (${point.totalTokens > 0 ? (value / point.totalTokens * 100).toFixed(1) : '0.0'}%)`} />
         })}</g><text x={x} y={height - 18} textAnchor="middle" className="chart-day-label">{point.day.slice(5).replace('-', '/')}</text></g>
       })}
       {segments.map((segment, index) => segment.length > 1 && <polyline key={index} points={segment.map(point => `${xFor(point)},${yForRate(point.cacheRate!)}`).join(' ')} className="cache-line" />)}
@@ -480,7 +487,7 @@ function WeeklyChart({ points, locale = 'en' }: { points: WeeklyUsagePoint[]; lo
         const y = yForRate(point.cacheRate!)
         const label = `${(point.cacheRate! * 100).toFixed(1)}%`
         const labelBelow = y < top + 27 || (index % 2 === 1 && y < top + 52)
-        return <g key={point.day} className="cache-marker"><circle cx={x} cy={y} r="5" className="cache-point"><title>{`${point.day} ${t('cacheRate', locale)} ${label}`}</title></circle><text x={x} y={labelBelow ? y + 20 : y - 11} textAnchor="middle" className="cache-point-label">{label}</text></g>
+        return <g key={point.day} className="cache-marker"><circle cx={x} cy={y} r="5" className="cache-point" data-tooltip={`${point.day} ${t('cacheRate', locale)} ${label}`} /><text visibility={width < 480 ? 'hidden' : undefined} x={x} y={labelBelow ? y + 20 : y - 11} textAnchor="middle" className="cache-point-label">{label}</text></g>
       })}
     </svg> : <Empty locale={locale} />}
   </Card>
@@ -512,14 +519,12 @@ function ModelPieChart({ rows, locale = 'en' }: { rows: ModelTotal[]; locale?: L
   })
 
   return <div className="model-pie-wrap">
-    <svg className="model-pie" viewBox="0 0 216 216" role="img" aria-label={t('modelPieAria', locale)}>
+    <svg onKeyDown={event => rovingDataKeyDown(event)} className="model-pie" viewBox="0 0 216 216" role="group" aria-label={t('modelPieAria', locale)}>
       <title>{t('modelPieTitle', locale)}</title>
-      {sectors.map(sector => <path key={sector.model} className="model-pie-slice" d={pieSectorPath(centerX, centerY, radius, sector.startAngle, sector.endAngle)} fill={modelPieColors[sector.index % modelPieColors.length]}>
-        <title>{`${modelDisplayName(sector.model, locale)} · ${formatTokens(sector.totalTokens)} · ${(sector.totalTokens / total * 100).toFixed(1)}%`}</title>
-      </path>)}
+      {sectors.map(sector => <path key={sector.model} tabIndex={sector.index === 0 ? 0 : -1} data-tooltip={`${modelDisplayName(sector.model, locale)} · ${formatTokens(sector.totalTokens)} · ${(sector.totalTokens / total * 100).toFixed(1)}%`} className="model-pie-slice" d={pieSectorPath(centerX, centerY, radius, sector.startAngle, sector.endAngle)} fill={modelPieColors[sector.index % modelPieColors.length]} />)}
     </svg>
     <div className="model-pie-legend" aria-label={t('modelLegendAria', locale)}>
-      {sectors.map(sector => <div key={sector.model}><i style={{ background: modelPieColors[sector.index % modelPieColors.length] }} /><strong title={modelDisplayName(sector.model, locale)}>{modelDisplayName(sector.model, locale)}</strong><span>{formatTokens(sector.totalTokens)} · {(sector.totalTokens / total * 100).toFixed(1)}%</span></div>)}
+      {sectors.map(sector => <div key={sector.model}><i style={{ background: modelPieColors[sector.index % modelPieColors.length] }} /><strong tabIndex={0} data-tooltip={modelDisplayName(sector.model, locale)}>{modelDisplayName(sector.model, locale)}</strong><span>{formatTokens(sector.totalTokens)} · {(sector.totalTokens / total * 100).toFixed(1)}%</span></div>)}
     </div>
   </div>
 }

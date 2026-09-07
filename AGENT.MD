@@ -5,7 +5,7 @@
 Digiworld 的界面是面向 Windows 桌面端的简洁、紧凑型数据工具风格，支持完整浅色和深色主题。新增或修改 UI 时，应遵循 `docs/ui-design.md` 和以下规范：
 
 - 主程序使用 `@digiworld/typography` 提供的字体和字号 token，并通过 `@digiworld/design-system/tokens.css` 共享颜色、圆角、阴影和动效。界面支持 Plex 灵动、HarmonyOS Sans SC 和 Sarasa Gothic 三套全局字体预设；宿主负责向隔离插件页提供字体声明和 `--dw-font-sans`、`--dw-font-display`、`--dw-font-brand`，插件不得依赖或打包字体文件，也不要在局部硬编码字体栈。
-- 使用 design-system/themes.ts 中的九套语义主题和五种配色。背景、卡片、文字、状态和图表都服从宿主，禁止写死浅色背景或白色按钮文字。
+- 使用 design-system/themes.ts 中的浅／深两套语义主题和五种配色。背景、卡片、文字、状态和图表都服从宿主，禁止写死浅色背景或白色按钮文字。
 - 通用控件使用 `@digiworld/design-system/react`（其他技术栈可使用同包 CSS 类），统一字号、行高、圆角、焦点与状态；插件 CSS 只处理业务布局和可视化。正文默认 14px 标准字阶。
 - 新插件版本声明 `uiDesignVersion: 1`，打包前执行 `pnpm check:ui`、构建及完整 `pnpm test:ui`，禁止跳过或伪造与最终 UI 哈希关联的验证记录。
 - 优先复用宿主提供的 `--dw-*` 主题变量和共享设计 token，不在插件中另建冲突的配色、圆角、阴影或动效体系。
