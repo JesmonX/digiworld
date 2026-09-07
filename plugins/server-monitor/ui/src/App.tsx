@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { PluginPage, PageToolbar, Button, Input, Card, Progress, Status, Select } from '@digiworld/design-system/react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import { Server, Plus, RefreshCw, HardDrive, MemoryStick, Cpu, Gauge, Network, Settings, X, LoaderCircle, AlertCircle } from 'lucide-react'
+import { t, type Locale } from './i18n'
 
 const bridge = createPluginBridge('io.github.jesmonx.digiworld.server-monitor')
 
@@ -73,6 +74,9 @@ const rate = (v: number) => v < 1024 ? `${v.toFixed(0)} B/s` : v < 1024 ** 2 ? `
 const pct = (a: number, b: number) => b ? Math.round((a / b) * 100) : 0
 
 export default function App() {
+  const [locale, setLocale] = useState<Locale>(() => {
+    return (document.documentElement.lang?.startsWith('zh') ? 'zh' : 'en') as Locale
+  })
   const [configs, setConfigs] = useState<Config[]>([])
   const [devices, setDevices] = useState<Device[]>([])
   const [draft, setDraft] = useState<Config | null>(null)
@@ -158,10 +162,16 @@ export default function App() {
     void loadSettings()
     bridge.ready()
 
-    const unlisten = bridge.on<{ active: boolean }>('host.visibility', ({ active }) => {
+    const unlistenVisibility = bridge.on<{ active: boolean }>('host.visibility', ({ active }) => {
       isActiveRef.current = active
       if (active) {
         void refreshSamples()
+      }
+    })
+
+    const unlistenLocale = bridge.on<{ locale: Locale }>('locale', ({ locale: nextLocale }) => {
+      if (nextLocale) {
+        setLocale(nextLocale)
       }
     })
 
@@ -172,7 +182,8 @@ export default function App() {
     }, 5000)
 
     return () => {
-      unlisten()
+      if (typeof unlistenVisibility === 'function') unlistenVisibility()
+      if (typeof unlistenLocale === 'function') unlistenLocale()
       clearInterval(intervalId)
     }
   }, [loadSettings, refreshSamples])
@@ -266,19 +277,19 @@ export default function App() {
       <PageToolbar className="">
         <div>
           <Server size={18} />
-          <strong>远程 Linux 设备</strong>
+          <strong>{t('title', locale)}</strong>
         </div>
         <div className="layout-select">
-          <Select aria-label="排布方式" value={layout} onChange={e => changeLayout(e.target.value as LayoutMode)}>
-            <option value="auto">自适应排布</option>
-            <option value="compact">紧凑多列</option>
-            <option value="double">标准双列</option>
-            <option value="single">单列全宽</option>
+          <Select aria-label={t('layoutAria', locale)} value={layout} onChange={e => changeLayout(e.target.value as LayoutMode)}>
+            <option value="auto">{t('layoutAuto', locale)}</option>
+            <option value="compact">{t('layoutCompact', locale)}</option>
+            <option value="double">{t('layoutDouble', locale)}</option>
+            <option value="single">{t('layoutSingle', locale)}</option>
           </Select>
         </div>
-        <Button onClick={() => edit()}><Plus size={15} />添加设备</Button>
+        <Button onClick={() => edit()}><Plus size={15} />{t('addServer', locale)}</Button>
         <Button onClick={() => void loadSettings()} disabled={busy}>
-          <RefreshCw className={busy ? 'spin' : ''} size={15} />刷新
+          <RefreshCw className={busy ? 'spin' : ''} size={15} />{t('refresh', locale)}
         </Button>
       </PageToolbar>
 
@@ -286,7 +297,7 @@ export default function App() {
 
       <section className={`devices layout-${layout}`}>
         {configs.length === 0 ? (
-          <Status>使用 OpenSSH 配置别名添加第一台 Linux 设备。</Status>
+          <Status>{t('noServers', locale)}</Status>
         ) : (
           devices.map(d => {
             const visibleDisks = (d.disks || []).filter(x => !d.selection.disks.length || d.selection.disks.includes(x.mount))
@@ -296,15 +307,21 @@ export default function App() {
               <Card key={d.id}>
                 <header>
                   <div>
-                    <Server size={16} />
+                    <span className="device-avatar">
+                      <Server size={16} />
+                    </span>
                     <span>
                       <strong>{d.label}</strong>
                       <small>
-                        {d.hostname ? `${d.hostname} · 运行 ${Math.floor((d.uptimeSeconds ?? 0) / 86400)} 天 · ${new Date((d.timestamp ?? 0) * 1000).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : d.error ? '连接异常' : '载入中…'}
+                        {d.hostname
+                          ? `${d.hostname} · ${t('uptimeDays', locale).replace('{days}', String(Math.floor((d.uptimeSeconds ?? 0) / 86400)))} · ${new Date((d.timestamp ?? 0) * 1000).toLocaleTimeString(locale === 'zh' ? 'zh-CN' : 'en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
+                          : d.error
+                            ? t('connectionFailed', locale)
+                            : t('loading', locale)}
                       </small>
                     </span>
                   </div>
-                  <Button aria-label="设备设置" onClick={() => edit(configs.find(x => x.id === d.id))}>
+                  <Button aria-label={t('serverSettings', locale)} onClick={() => edit(configs.find(x => x.id === d.id))}>
                     <Settings size={15} />
                   </Button>
                 </header>
@@ -320,15 +337,15 @@ export default function App() {
                       <div className="metrics">
                         <Metric
                           icon={<MemoryStick size={15} />}
-                          title="内存"
+                          title={t('memory', locale)}
                           value={`${size(d.memory.used)} / ${size(d.memory.total)}`}
                           percent={pct(d.memory.used, d.memory.total)}
                         />
                         {d.selection.showCpu && d.cpu && (
                           <Metric
                             icon={<Cpu size={15} />}
-                            title="CPU 负载"
-                            value={`${d.cpu.load1.toFixed(2)} / ${d.cpu.logicalCores} 核`}
+                            title={t('cpuLoad', locale)}
+                            value={`${d.cpu.load1.toFixed(2)} / ${d.cpu.logicalCores} ${t('cores', locale)}`}
                             percent={Math.min(100, (d.cpu.load1 / d.cpu.logicalCores) * 100)}
                           />
                         )}
@@ -362,10 +379,10 @@ export default function App() {
                                 ? memoryValue
                                 : `${memoryValue} (${memoryPercent}%)`
                             const details = [
-                              d.selection.showGpuLabels ? `利用率: ${g.utilization}%` : `${g.utilization}%`,
-                              d.selection.showGpuLabels ? `显存: ${memoryDisplay}` : memoryDisplay,
-                              d.selection.showGpuTemperature !== false && g.temperatureC != null ? (d.selection.showGpuLabels ? `温度: ${g.temperatureC}°C` : `${g.temperatureC}°C`) : null,
-                              (d.selection.showGpuPower && g.powerDrawW != null) ? (d.selection.showGpuLabels ? `功率: ${Math.round(g.powerDrawW)}W` : `${Math.round(g.powerDrawW)}W`) : null,
+                              d.selection.showGpuLabels ? `${t('gpuUtil', locale)}: ${g.utilization}%` : `${g.utilization}%`,
+                              d.selection.showGpuLabels ? `${t('gpuVram', locale)}: ${memoryDisplay}` : memoryDisplay,
+                              d.selection.showGpuTemperature !== false && g.temperatureC != null ? (d.selection.showGpuLabels ? `${t('gpuTemp', locale)}: ${g.temperatureC}°C` : `${g.temperatureC}°C`) : null,
+                              (d.selection.showGpuPower && g.powerDrawW != null) ? (d.selection.showGpuLabels ? `${t('gpuPower', locale)}: ${Math.round(g.powerDrawW)}W` : `${Math.round(g.powerDrawW)}W`) : null,
                             ].filter(Boolean).join(' · ')
                             return (
                               <Metric
@@ -378,7 +395,9 @@ export default function App() {
                             )
                           })
                         ) : (
-                          <small className={`gpu-unavailable ${d.gpuStatus === 'error' ? 'error' : ''}`} title={d.gpuError ?? undefined}>{d.gpuStatus === 'error' ? 'GPU 信息采集失败' : d.gpuStatus === 'unavailable' ? '未安装 nvidia-smi' : '未检测到 GPU'}</small>
+                          <small className={`gpu-unavailable ${d.gpuStatus === 'error' ? 'error' : ''}`} title={d.gpuError ?? undefined}>
+                            {d.gpuStatus === 'error' ? t('gpuError', locale) : d.gpuStatus === 'unavailable' ? t('noNvidiaSmi', locale) : t('noGpu', locale)}
+                          </small>
                         )}
                       </div>
                     )}
@@ -387,23 +406,25 @@ export default function App() {
                       <div className="traffic">
                         <div className="traffic-head">
                           <Network size={15} />
-                          <small title={d.vnstatError ?? undefined}>{d.vnstat ? 'vnStat 每日记录已连接' : d.vnstatStatus === 'error' ? 'vnStat 采集失败，仅显示网卡累计' : '未检测到 vnStat，仅显示网卡累计'}</small>
+                          <small title={d.vnstatError ?? undefined}>
+                            {d.vnstat ? t('vnstatReady', locale) : d.vnstatStatus === 'error' ? t('vnstatFailed', locale) : t('vnstatMissing', locale)}
+                          </small>
                         </div>
                         {visibleInterfaces.length > 0 && (
                           <div className="traffic-rates">
                             {visibleInterfaces.map(n => (
                               <span key={n.name}>
-                                <strong>{n.name}</strong> ↓ {n.receivedPerSecond === undefined ? '采样中' : rate(n.receivedPerSecond)} ↑ {n.sentPerSecond === undefined ? '采样中' : rate(n.sentPerSecond)} · 累计 ↓ {size(n.receivedBytes)} ↑ {size(n.sentBytes)}
+                                <strong>{n.name}</strong> ↓ {n.receivedPerSecond === undefined ? t('sampling', locale) : rate(n.receivedPerSecond)} ↑ {n.sentPerSecond === undefined ? t('sampling', locale) : rate(n.sentPerSecond)} · {t('cumulative', locale)} ↓ {size(n.receivedBytes)} ↑ {size(n.sentBytes)}
                               </span>
                             ))}
                           </div>
                         )}
                         {visibleVnstat.length > 0 && (
                           <details className="daily-details">
-                            <summary><small>每日流量历史 (最多 30 天)</small></summary>
+                            <summary><small>{t('dailyTraffic', locale)}</small></summary>
                             {visibleVnstat.map(v => (
                               <div className="daily" key={v.name}>
-                                <strong>{v.name} · 每日流量</strong>
+                                <strong>{v.name} · {t('dailyTrafficTitle', locale)}</strong>
                                 {(v.traffic?.day || []).slice(-30).reverse().map(x => (
                                   <span key={`${x.date.year}-${x.date.month}-${x.date.day}`}>
                                     <time>{x.date.month}/{x.date.day}</time>
@@ -427,15 +448,15 @@ export default function App() {
       {draft && (
         <Card className="editor">
           <header>
-            <h2>设备设置</h2>
-            <Button aria-label="关闭" onClick={() => setDraft(null)}><X size={16} /></Button>
+            <h2>{t('serverSettings', locale)}</h2>
+            <Button aria-label={t('close', locale)} onClick={() => setDraft(null)}><X size={16} /></Button>
           </header>
           <label>
-            名称
+            {t('name', locale)}
             <Input value={draft.label} onChange={e => setDraft({ ...draft, label: e.target.value })} />
           </label>
           <label>
-            OpenSSH Host 别名
+            {t('hostAlias', locale)}
             <Input value={draft.host} onChange={e => setDraft({ ...draft, host: e.target.value })} />
           </label>
           <div className="toggles">
@@ -457,7 +478,7 @@ export default function App() {
                 checked={draft.showDiskDevice !== false}
                 onChange={e => setDraft({ ...draft, showDiskDevice: e.target.checked })}
               />
-              显示硬盘设备号
+              {t('showDiskDevice', locale)}
             </label>
             <label>
               <input
@@ -465,7 +486,7 @@ export default function App() {
                 checked={!!draft.showGpuLabels}
                 onChange={e => setDraft({ ...draft, showGpuLabels: e.target.checked })}
               />
-              GPU 显示详细文字标签
+              {t('showGpuLabels', locale)}
             </label>
             <label>
               <input
@@ -473,7 +494,7 @@ export default function App() {
                 checked={!!draft.showGpuPower}
                 onChange={e => setDraft({ ...draft, showGpuPower: e.target.checked })}
               />
-              GPU 显示功率
+              {t('showGpuPower', locale)}
             </label>
             <label>
               <input
@@ -481,25 +502,25 @@ export default function App() {
                 checked={draft.showGpuTemperature !== false}
                 onChange={e => setDraft({ ...draft, showGpuTemperature: e.target.checked })}
               />
-              GPU 显示温度
+              {t('showGpuTemp', locale)}
             </label>
             <label>
-              GPU 显存显示
+              {t('gpuMemoryMode', locale)}
               <Select
                 value={draft.gpuMemoryDisplay ?? 'both'}
                 onChange={e => setDraft({ ...draft, gpuMemoryDisplay: e.target.value as NonNullable<Config['gpuMemoryDisplay']> })}
               >
-                <option value="percent">占用百分比</option>
-                <option value="value">具体数值</option>
-                <option value="both">百分比 + 具体数值</option>
+                <option value="percent">{t('memPercent', locale)}</option>
+                <option value="value">{t('memValue', locale)}</option>
+                <option value="both">{t('memBoth', locale)}</option>
               </Select>
             </label>
           </div>
-          <p>选择要并列显示的挂载点和网卡；空选择表示全部显示。</p>
+          <p>{t('selectPrompt', locale)}</p>
           {devices.find(x => x.id === draft.id && x.disks && x.network) && (
             <div className="selectors">
               <fieldset>
-                <legend>硬盘 / 挂载点</legend>
+                <legend>{t('monitoredDisks', locale)}</legend>
                 {(devices.find(x => x.id === draft.id)?.disks || []).map(x => (
                   <label key={x.mount}>
                     <input
@@ -515,7 +536,7 @@ export default function App() {
                 ))}
               </fieldset>
               <fieldset>
-                <legend>网卡</legend>
+                <legend>{t('monitoredInterfaces', locale)}</legend>
                 {(devices.find(x => x.id === draft.id)?.network || []).map(x => (
                   <label key={x.name}>
                     <input
@@ -534,21 +555,21 @@ export default function App() {
           )}
           <div className="vnstat">
             <Button onClick={() => void vnstat(false)} disabled={actionBusy !== null}>
-              {actionBusy === 'detect' ? <><LoaderCircle className="spin" size={14} /> 检测中…</> : '检测 vnStat'}
+              {actionBusy === 'detect' ? <><LoaderCircle className="spin" size={14} /> {t('detecting', locale)}</> : t('detectVnstat', locale)}
             </Button>
             <Button onClick={() => void vnstat(true)} variant="primary" disabled={actionBusy !== null}>
-              {actionBusy === 'install' ? <><LoaderCircle className="spin" size={14} /> 安装中…</> : '安装并启用'}
+              {actionBusy === 'install' ? <><LoaderCircle className="spin" size={14} /> {t('installing', locale)}</> : t('installVnstat', locale)}
             </Button>
           </div>
           {setup && <pre>{setup}</pre>}
           <footer>
-            <Button onClick={() => setDraft(null)} disabled={actionBusy !== null}>取消</Button>
+            <Button onClick={() => setDraft(null)} disabled={actionBusy !== null}>{t('cancel', locale)}</Button>
             <Button
               variant="primary"
               onClick={() => void save()}
               disabled={actionBusy !== null || !draft.label || !draft.host}
             >
-              {actionBusy === 'save' ? <><LoaderCircle className="spin" size={14} /> 保存中…</> : '保存'}
+              {actionBusy === 'save' ? <><LoaderCircle className="spin" size={14} /> {t('saving', locale)}</> : t('save', locale)}
             </Button>
           </footer>
         </Card>
@@ -560,12 +581,13 @@ export default function App() {
 function Metric({ icon, title, value, percent }: { icon: React.ReactNode; title: string; value: string; percent: number }) {
   return (
     <div className="metric">
-      <div>
-        {icon}
-        <span>
+      <div className="metric-header">
+        <span className="metric-icon-wrap">{icon}</span>
+        <div className="metric-info">
           <small>{title}</small>
           <strong>{value}</strong>
-        </span>
+        </div>
+        <span className="metric-badge">{Math.round(percent)}%</span>
       </div>
       <Progress value={percent} max={100} emphasized />
     </div>

@@ -9,60 +9,48 @@ import {
 } from './theme'
 
 describe('accent themes', () => {
-  it('loads a stored theme and falls back for unknown values', () => {
-    expect(loadAccentThemeId({ getItem: () => 'catppuccin-mocha' })).toBe('catppuccin-mocha')
-    expect(loadAccentThemeId({ getItem: () => 'tokyo-night' })).toBe('tokyo-night')
-    expect(loadAccentThemeId({ getItem: () => 'tokyo-night-day' })).toBe('tokyo-night-day')
-    expect(loadAccentThemeId({ getItem: () => 'nord' })).toBe('nord')
-    expect(loadAccentThemeId({ getItem: () => 'github-light' })).toBe('github-light')
-    expect(loadAccentThemeId({ getItem: () => 'dracula' })).toBe('dracula')
-    expect(loadAccentThemeId({ getItem: () => 'dark' })).toBe(DEFAULT_ACCENT_THEME_ID)
+  it('loads a stored theme and maps legacy values cleanly', () => {
+    expect(loadAccentThemeId({ getItem: () => 'light' })).toBe('light')
+    expect(loadAccentThemeId({ getItem: () => 'dark' })).toBe('dark')
+    expect(loadAccentThemeId({ getItem: () => 'catppuccin-mocha' })).toBe('dark')
+    expect(loadAccentThemeId({ getItem: () => 'tokyo-night' })).toBe('dark')
+    expect(loadAccentThemeId({ getItem: () => 'github-light' })).toBe('light')
+    expect(loadAccentThemeId({ getItem: () => 'unknown' })).toBe(DEFAULT_ACCENT_THEME_ID)
   })
 
   it('persists the selected theme', () => {
     const setItem = vi.fn()
-    saveAccentThemeId('rose-pine-moon', { setItem })
-    expect(setItem).toHaveBeenCalledWith(THEME_STORAGE_KEY, 'rose-pine-moon')
-    saveAccentThemeId('tokyo-night', { setItem })
-    expect(setItem).toHaveBeenCalledWith(THEME_STORAGE_KEY, 'tokyo-night')
+    saveAccentThemeId('dark', { setItem })
+    expect(setItem).toHaveBeenCalledWith(THEME_STORAGE_KEY, 'dark')
+    saveAccentThemeId('light', { setItem })
+    expect(setItem).toHaveBeenCalledWith(THEME_STORAGE_KEY, 'light')
   })
 
   it('resolves complete palette and typography for plugins', () => {
-    const theme = pluginTheme(getAccentTheme('rose-pine-dawn'), getFontTheme('harmony'))
-    expect(theme).toMatchObject({
+    const light = pluginTheme(getAccentTheme('light'), getFontTheme('harmony'))
+    expect(light).toMatchObject({
       'color-scheme': 'light',
-      'bg': '#faf4ed',
-      'surface': '#fffaf3',
-      'accent': '#79569b',
-      'accent-strong': expect.stringContaining('color-mix'),
-      'accent-soft': expect.stringContaining('color-mix'),
+      'bg': '#f5f7fa',
+      'surface': '#ffffff',
+      'accent': '#111827',
+      'accent-contrast': '#ffffff',
       'font-sans': expect.stringContaining('HarmonyOS Sans SC'),
       'font-display': expect.stringContaining('HarmonyOS Sans SC'),
       'font-brand': expect.stringContaining('Digiworld Smiley Sans'),
-      success: '#436b58',
-      warning: '#916000',
+      success: '#0d7650',
+      warning: '#92400e',
+      danger: '#b91c1c',
     })
 
-    const tokyo = pluginTheme(getAccentTheme('tokyo-night'))
-    expect(tokyo).toMatchObject({
+    const dark = pluginTheme(getAccentTheme('dark'))
+    expect(dark).toMatchObject({
       'color-scheme': 'dark',
-      'bg': '#1a1b26',
-      'surface': '#202333',
-      'accent': '#7aa2f7',
-      success: '#9ece6a',
-      warning: '#e0af68',
-      danger: '#f7768e',
-    })
-
-    const github = pluginTheme(getAccentTheme('github-light'))
-    expect(github).toMatchObject({
-      'color-scheme': 'light',
-      'bg': '#f6f8fa',
-      'surface': '#ffffff',
-      'accent': '#0969da',
-      success: '#147432',
-      warning: '#8c5c00',
-      danger: '#cf222e',
+      'bg': '#0c0e12',
+      'surface': '#14171f',
+      'accent': '#f8fafc',
+      success: '#34d399',
+      warning: '#fbbf24',
+      danger: '#f87171',
     })
   })
 })
@@ -110,7 +98,7 @@ describe('font themes', () => {
     const setItem = vi.fn()
     saveFontWeight(400, { setItem })
     expect(setItem).toHaveBeenCalledWith(FONT_WEIGHT_STORAGE_KEY, '400')
-    expect(pluginTheme(getAccentTheme('catppuccin-latte'), getFontTheme('plex'), 600)).toMatchObject({
+    expect(pluginTheme(getAccentTheme('light'), getFontTheme('plex'), 600)).toMatchObject({
       'weight-regular': '600',
       'weight-medium': '600',
       'weight-semibold': '700',
@@ -136,32 +124,32 @@ describe('complete theme preferences', () => {
   it('migrates old accent preferences once without overwriting the new selection', () => {
     const values = new Map([['digiworld.accent-theme.v1', 'rose']])
     const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value) } }
-    expect(loadAccentThemeId(storage)).toBe('catppuccin-latte')
-    saveAccentThemeId('catppuccin-mocha', storage)
-    expect(loadAccentThemeId(storage)).toBe('catppuccin-mocha')
-    expect(pluginTheme(getAccentTheme('catppuccin-mocha'))['color-scheme']).toBe('dark')
+    expect(loadAccentThemeId(storage)).toBe('light')
+    saveAccentThemeId('dark', storage)
+    expect(loadAccentThemeId(storage)).toBe('dark')
+    expect(pluginTheme(getAccentTheme('dark'))['color-scheme']).toBe('dark')
   })
 
-  it('loads, saves and applies color scheme preferences', () => {
-    expect(loadColorSchemeId({ getItem: () => 'ocean' })).toBe('ocean')
+  it('loads and saves color scheme preferences with modern defaults', () => {
+    expect(loadColorSchemeId({ getItem: () => 'classic' })).toBe('classic')
     expect(loadColorSchemeId({ getItem: () => 'invalid' })).toBe(DEFAULT_COLOR_SCHEME_ID)
 
     const setItem = vi.fn()
-    saveColorSchemeId('amber', { setItem })
-    expect(setItem).toHaveBeenCalledWith(COLOR_SCHEME_STORAGE_KEY, 'amber')
+    saveColorSchemeId('classic', { setItem })
+    expect(setItem).toHaveBeenCalledWith(COLOR_SCHEME_STORAGE_KEY, 'classic')
 
-    const oceanTheme = getAccentTheme('catppuccin-latte', 'ocean')
-    expect(oceanTheme.colors.accent).toBe('#1e66f5')
-    expect(oceanTheme.colors['chart-1']).toBe('#1e66f5')
-    expect(oceanTheme.colors['chart-2']).toBe('#209fb5')
+    const lightTheme = getAccentTheme('light')
+    expect(lightTheme.colors.accent).toBe('#111827')
+    expect(lightTheme.colors['chart-1']).toBe('#059669')
+    expect(lightTheme.colors['chart-2']).toBe('#2563eb')
 
-    const pineMoonTheme = getAccentTheme('rose-pine-moon', 'pine')
-    expect(pineMoonTheme.colors.accent).toBe('#a3c9ad')
-    expect(pineMoonTheme.colors['chart-1']).toBe('#a3c9ad')
-    expect(pineMoonTheme.colors['chart-2']).toBe('#3e8fb0')
+    const darkTheme = getAccentTheme('dark')
+    expect(darkTheme.colors.accent).toBe('#f8fafc')
+    expect(darkTheme.colors['chart-1']).toBe('#34d399')
+    expect(darkTheme.colors['chart-2']).toBe('#60a5fa')
 
-    const plugin = pluginTheme(oceanTheme)
-    expect(plugin['chart-1']).toBe('#1e66f5')
-    expect(plugin['chart-8']).toBe('#d25400')
+    const plugin = pluginTheme(lightTheme)
+    expect(plugin['chart-1']).toBe('#059669')
+    expect(plugin['chart-8']).toBe('#ea580c')
   })
 })

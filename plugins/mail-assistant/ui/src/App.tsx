@@ -5,6 +5,7 @@ import {
   Search, Settings, Trash2, X,
 } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
+import { t, type Locale } from './i18n'
 import './styles.css'
 
 const PLUGIN_ID = 'io.github.jesmonx.digiworld.mail-assistant'
@@ -38,10 +39,21 @@ const providers: Record<Provider, { label: string; host: string; port: number }>
 
 const emptyDraft = (): AccountDraft => ({ provider: 'gmail', label: 'Gmail', email: '', username: '', host: 'imap.gmail.com', port: 993, useProxy: true, secret: '' })
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error)
-const fmtDate = (value?: string) => value ? new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : ''
+const fmtDate = (value?: string, locale: Locale = 'en') =>
+  value
+    ? new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(new Date(value))
+    : ''
 const fmtSize = (value: number) => value < 1024 ? `${value} B` : value < 1024 ** 2 ? `${(value / 1024).toFixed(1)} KB` : `${(value / 1024 ** 2).toFixed(1)} MB`
 
 export default function App() {
+  const [locale, setLocale] = useState<Locale>(() => {
+    return (document.documentElement.lang?.startsWith('zh') ? 'zh' : 'en') as Locale
+  })
   const [accounts, setAccounts] = useState<Account[]>([])
   const [syncing, setSyncing] = useState<string[]>([])
   const [accountId, setAccountId] = useState('')
@@ -87,6 +99,18 @@ export default function App() {
       bridge.request<{ pollMinutes: number }>('mail.settings.get').then(value => setPollMinutes(value.pollMinutes)),
     ]).catch(reason => setError(errorText(reason)))
     bridge.ready()
+
+    const unlistenLocale = bridge.on<{ locale: Locale }>('locale', ({ locale: nextLocale }) => {
+      if (nextLocale) {
+        setLocale(nextLocale)
+      }
+    })
+
+    return () => {
+      if (typeof unlistenLocale === 'function') {
+        unlistenLocale()
+      }
+    }
   }, [refreshStatus])
 
   useEffect(() => {
@@ -134,16 +158,17 @@ export default function App() {
   }
 
   const markAllRead = async () => {
-    if (!currentAccount || !window.confirm(`将“${currentAccount.label}”中的全部邮件标为已读？`)) return
+    const confirmMsg = t('confirmMarkAllRead', locale).replace('{label}', currentAccount?.label ?? '')
+    if (!currentAccount || !window.confirm(confirmMsg)) return
     const id = currentAccount.id
-    setBusy('mark-all-read'); setError(''); setActionNotice('正在将本地缓存中的邮件标为已读…')
+    setBusy('mark-all-read'); setError(''); setActionNotice(t('noticeMarking', locale))
     setMessages(items => items.map(item => item.accountId === id ? { ...item, locallyViewed: true } : item))
     setSelected(current => current && current.accountId === id ? { ...current, locallyViewed: true } : current)
     try {
       const result = await bridge.request<{ ok: boolean; updated: number }>('mail.messages.mark_all_read', { accountId: id })
       setActionNotice(result.updated > 0
-        ? `已将“${currentAccount.label}”中的 ${result.updated} 封缓存邮件标为已读，正在同步服务器`
-        : `“${currentAccount.label}”中的邮件已全部标为已读，正在同步服务器`)
+        ? t('noticeMarkedCount', locale).replace('{label}', currentAccount.label).replace('{count}', String(result.updated))
+        : t('noticeMarkedAll', locale).replace('{label}', currentAccount.label))
       await refreshStatus()
     } catch (reason) {
       setError(errorText(reason))
@@ -174,7 +199,7 @@ export default function App() {
     try {
       if (testOnly) {
         await bridge.request('mail.accounts.test', { account })
-        setNotice('连接成功')
+        setNotice(t('testSuccess', locale))
       } else {
         await bridge.request('mail.accounts.save', { account })
         setDraft(null)
@@ -184,7 +209,8 @@ export default function App() {
   }
 
   const removeAccount = async () => {
-    if (!draft?.id || !window.confirm(`删除“${draft.label}”及其本地邮件缓存？`)) return
+    const confirmMsg = t('confirmDelete', locale).replace('{label}', draft?.label ?? '')
+    if (!draft?.id || !window.confirm(confirmMsg)) return
     setBusy('remove'); setError('')
     try {
       await bridge.request('mail.accounts.remove', { id: draft.id })
@@ -196,69 +222,69 @@ export default function App() {
 
   return <PluginPage scroll="panes" className="mail-app">
     <PageToolbar className=" toolbar">
-      <div className="search"><Search size={15} /><Input aria-label="搜索邮件" placeholder="搜索发件人、主题或正文" value={query} onChange={event => setQuery(event.target.value)} /></div>
-      <label className="poll"><Settings size={15} /><span>每</span><Select value={pollMinutes} onChange={event => void changePoll(Number(event.target.value))}>
-        {[5, 10, 15, 30].map(value => <option key={value} value={value}>{value} 分钟</option>)}
+      <div className="search"><Search size={15} /><Input aria-label={t('searchAria', locale)} placeholder={t('searchPlaceholder', locale)} value={query} onChange={event => setQuery(event.target.value)} /></div>
+      <label className="poll"><Settings size={15} /><span>{t('pollEvery', locale)}</span><Select value={pollMinutes} onChange={event => void changePoll(Number(event.target.value))}>
+        {[5, 10, 15, 30].map(value => <option key={value} value={value}>{t('pollMinutes', locale).replace('{minutes}', String(value))}</option>)}
       </Select></label>
-      {currentAccount && <Button className="secondary mark-all" onClick={() => void markAllRead()} disabled={!!busy || syncing.includes(currentAccount.id)}><MailCheck size={15} />{busy === 'mark-all-read' ? '标记中…' : '全部标为已读'}</Button>}
-      <Button className="secondary" onClick={() => void syncNow()} disabled={busy === 'sync'}>{busy === 'sync' ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}刷新</Button>
-      <Button className="primary" onClick={() => editAccount()}><Plus size={16} />添加账号</Button>
+      {currentAccount && <Button className="secondary mark-all" onClick={() => void markAllRead()} disabled={!!busy || syncing.includes(currentAccount.id)}><MailCheck size={15} />{busy === 'mark-all-read' ? t('marking', locale) : t('markAllRead', locale)}</Button>}
+      <Button className="secondary" onClick={() => void syncNow()} disabled={busy === 'sync'}>{busy === 'sync' ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}{t('sync', locale)}</Button>
+      <Button className="primary" onClick={() => editAccount()}><Plus size={16} />{t('addAccount', locale)}</Button>
     </PageToolbar>
 
     {error && <Status tone="error" className="error"><AlertCircle size={16} /><span>{error}</span><Button onClick={() => setError('')}><X size={15} /></Button></Status>}
     {actionNotice && <div className="notice" role="status">{actionNotice}</div>}
     <section className={`workspace ${selected ? 'reading' : ''}`}>
       <aside className="dw-card accounts">
-        <Button className={!accountId ? 'active' : ''} onClick={() => setAccountId('')}><Inbox size={17} /><span>全部收件箱</span></Button>
+        <Button className={!accountId ? 'active' : ''} onClick={() => setAccountId('')}><Inbox size={17} /><span>{t('allInboxes', locale)}</span></Button>
         {accounts.map(account => <Button key={account.id} className={accountId === account.id ? 'active' : ''} onClick={() => { setAccountId(account.id); setActionNotice('') }} onDoubleClick={() => editAccount(account)}>
-          <Mail size={17} /><span><strong>{account.label}</strong><small title={account.lastError}>{syncing.includes(account.id) ? `${account.syncPhase === 'indexing' ? '索引' : '正文'} ${account.indexed}/${account.total}` : account.lastError || account.email}</small></span>
-          {syncing.includes(account.id) ? <LoaderCircle className="spin" size={14} /> : account.lastError ? <span aria-label="同步失败" title={account.lastError}><AlertCircle className="warn" size={14} /></span> : null}
+          <Mail size={17} /><span><strong>{account.label}</strong><small title={account.lastError}>{syncing.includes(account.id) ? `${account.syncPhase === 'indexing' ? t('indexing', locale) : t('bodyPhase', locale)} ${account.indexed}/${account.total}` : account.lastError || account.email}</small></span>
+          {syncing.includes(account.id) ? <LoaderCircle className="spin" size={14} /> : account.lastError ? <span aria-label={t('syncFailed', locale)} title={account.lastError}><AlertCircle className="warn" size={14} /></span> : null}
         </Button>)}
-        {currentAccount && <Button className="manage" onClick={() => editAccount(currentAccount)}><Settings size={15} />账号设置</Button>}
+        {currentAccount && <Button className="manage" onClick={() => editAccount(currentAccount)}><Settings size={15} />{t('accountSettings', locale)}</Button>}
       </aside>
 
-      <MasterDetail selected={Boolean(selected)} onBack={() => setSelected(null)} backLabel="返回邮件列表" list={<section className="dw-card message-list" aria-label="邮件列表" aria-busy={listBusy}>
-        {listBusy && messages.length === 0 ? <Empty icon={<LoaderCircle className="spin" />} title="正在载入邮件" text="正在读取本地缓存。" /> : accounts.length === 0 ? <Empty icon={<Mail />} title="添加邮箱账号" text="支持 Gmail、QQ、163 和自定义 IMAP。" action={() => editAccount()} /> : messages.length === 0 ? <Empty icon={<Inbox />} title={syncing.length ? '正在同步收件箱' : '没有找到邮件'} text={syncing.length ? '首次完整同步可在后台继续。' : '尝试刷新或更换搜索条件。'} /> : <>
+      <MasterDetail selected={Boolean(selected)} onBack={() => setSelected(null)} backLabel={t('backToList', locale)} list={<section className="dw-card message-list" aria-label={t('messageListAria', locale)} aria-busy={listBusy}>
+        {listBusy && messages.length === 0 ? <Empty icon={<LoaderCircle className="spin" />} title={t('loadingMessages', locale)} text={t('readingCache', locale)} /> : accounts.length === 0 ? <Empty icon={<Mail />} title={t('addEmailAccount', locale)} text={t('supportedProviders', locale)} action={() => editAccount()} actionLabel={t('addAccount', locale)} /> : messages.length === 0 ? <Empty icon={<Inbox />} title={syncing.length ? t('syncingInbox', locale) : t('noMessages', locale)} text={syncing.length ? t('syncBackgroundNotice', locale) : t('tryRefreshNotice', locale)} /> : <>
           {messages.map(message => <Button key={message.id} className={`mail-row ${selected?.id === message.id ? 'selected' : ''} ${(!message.serverSeen && !message.locallyViewed) ? 'new' : ''}`} aria-busy={detailBusy === message.id} onClick={() => void openMessage(message)}>
-            <span className="row-top"><strong>{message.sender || '未知发件人'}</strong><time>{fmtDate(message.receivedAt)}</time></span>
-            <span className="subject">{message.subject || '（无主题）'}</span>
-            <span className="snippet">{message.hasBody ? message.snippet : '正文正在后台同步…'}</span>
+            <span className="row-top"><strong>{message.sender || t('unknownSender', locale)}</strong><time>{fmtDate(message.receivedAt, locale)}</time></span>
+            <span className="subject">{message.subject || t('noSubject', locale)}</span>
+            <span className="snippet">{message.hasBody ? message.snippet : t('bodySyncing', locale)}</span>
             <small>{message.accountLabel}{message.size ? ` · ${fmtSize(message.size)}` : ''}</small>
           </Button>)}
-          {nextCursor !== undefined && <Button className="load-more" onClick={() => void loadMessages(true, nextCursor)}>加载更多<ChevronDown size={15} /></Button>}
+          {nextCursor !== undefined && <Button className="load-more" onClick={() => void loadMessages(true, nextCursor)}>{t('loadMore', locale)}<ChevronDown size={15} /></Button>}
         </>}
       </section>} detail={<Card className="dw-card detail">
-        {!selected ? <Empty icon={<Mail />} title="选择一封邮件" text="正文以纯文本显示，不加载远程图片。" /> : <>
+        {!selected ? <Empty icon={<Mail />} title={t('selectEmail', locale)} text={t('plainTextNotice', locale)} /> : <>
           <div className="detail-head">
-            <h2>{selected.subject || '（无主题）'}</h2>
-            <div><strong>{selected.sender || '未知发件人'}</strong><time>{fmtDate(selected.receivedAt)}</time></div>
-            <p>收件人：{selected.recipients || '未提供'}</p>
+            <h2>{selected.subject || t('noSubject', locale)}</h2>
+            <div><strong>{selected.sender || t('unknownSender', locale)}</strong><time>{fmtDate(selected.receivedAt, locale)}</time></div>
+            <p>{t('to', locale).replace('{recipients}', selected.recipients || t('notProvided', locale))}</p>
           </div>
           {selected.attachments.length > 0 && <div className="attachments">{selected.attachments.map((attachment, index) => <span key={`${attachment.filename}-${index}`}><Paperclip size={13} />{attachment.filename}<small>{fmtSize(attachment.size)}</small></span>)}</div>}
-          <pre>{selected.body || (selected.hasBody ? '这封邮件没有纯文本正文。' : '正文正在后台同步…')}{selected.bodyTruncated ? '\n\n[正文已截断]' : ''}</pre>
+          <pre>{selected.body || (selected.hasBody ? t('noPlainText', locale) : t('bodySyncing', locale))}{selected.bodyTruncated ? t('bodyTruncated', locale) : ''}</pre>
         </>}
       </Card>} />
     </section>
 
-    {draft && <Dialog open onClose={() => { if (!busy) setDraft(null) }} className="modal" aria-label="邮箱账号设置">
-      <header><div><h2>{draft.id ? '账号设置' : '添加邮箱账号'}</h2><p>使用应用专用密码或客户端授权码，凭据只保存到系统凭据库。</p></div><Button className="icon" onClick={() => setDraft(null)}><X size={18} /></Button></header>
+    {draft && <Dialog open onClose={() => { if (!busy) setDraft(null) }} className="modal" aria-label={t('dialogAria', locale)}>
+      <header><div><h2>{draft.id ? t('dialogTitleEdit', locale) : t('dialogTitleAdd', locale)}</h2><p>{t('dialogSubtitle', locale)}</p></div><Button className="icon" onClick={() => setDraft(null)}><X size={18} /></Button></header>
       <div className="dw-segmented provider-tabs">{(Object.keys(providers) as Provider[]).map(provider => <Button key={provider} className={draft.provider === provider ? 'active' : ''} onClick={() => applyProvider(provider)}>{providers[provider].label}</Button>)}</div>
       <div className="form-grid">
-        <FormField label="显示名称"><Input value={draft.label} onChange={event => setDraft({ ...draft, label: event.target.value })} /></FormField>
-        <label>邮箱地址<Input type="email" value={draft.email} onChange={event => setDraft({ ...draft, email: event.target.value, username: event.target.value })} /></label>
-        <label>IMAP 主机<Input disabled={draft.provider !== 'custom'} value={draft.host} onChange={event => setDraft({ ...draft, host: event.target.value })} /></label>
-        <label>端口<Input type="number" disabled={draft.provider !== 'custom'} value={draft.port} onChange={event => setDraft({ ...draft, port: Number(event.target.value) })} /></label>
-        <label className="wide">用户名<Input value={draft.username} onChange={event => setDraft({ ...draft, username: event.target.value })} placeholder="默认使用完整邮箱地址" /></label>
-        <label className="wide">{draft.id ? '新授权码（留空则不修改）' : '应用专用密码 / 客户端授权码'}<Input type="password" autoComplete="new-password" value={draft.secret} onChange={event => setDraft({ ...draft, secret: event.target.value })} /></label>
-        <label className="proxy-option wide"><span><strong>使用代理</strong><small>连接此邮箱时使用 Digiworld 的代理设置</small></span><Input type="checkbox" aria-label="此账号使用代理" checked={draft.useProxy} onChange={event => setDraft({ ...draft, useProxy: event.target.checked })} /></label>
+        <FormField label={t('displayName', locale)}><Input value={draft.label} onChange={event => setDraft({ ...draft, label: event.target.value })} /></FormField>
+        <label>{t('emailAddress', locale)}<Input type="email" value={draft.email} onChange={event => setDraft({ ...draft, email: event.target.value, username: event.target.value })} /></label>
+        <label>{t('imapHost', locale)}<Input disabled={draft.provider !== 'custom'} value={draft.host} onChange={event => setDraft({ ...draft, host: event.target.value })} /></label>
+        <label>{t('port', locale)}<Input type="number" disabled={draft.provider !== 'custom'} value={draft.port} onChange={event => setDraft({ ...draft, port: Number(event.target.value) })} /></label>
+        <label className="wide">{t('username', locale)}<Input value={draft.username} onChange={event => setDraft({ ...draft, username: event.target.value })} placeholder={t('usernamePlaceholder', locale)} /></label>
+        <label className="wide">{draft.id ? t('secretLabelEdit', locale) : t('secretLabelAdd', locale)}<Input type="password" autoComplete="new-password" value={draft.secret} onChange={event => setDraft({ ...draft, secret: event.target.value })} /></label>
+        <label className="proxy-option wide"><span><strong>{t('useProxy', locale)}</strong><small>{t('useProxyDesc', locale)}</small></span><Input type="checkbox" aria-label={t('useProxyAria', locale)} checked={draft.useProxy} onChange={event => setDraft({ ...draft, useProxy: event.target.checked })} /></label>
       </div>
       {notice && <Status tone="success" className="success">{notice}</Status>}
-      <footer>{draft.id ? <Button className="danger" onClick={() => void removeAccount()} disabled={!!busy}><Trash2 size={15} />删除账号</Button> : <span />}
-        <div><Button className="secondary" onClick={() => void saveAccount(true)} disabled={!!busy}>{busy === 'test' && <LoaderCircle className="spin" size={14} />}测试连接</Button><Button className="primary" onClick={() => void saveAccount(false)} disabled={!!busy}>{busy === 'save' && <LoaderCircle className="spin" size={14} />}保存并同步</Button></div></footer>
+      <footer>{draft.id ? <Button className="danger" onClick={() => void removeAccount()} disabled={!!busy}><Trash2 size={15} />{t('deleteAccount', locale)}</Button> : <span />}
+        <div><Button className="secondary" onClick={() => void saveAccount(true)} disabled={!!busy}>{busy === 'test' && <LoaderCircle className="spin" size={14} />}{busy === 'test' ? t('testing', locale) : t('testConnection', locale)}</Button><Button className="primary" onClick={() => void saveAccount(false)} disabled={!!busy}>{busy === 'save' && <LoaderCircle className="spin" size={14} />}{busy === 'save' ? t('saving', locale) : t('saveAndSync', locale)}</Button></div></footer>
     </Dialog>}
   </PluginPage>
 }
 
-function Empty({ icon, title, text, action }: { icon: React.ReactNode; title: string; text: string; action?: () => void }) {
-  return <EmptyState icon={icon} title={title} description={text} action={action && <Button className="primary" onClick={action}><Plus size={15} />添加账号</Button>} />
+function Empty({ icon, title, text, action, actionLabel }: { icon: React.ReactNode; title: string; text: string; action?: () => void; actionLabel?: string }) {
+  return <EmptyState icon={icon} title={title} description={text} action={action && <Button className="primary" onClick={action}><Plus size={15} />{actionLabel || 'Add Account'}</Button>} />
 }

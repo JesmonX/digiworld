@@ -10,6 +10,7 @@ for (const theme of THEMES) for (const [width, height] of [[900, 600], [1280, 80
     await page.addInitScript(({ id }) => {
       if (window !== window.top) return
       localStorage.setItem('digiworld.theme.v2', id)
+      localStorage.setItem('digiworld.locale.v1', 'zh')
     }, { id: theme.id })
     await gotoWithRetry(page, '/design.html')
     await expect(page.locator('.home-dashboard')).toBeVisible()

@@ -108,8 +108,8 @@ export function layoutKeys(layout: KeyboardLayout): KeyDefinition[] {
 const fullLayout = getKeyboardLayout('full')
 const keyLabelMap = new Map(layoutKeys(fullLayout).map(key => [key.id, key.label]))
 
-export function formatKeyLabel(keyId: string): string {
-  if (keyId === 'Space') return '空格'
+export function formatKeyLabel(keyId: string, locale: 'en' | 'zh' = 'zh'): string {
+  if (keyId === 'Space') return locale === 'en' ? 'Space' : '空格'
   const label = keyLabelMap.get(keyId)
   if (label && label.length > 0) return label
   return keyId

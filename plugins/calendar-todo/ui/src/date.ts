@@ -43,16 +43,24 @@ export function nextDayKey(dk: DateKey): DateKey {
   return dateKey(date)
 }
 
-export function formatDisplayDate(dk: DateKey): string {
+export function formatDisplayDate(dk: DateKey, locale: 'en' | 'zh' = 'en'): string {
   const parts = dk.split('-').map(Number)
   const y = parts[0] ?? 2026
   const m = parts[1] ?? 1
   const d = parts[2] ?? 1
-  return `${y}年${m}月${d}日`
+  if (locale === 'zh') {
+    return `${y}年${m}月${d}日`
+  }
+  const date = new Date(y, m - 1, d)
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date)
 }
 
-export function formatDisplayMonth(year: number, month: number): string {
-  return `${year}年${month}月`
+export function formatDisplayMonth(year: number, month: number, locale: 'en' | 'zh' = 'en'): string {
+  if (locale === 'zh') {
+    return `${year}年${month}月`
+  }
+  const date = new Date(year, month - 1, 1)
+  return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(date)
 }
 
 export interface MonthDayCell {

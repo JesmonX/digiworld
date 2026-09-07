@@ -12,6 +12,7 @@ interface PluginFrameProps {
   html: string
   theme: PluginTheme
   active?: boolean
+  locale?: string
 }
 
 export function resolveTypographyUrls(css: string, baseUrl?: string): string {
@@ -83,7 +84,7 @@ export function withInitialTheme(html: string, theme: PluginTheme): string {
     : themed
 }
 
-export function PluginFrame({ pluginId, html, theme, active = true }: PluginFrameProps) {
+export function PluginFrame({ pluginId, html, theme, active = true, locale = 'en' }: PluginFrameProps) {
   const frame = useRef<HTMLIFrameElement>(null)
   const ready = useRef(false)
   // Theme changes travel over the bridge; changing srcDoc would destroy plugin state.
@@ -107,6 +108,10 @@ export function PluginFrame({ pluginId, html, theme, active = true }: PluginFram
           source: 'digiworld-host', pluginId, kind: 'event', method: 'host.visibility', payload: { active },
         }
         frame.current?.contentWindow?.postMessage(visibilityMessage, '*')
+        const localeMessage: HostToPluginMessage = {
+          source: 'digiworld-host', pluginId, kind: 'locale', payload: { locale },
+        }
+        frame.current?.contentWindow?.postMessage(localeMessage, '*')
         const themeMessage: HostToPluginMessage = {
           source: 'digiworld-host', pluginId, kind: 'theme', payload: theme,
         }
@@ -129,7 +134,7 @@ export function PluginFrame({ pluginId, html, theme, active = true }: PluginFram
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [pluginId, theme, active])
+  }, [pluginId, theme, active, locale])
 
   useEffect(() => {
     if (!ready.current) return
@@ -138,6 +143,14 @@ export function PluginFrame({ pluginId, html, theme, active = true }: PluginFram
     }
     frame.current?.contentWindow?.postMessage(themeMessage, '*')
   }, [pluginId, theme])
+
+  useEffect(() => {
+    if (!ready.current) return
+    const localeMessage: HostToPluginMessage = {
+      source: 'digiworld-host', pluginId, kind: 'locale', payload: { locale },
+    }
+    frame.current?.contentWindow?.postMessage(localeMessage, '*')
+  }, [pluginId, locale])
 
   useEffect(() => {
     if (!ready.current) return

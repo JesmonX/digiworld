@@ -42,6 +42,7 @@ describe('mail assistant status and search', () => {
   let container: HTMLDivElement
 
   beforeEach(() => {
+    document.documentElement.lang = 'zh'
     container = document.createElement('div')
     document.body.append(container)
     mocks.ready.mockReset()
@@ -55,6 +56,7 @@ describe('mail assistant status and search', () => {
   })
 
   afterEach(() => {
+    document.documentElement.lang = ''
     vi.useRealTimers()
     vi.restoreAllMocks()
     container.remove()

@@ -3,8 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronDown, Flame, Keyboard, Pause, Play } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import {
-  formatKeyLabel, getKeyboardLayout, heatLevel, keyboardLayouts, layoutKeys, type KeyboardLayoutId, type KeyDefinition,
+  formatKeyLabel, getKeyboardLayout, heatLevel, keyboardLayouts, layoutKeys, type KeyboardLayout, type KeyboardLayoutId, type KeyDefinition,
 } from './keyboard'
+import { t, type Locale } from './i18n'
 import './styles.css'
 
 const PLUGIN_ID = 'io.github.jesmonx.digiworld.keyboard-heatmap'
@@ -20,7 +21,11 @@ interface Snapshot {
   counts: Record<string, number>
   topTen: RankingEntry[]
 }
+
 export default function App() {
+  const [locale, setLocale] = useState<Locale>(() => {
+    return (document.documentElement.lang?.startsWith('zh') ? 'zh' : 'en') as Locale
+  })
   const [scope, setScope] = useState<'today' | 'all'>('today')
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const [layoutId, setLayoutId] = useState<KeyboardLayoutId>('full')
@@ -43,7 +48,17 @@ export default function App() {
     bridge.ready()
     void refresh()
     const interval = window.setInterval(refresh, 2000)
-    return () => window.clearInterval(interval)
+
+    const unlistenLocale = bridge.on<{ locale: Locale }>('locale', ({ locale: nextLocale }) => {
+      if (nextLocale) {
+        setLocale(nextLocale)
+      }
+    })
+
+    return () => {
+      window.clearInterval(interval)
+      if (typeof unlistenLocale === 'function') unlistenLocale()
+    }
   }, [refresh])
 
   useEffect(() => {
@@ -102,16 +117,30 @@ export default function App() {
     }
   }
 
+  const getLayoutLabel = (opt: KeyboardLayout) => {
+    if (locale === 'en') {
+      const map: Record<string, string> = { full: '104-Key', tkl: '87-Key', '75': '84-Key', '65': '68-Key', '60': '61-Key' }
+      return map[opt.id] || opt.label
+    }
+    return opt.label
+  }
+
   return (
     <PluginPage className="heatmap-app">
       <PageToolbar className=" plugin-header">
-        <div className="summary-line" aria-label="键盘统计摘要">
-          <div><span>总次数</span><strong>{(snapshot?.total ?? 0).toLocaleString()}</strong></div>
-          <div><Flame /><span>最高频</span><strong>{snapshot?.topKey ?? '—'}</strong></div>
+        <div className="summary-line" aria-label={t('summaryAria', locale)}>
+          <div><span>{t('totalCount', locale)}</span><strong>{(snapshot?.total ?? 0).toLocaleString()}</strong></div>
+          <div><Flame /><span>{t('topKey', locale)}</span><strong>{snapshot?.topKey ? formatKeyLabel(snapshot.topKey, locale) : '—'}</strong></div>
         </div>
         <div className="header-actions">
-          <div className="dw-segmented scope-toggle" role="group" aria-label="统计时间范围"><Button aria-pressed={scope === 'today'} className={scope === 'today' ? 'active' : ''} onClick={() => setScope('today')}>今天</Button><Button aria-pressed={scope === 'all'} className={scope === 'all' ? 'active' : ''} onClick={() => setScope('all')}>全部</Button></div>
-          <Button className={`pause-button ${snapshot?.paused ? 'paused' : ''}`} disabled={pauseBusy || !snapshot} onClick={() => void togglePause()}>{snapshot?.paused ? <Play /> : <Pause />}{pauseBusy ? '处理中…' : snapshot?.paused ? '继续' : '暂停'}</Button>
+          <div className="dw-segmented scope-toggle" role="group" aria-label={t('scopeAria', locale)}>
+            <Button aria-pressed={scope === 'today'} className={scope === 'today' ? 'active' : ''} onClick={() => setScope('today')}>{t('today', locale)}</Button>
+            <Button aria-pressed={scope === 'all'} className={scope === 'all' ? 'active' : ''} onClick={() => setScope('all')}>{t('all', locale)}</Button>
+          </div>
+          <Button className={`pause-button ${snapshot?.paused ? 'paused' : ''}`} disabled={pauseBusy || !snapshot} onClick={() => void togglePause()}>
+            {snapshot?.paused ? <Play /> : <Pause />}
+            {pauseBusy ? t('processing', locale) : snapshot?.paused ? t('resume', locale) : t('pause', locale)}
+          </Button>
         </div>
       </PageToolbar>
 
@@ -129,28 +158,28 @@ export default function App() {
             onClick={() => setLayoutMenuOpen(open => !open)}
           >
             <span className="layout-preview" aria-hidden="true">{layout.preview.map((row, rowIndex) => <i key={rowIndex}>{row.map((width, index) => <b key={index} style={{ flex: width }} />)}</i>)}</span>
-            <span className="layout-picker-copy"><strong>{layout.label}</strong></span>
+            <span className="layout-picker-copy"><strong>{getLayoutLabel(layout)}</strong></span>
             <ChevronDown aria-hidden="true" />
           </Button>
-          <Menu id="keyboard-layout-menu" className={`layout-menu ${layoutMenuOpen ? 'open' : ''}`} role="menu" aria-label="键盘尺寸选项" aria-hidden={!layoutMenuOpen}>
+          <Menu id="keyboard-layout-menu" className={`layout-menu ${layoutMenuOpen ? 'open' : ''}`} role="menu" aria-label={t('layoutOptionsAria', locale)} aria-hidden={!layoutMenuOpen}>
             {keyboardLayouts.map(option => <Button key={option.id} type="button" role="menuitemradio" aria-checked={layoutId === option.id} className={layoutId === option.id ? 'active' : ''} onClick={() => void selectLayout(option.id)}>
               <span className="layout-preview" aria-hidden="true">{option.preview.map((row, rowIndex) => <i key={rowIndex}>{row.map((width, index) => <b key={index} style={{ flex: width }} />)}</i>)}</span>
-              <span><strong>{option.label}</strong><small>{option.id === 'full' ? '全尺寸' : option.id === 'tkl' ? 'TKL' : `${option.id}%`}</small></span>
+              <span><strong>{getLayoutLabel(option)}</strong><small>{option.id === 'full' ? t('fullSize', locale) : option.id === 'tkl' ? 'TKL' : `${option.id}%`}</small></span>
               {layoutId === option.id && <Check aria-hidden="true" />}
             </Button>)}
           </Menu>
         </div>
-        <div className="keyboard-scroll" tabIndex={0} aria-label="键盘热力图，可横向滚动" style={{ '--board-min-width': `${layout.minWidth}px` } as React.CSSProperties}>
+        <div className="keyboard-scroll" tabIndex={0} aria-label={t('scrollAria', locale)} style={{ '--board-min-width': `${layout.minWidth}px` } as React.CSSProperties}>
           <div className="board-toolbar">
-            <div><h2><Keyboard />按键分布</h2></div>
-            <div className="legend"><span>低</span>{[1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>高</span></div>
+            <div><h2><Keyboard />{t('keyDistribution', locale)}</h2></div>
+            <div className="legend"><span>{t('low', locale)}</span>{[1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>{t('high', locale)}</span></div>
           </div>
           <div className={`keyboard-board layout-${layout.id}`}>
-            {layout.functionRow.length > 0 && <><div className="function-row-layout"><KeyboardRow keys={layout.functionRow} counts={snapshot?.counts ?? {}} max={maxCount} /></div><div className="keyboard-gap" /></>}
+            {layout.functionRow.length > 0 && <><div className="function-row-layout"><KeyboardRow keys={layout.functionRow} counts={snapshot?.counts ?? {}} max={maxCount} locale={locale} /></div><div className="keyboard-gap" /></>}
             <div className={`keyboard-sections ${layout.numpadKeys.length ? '' : 'without-numpad'} ${layout.navRows.length ? '' : 'without-nav'}`}>
-              <div className="alpha-section">{layout.alphaRows.map((row, index) => <KeyboardRow key={index} keys={row} counts={snapshot?.counts ?? {}} max={maxCount} />)}</div>
-              {layout.navRows.length > 0 && <div className="nav-section">{layout.navRows.map((row, index) => <KeyboardRow key={index} className={index === 3 ? 'arrow-up-row' : ''} keys={row} counts={snapshot?.counts ?? {}} max={maxCount} />)}</div>}
-              {layout.numpadKeys.length > 0 && <div className="numpad-section">{layout.numpadKeys.map(key => <Keycap key={key.id} definition={key} count={snapshot?.counts[key.id] ?? 0} max={maxCount} grid />)}</div>}
+              <div className="alpha-section">{layout.alphaRows.map((row, index) => <KeyboardRow key={index} keys={row} counts={snapshot?.counts ?? {}} max={maxCount} locale={locale} />)}</div>
+              {layout.navRows.length > 0 && <div className="nav-section">{layout.navRows.map((row, index) => <KeyboardRow key={index} className={index === 3 ? 'arrow-up-row' : ''} keys={row} counts={snapshot?.counts ?? {}} max={maxCount} locale={locale} />)}</div>}
+              {layout.numpadKeys.length > 0 && <div className="numpad-section">{layout.numpadKeys.map(key => <Keycap key={key.id} definition={key} count={snapshot?.counts[key.id] ?? 0} max={maxCount} grid locale={locale} />)}</div>}
             </div>
           </div>
         </div>
@@ -158,11 +187,11 @@ export default function App() {
 
       <section className="lower-grid">
         <Card className="dw-card ranking-card">
-          <h2>高频键位</h2>
+          <h2>{t('topKeys', locale)}</h2>
           <div className="ranking-list">
             {snapshot?.topTen.length
-              ? snapshot.topTen.map((entry, index) => <div key={entry.key}><b>{index + 1}</b><span>{formatKeyLabel(entry.key)}</span><i><em style={{ width: `${(entry.count / (snapshot.topTen[0]?.count || 1)) * 100}%` }} /></i><strong>{entry.count.toLocaleString()}</strong></div>)
-              : <p className="no-data">暂无数据</p>}
+              ? snapshot.topTen.map((entry, index) => <div key={entry.key}><b>{index + 1}</b><span>{formatKeyLabel(entry.key, locale)}</span><i><em style={{ width: `${(entry.count / (snapshot.topTen[0]?.count || 1)) * 100}%` }} /></i><strong>{entry.count.toLocaleString()}</strong></div>)
+              : <p className="no-data">{t('noData', locale)}</p>}
           </div>
         </Card>
       </section>
@@ -170,18 +199,20 @@ export default function App() {
   )
 }
 
-function KeyboardRow({ keys, counts, max, className = '' }: { keys: KeyDefinition[]; counts: Record<string, number>; max: number; className?: string }) {
-  return <div className={`key-row ${className}`}>{keys.map(key => <Keycap key={key.id} definition={key} count={counts[key.id] ?? 0} max={max} />)}</div>
+function KeyboardRow({ keys, counts, max, className = '', locale = 'en' }: { keys: KeyDefinition[]; counts: Record<string, number>; max: number; className?: string; locale?: Locale }) {
+  return <div className={`key-row ${className}`}>{keys.map(key => <Keycap key={key.id} definition={key} count={counts[key.id] ?? 0} max={max} locale={locale} />)}</div>
 }
 
-function Keycap({ definition, count, max, grid = false }: { definition: KeyDefinition; count: number; max: number; grid?: boolean }) {
+function Keycap({ definition, count, max, grid = false, locale = 'en' }: { definition: KeyDefinition; count: number; max: number; grid?: boolean; locale?: Locale }) {
   const level = heatLevel(count, max)
   const style = grid
     ? { gridRow: `${definition.row} / span ${definition.rowSpan ?? 1}`, gridColumn: `${definition.column} / span ${definition.columnSpan ?? 1}` }
     : { '--width': definition.width ?? 1, '--spacer': definition.spacer ?? 0 }
+  const label = formatKeyLabel(definition.id, locale)
+  const countText = t('presses', locale).replace('{count}', count.toLocaleString())
   return (
-    <div tabIndex={0} className={`key level-${level} ${count > 0 ? 'has-count' : ''} ${level >= 3 ? 'strong-heat' : ''}`} title={`${definition.id}: ${count.toLocaleString()} 次`} aria-label={`${definition.label || definition.id}，${count.toLocaleString()} 次`} style={style as React.CSSProperties}>
-      <span>{definition.label}</span>
+    <div tabIndex={0} className={`key level-${level} ${count > 0 ? 'has-count' : ''} ${level >= 3 ? 'strong-heat' : ''}`} title={`${definition.id}: ${countText}`} aria-label={`${definition.label || label}, ${countText}`} style={style as React.CSSProperties}>
+      <span>{definition.label || label}</span>
       {count > 0 && <small>{count > 999 ? `${(count / 1000).toFixed(1)}k` : count}</small>}
     </div>
   )

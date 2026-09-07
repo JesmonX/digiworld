@@ -145,7 +145,7 @@ export interface PluginSummary {
 export interface HostToPluginMessage {
   source: 'digiworld-host'
   pluginId: string
-  kind: 'response' | 'event' | 'theme'
+  kind: 'response' | 'event' | 'theme' | 'locale'
   requestId?: string
   method?: string
   payload?: unknown

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Check, Clock3, Database, Gauge, HardDrive, PieChart, Plus, RefreshCw, Server, Settings2, Ticket, Trash2, X } from 'lucide-react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import { cacheRateScale, calendarCells, formatTokens, heatLevel, weeklyModelCategories, weeklyUsage, type Metric, type UsageDay, type WeeklyUsagePoint } from './heatmap'
+import { t, type Locale } from './i18n'
 import './styles.css'
 
 const PLUGIN_ID = 'io.github.jesmonx.digiworld.agent-token-heatmap'
@@ -139,6 +140,13 @@ function AgentIcon({ agent, className = '' }: { agent: Agent; className?: string
 }
 
 export default function App() {
+  const [locale, setLocale] = useState<Locale>(() => {
+    if (typeof document !== 'undefined') {
+      if (document.documentElement.lang === 'en') return 'en'
+      if (document.documentElement.lang.startsWith('zh')) return 'zh'
+    }
+    return 'en'
+  })
   const [settings, setSettings] = useState<UsageSettings | null>(null)
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
   const [agents, setAgents] = useState<Agent[]>([...AGENTS])
@@ -150,6 +158,13 @@ export default function App() {
   const [quotaLoading, setQuotaLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+
+  useEffect(() => {
+    return bridge.on('locale', (payload: unknown) => {
+      const loc = (payload as { locale?: Locale })?.locale
+      if (loc === 'en' || loc === 'zh') setLocale(loc)
+    })
+  }, [])
 
   const loadSnapshot = useCallback(async (nextSettings?: UsageSettings, currentAgents?: Agent[], currentSources?: string[]) => {
     const configured = nextSettings ?? settings
@@ -330,55 +345,55 @@ export default function App() {
       .sort((a, b) => b.totalTokens - a.totalTokens || a.model.localeCompare(b.model))
   }, [snapshot])
   const weekly = useMemo(() => snapshot ? weeklyUsage(snapshot.endDay, snapshot.days) : [], [snapshot])
-  const sourceOptions = settings ? [{ id: 'local', label: '本机' }, ...settings.sshSources] : []
+  const sourceOptions = settings ? [{ id: 'local', label: locale === 'zh' ? '本机' : 'Local' }, ...settings.sshSources] : []
 
   return (
     <PluginPage className="usage-app">
       <PageToolbar className=" usage-header">
         <div className="header-buttons">
-          <Button className="secondary" onClick={() => setSettingsOpen(true)}><Settings2 />设置</Button>
-          <Button className="primary" disabled={refresh.running} onClick={() => void startRefresh()}><RefreshCw className={refresh.running ? 'spin' : ''} />{refresh.running ? `${refresh.completed}/${refresh.total} ${refresh.currentSource ?? ''}` : '手动刷新'}</Button>
+          <Button className="secondary" onClick={() => setSettingsOpen(true)}><Settings2 />{t('settings', locale)}</Button>
+          <Button className="primary" disabled={refresh.running} onClick={() => void startRefresh()}><RefreshCw className={refresh.running ? 'spin' : ''} />{refresh.running ? `${refresh.completed}/${refresh.total} ${refresh.currentSource ?? ''}` : t('manualRefresh', locale)}</Button>
         </div>
       </PageToolbar>
 
       {(error || refresh.errors.length > 0) && <Status tone="error" className="error-banner"><AlertTriangle /><span>{error ?? refresh.errors.join('；')}</span><Button onClick={() => { setError(null); setRefresh(current => ({ ...current, errors: [] })) }}><X /></Button></Status>}
 
       <section className="filter-bar">
-        <FilterGroup label="Agent">{AGENTS.map(agent => <FilterChip key={agent} active={agents.includes(agent)} label={agentLabel[agent]} icon={<AgentIcon agent={agent} />} onClick={() => toggleAgent(agent)} />)}</FilterGroup>
-        <FilterGroup label="设备">{sourceOptions.map(source => <FilterChip key={source.id} active={sources.includes(source.id)} label={source.label} onClick={() => toggleSource(source.id)} />)}</FilterGroup>
+        <FilterGroup label={t('agents', locale)}>{AGENTS.map(agent => <FilterChip key={agent} active={agents.includes(agent)} label={agentLabel[agent]} icon={<AgentIcon agent={agent} />} onClick={() => toggleAgent(agent)} />)}</FilterGroup>
+        <FilterGroup label={t('devices', locale)}>{sourceOptions.map(source => <FilterChip key={source.id} active={sources.includes(source.id)} label={source.label} onClick={() => toggleSource(source.id)} />)}</FilterGroup>
       </section>
 
       <section className="insights-grid">
         <WeeklyChart points={weekly} />
-        <QuotaCard quota={quota} loading={quotaLoading} configured={Boolean(settings?.codexQuota.sourceId)} onRefresh={() => void loadQuota(true)} onConfigure={() => setSettingsOpen(true)} />
+        <QuotaCard quota={quota} loading={quotaLoading} configured={Boolean(settings?.codexQuota.sourceId)} locale={locale} onRefresh={() => void loadQuota(true)} onConfigure={() => setSettingsOpen(true)} />
       </section>
 
       <section className="dw-card heatmap-card">
         <div className="card-title">
-          <div><h2>每日热力图</h2><p>{snapshot?.startDay ?? snapshot?.days[0]?.day ?? '—'} 至 {snapshot?.endDay ?? '—'}</p></div>
+          <div><h2>{t('dailyHeatmap', locale)}</h2><p>{snapshot?.startDay ?? snapshot?.days[0]?.day ?? '—'} {t('to', locale)} {snapshot?.endDay ?? '—'}</p></div>
           <div className="heatmap-controls">
-            <div className="dw-segmented range-group" aria-label="统计范围">{(['30', '90', '365', 'all'] as Range[]).map(value => <Button key={value} className={range === value ? 'active' : ''} onClick={() => setRange(value)}>{value === 'all' ? '全部' : `${value} 天`}</Button>)}</div>
-            <Select aria-label="热力图指标" value={metric} onChange={event => setMetric(event.target.value as Metric)}><option value="totalTokens">总 Token</option><option value="inputTokens">输入</option><option value="outputTokens">输出</option><option value="cacheReadTokens">缓存读取</option></Select>
+            <div className="dw-segmented range-group" aria-label="统计范围">{(['30', '90', '365', 'all'] as Range[]).map(value => <Button key={value} className={range === value ? 'active' : ''} onClick={() => setRange(value)}>{value === 'all' ? t('all', locale) : locale === 'zh' ? `${value} 天` : `${value}d`}</Button>)}</div>
+            <Select aria-label="热力图指标" value={metric} onChange={event => setMetric(event.target.value as Metric)}><option value="totalTokens">{t('totalTokens', locale)}</option><option value="inputTokens">{t('inputTokens', locale)}</option><option value="outputTokens">{t('outputTokens', locale)}</option><option value="cacheReadTokens">{t('cacheReadTokens', locale)}</option></Select>
           </div>
         </div>
         <MetricGrid aria-label="所选范围用量汇总">
-          <Summary label="总 Token" value={snapshot?.totals.totalTokens} />
-          <Summary label="输入" value={snapshot?.totals.inputTokens} />
-          <Summary label="输出" value={snapshot?.totals.outputTokens} />
-          <Summary label="缓存读取" value={snapshot?.totals.cacheReadTokens} />
-          <Summary label="缓存写入" value={snapshot?.totals.cacheWriteTokens} />
-          <Summary label="缓存率" text={snapshot?.totals.cacheRate == null ? '—' : `${(snapshot.totals.cacheRate * 100).toFixed(1)}%`} />
+          <Summary label={t('totalTokens', locale)} value={snapshot?.totals.totalTokens} />
+          <Summary label={t('inputTokens', locale)} value={snapshot?.totals.inputTokens} />
+          <Summary label={t('outputTokens', locale)} value={snapshot?.totals.outputTokens} />
+          <Summary label={t('cacheReadTokens', locale)} value={snapshot?.totals.cacheReadTokens} />
+          <Summary label={t('cacheWriteTokens', locale)} value={snapshot?.totals.cacheWriteTokens} />
+          <Summary label={t('cacheRate', locale)} text={snapshot?.totals.cacheRate == null ? '—' : `${(snapshot.totals.cacheRate * 100).toFixed(1)}%`} />
         </MetricGrid>
-        {snapshot && cells.length ? <div className="calendar-wrap"><div className="weekday-labels"><span>一</span><span>三</span><span>五</span><span>日</span></div><div className="calendar-grid">{cells.map((cell, index) => <i key={cell.day ?? `blank-${index}`} tabIndex={cell.day ? 0 : undefined} aria-label={cell.day ? `${cell.day}，${formatTokens(cell.value)}` : undefined} className={`level-${heatLevel(cell.value, max)} ${cell.day ? '' : 'blank'}`} title={cell.day ? `${cell.day} · ${formatTokens(cell.value)}` : undefined} />)}</div><div className="legend"><span>低</span>{[0, 1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>高</span></div></div> : <Empty />}
+        {snapshot && cells.length ? <div className="calendar-wrap"><div className="weekday-labels">{locale === 'zh' ? <><span>一</span><span>三</span><span>五</span><span>日</span></> : <><span>M</span><span>W</span><span>F</span><span>S</span></>}</div><div className="calendar-grid">{cells.map((cell, index) => <i key={cell.day ?? `blank-${index}`} tabIndex={cell.day ? 0 : undefined} aria-label={cell.day ? `${cell.day}，${formatTokens(cell.value)}` : undefined} className={`level-${heatLevel(cell.value, max)} ${cell.day ? '' : 'blank'}`} title={cell.day ? `${cell.day} · ${formatTokens(cell.value)}` : undefined} />)}</div><div className="legend"><span>{t('low', locale)}</span>{[0, 1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>{t('high', locale)}</span></div></div> : <Empty />}
       </section>
 
       <section className="lower-grid">
-        <Card className="dw-card breakdown-card"><h2>来源明细</h2>{snapshot?.breakdown.length ? <div className="breakdown-table">{[...snapshot.breakdown].sort((a, b) => b.totalTokens - a.totalTokens).map(row => <div key={`${row.sourceId}-${row.agent}`}><AgentIcon agent={row.agent} className={`agent-breakdown-icon ${row.agent}`} /><strong>{agentLabel[row.agent]}</strong><span>{row.sourceLabel}</span><b>{formatTokens(row.totalTokens)}</b><small>{row.cacheRate == null ? `${formatTokens(row.cacheReadTokens)} cache` : `${(row.cacheRate * 100).toFixed(1)}% cache`}</small></div>)}</div> : <Empty />}</Card>
-        <Card className="dw-card daily-ranking-card"><h2>每日用量排行</h2>{dailyRanking.length ? <div className="daily-ranking">{dailyRanking.map((day, index) => <div key={day.day}><b>{index + 1}</b><span>{day.day}</span><i><em style={{ width: `${(day.totalTokens / dailyMax) * 100}%` }} /></i><strong>{formatTokens(day.totalTokens)}</strong></div>)}</div> : <Empty />}</Card>
+        <Card className="dw-card breakdown-card"><h2>{t('sourceBreakdown', locale)}</h2>{snapshot?.breakdown.length ? <div className="breakdown-table">{[...snapshot.breakdown].sort((a, b) => b.totalTokens - a.totalTokens).map(row => <div key={`${row.sourceId}-${row.agent}`}><AgentIcon agent={row.agent} className={`agent-breakdown-icon ${row.agent}`} /><strong>{agentLabel[row.agent]}</strong><span>{row.sourceLabel}</span><b>{formatTokens(row.totalTokens)}</b><small>{row.cacheRate == null ? `${formatTokens(row.cacheReadTokens)} cache` : `${(row.cacheRate * 100).toFixed(1)}% cache`}</small></div>)}</div> : <Empty />} </Card>
+        <Card className="dw-card daily-ranking-card"><h2>{t('dailyRanking', locale)}</h2>{dailyRanking.length ? <div className="daily-ranking">{dailyRanking.map((day, index) => <div key={day.day}><b>{index + 1}</b><span>{day.day}</span><i><em style={{ width: `${(day.totalTokens / dailyMax) * 100}%` }} /></i><strong>{formatTokens(day.totalTokens)}</strong></div>)}</div> : <Empty />}</Card>
       </section>
 
       <Card className="dw-card model-card">
-        <div className="model-card-heading"><div><h2>模型来源明细</h2><p>按模型聚合 Token 用量</p></div><PieChart /></div>
+        <div className="model-card-heading"><div><h2>{t('modelBreakdown', locale)}</h2><p>{t('modelAggregated', locale)}</p></div><PieChart /></div>
         <ModelPieChart rows={modelTotals} />
       </Card>
 
@@ -525,25 +540,25 @@ function modelDisplayName(model: string): string {
   return model === 'unknown' ? '未知模型' : model
 }
 
-function QuotaCard({ quota, loading, configured, onRefresh, onConfigure }: { quota: CodexQuotaSnapshot | null; loading: boolean; configured: boolean; onRefresh(): void; onConfigure(): void }) {
+function QuotaCard({ quota, loading, configured, locale = 'en', onRefresh, onConfigure }: { quota: CodexQuotaSnapshot | null; loading: boolean; configured: boolean; locale?: Locale; onRefresh(): void; onConfigure(): void }) {
   const available = quota && (quota.status === 'ready' || quota.status === 'stale') && quota.windows.length > 0
   const resetSummary = quota?.resetCredits
   const availableResets = resetSummary?.availableCount ?? 0
   const credits = (resetSummary?.credits ?? []).filter(credit => credit.status !== 'redeemed')
   return <Card className={`quota-card ${quota?.status ?? ''}`}>
-    <div className="panel-heading"><div><h2>Codex 限额</h2><p>{quota?.sourceLabel ?? '指定账号设备'}{quota?.planType ? ` · ${quota.planType}` : ''}</p></div><Button className="panel-action" title="刷新 Codex 限额" disabled={loading || !configured} onClick={onRefresh}><RefreshCw className={loading ? 'spin' : ''} /></Button></div>
-    {!configured || quota?.status === 'unconfigured' ? <div className="quota-empty"><Gauge /><span>尚未选择限额查询设备</span><Button onClick={onConfigure}>前往设置</Button></div>
-      : loading && !quota ? <div className="quota-empty"><RefreshCw className="spin" /><span>正在获取最新限额…</span></div>
+    <div className="panel-heading"><div><h2>{t('codexQuota', locale)}</h2><p>{quota?.sourceLabel ?? (locale === 'zh' ? '指定账号设备' : 'Designated Device')}{quota?.planType ? ` · ${quota.planType}` : ''}</p></div><Button className="panel-action" title={locale === 'zh' ? '刷新 Codex 限额' : 'Refresh Codex Quota'} disabled={loading || !configured} onClick={onRefresh}><RefreshCw className={loading ? 'spin' : ''} /></Button></div>
+    {!configured || quota?.status === 'unconfigured' ? <div className="quota-empty"><Gauge /><span>{locale === 'zh' ? '尚未选择限额查询设备' : 'No device configured for quota queries'}</span><Button onClick={onConfigure}>{t('settings', locale)}</Button></div>
+      : loading && !quota ? <div className="quota-empty"><RefreshCw className="spin" /><span>{locale === 'zh' ? '正在获取最新限额…' : 'Fetching latest quota...'}</span></div>
         : available ? <>
           <div className="quota-windows">{quota.windows.map((window, index) => {
             const remaining = 100 - Math.max(0, Math.min(100, window.usedPercent))
-            return <div key={`${window.windowDurationMins ?? index}-${window.resetsAt ?? index}`} className="quota-window"><div><strong>{formatDuration(window.windowDurationMins)}</strong><span>剩余 {remaining}%</span></div><div className="quota-track"><i style={{ width: `${remaining}%` }} /></div><small><Clock3 />{formatReset(window.resetsAt)}</small></div>
+            return <div key={`${window.windowDurationMins ?? index}-${window.resetsAt ?? index}`} className="quota-window"><div><strong>{formatDuration(window.windowDurationMins)}</strong><span>{locale === 'zh' ? `剩余 ${remaining}%` : `Remaining ${remaining}%`}</span></div><div className="quota-track"><i style={{ width: `${remaining}%` }} /></div><small><Clock3 />{formatReset(window.resetsAt, locale)}</small></div>
           })}</div>
           <div className="quota-resets">
             <div className="quota-resets-header">
-              <span className="quota-resets-title"><Ticket />重置卡</span>
+              <span className="quota-resets-title"><Ticket />{t('resetCards', locale)}</span>
               <span className={`quota-resets-badge ${availableResets > 0 ? 'active' : 'zero'}`}>
-                {availableResets > 0 ? `${availableResets} 张可用` : '0 张可用'}
+                {locale === 'zh' ? (availableResets > 0 ? `${availableResets} 张可用` : '0 张可用') : (availableResets > 0 ? `${availableResets} available` : '0 available')}
               </span>
             </div>
             {credits.length > 0 && (
@@ -551,19 +566,19 @@ function QuotaCard({ quota, loading, configured, onRefresh, onConfigure }: { quo
                 {credits.map((credit, index) => (
                   <div key={credit.id || index} className="quota-reset-item">
                     <div className="quota-reset-item-name">
-                      <span>{credit.title || '额度重置卡'}</span>
+                      <span>{credit.title || t('defaultResetCard', locale)}</span>
                     </div>
                     <div className="quota-reset-item-dates">
-                      <span>获得：{formatCardDate(credit.grantedAt)}</span>
-                      <span>到期：{formatCardDate(credit.expiresAt)}</span>
+                      <span>{t('granted', locale)} {formatCardDate(credit.grantedAt, locale)}</span>
+                      <span>{t('expires', locale)} {formatCardDate(credit.expiresAt, locale)}</span>
                     </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
-          <div className={`quota-meta ${quota.status === 'stale' ? 'warning' : ''}`}>{quota.status === 'stale' ? `刷新失败，显示上次结果：${quota.error ?? '未知错误'}` : `更新于 ${formatFetchedAt(quota.fetchedAt)}`}</div>
-        </> : <div className="quota-empty error"><AlertTriangle /><span>{quota?.error ?? '当前设备无法获取 Codex 限额'}</span><Button onClick={onConfigure}>检查设置</Button></div>}
+          <div className={`quota-meta ${quota.status === 'stale' ? 'warning' : ''}`}>{quota.status === 'stale' ? (locale === 'zh' ? `刷新失败，显示上次结果：${quota.error ?? '未知错误'}` : `Failed to refresh, showing last result: ${quota.error ?? 'Unknown'}`) : (locale === 'zh' ? `更新于 ${formatFetchedAt(quota.fetchedAt)}` : `Updated at ${formatFetchedAt(quota.fetchedAt)}`)}</div>
+        </> : <div className="quota-empty error"><AlertTriangle /><span>{quota?.error ?? (locale === 'zh' ? '当前设备无法获取 Codex 限额' : 'Unable to query Codex quota from device')}</span><Button onClick={onConfigure}>{t('settings', locale)}</Button></div>}
   </Card>
 }
 
@@ -575,16 +590,17 @@ function formatDuration(minutes: number | null): string {
   return `${minutes}m`
 }
 
-function formatReset(seconds: number | null): string {
-  if (!seconds) return '未提供重置时间'
+function formatReset(seconds: number | null, locale: Locale = 'en'): string {
+  if (!seconds) return locale === 'zh' ? '未提供重置时间' : 'No reset time'
   const ms = seconds > 100_000_000_000 ? seconds : seconds * 1000
-  return `${new Date(ms).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })} 重置`
+  const dateStr = new Date(ms).toLocaleString(locale === 'zh' ? 'zh-CN' : 'en-US', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  return locale === 'zh' ? `${dateStr} 重置` : `Resets ${dateStr}`
 }
 
-function formatCardDate(seconds: number | null | undefined): string {
-  if (!seconds) return '永久有效'
+function formatCardDate(seconds: number | null | undefined, locale: Locale = 'en'): string {
+  if (!seconds) return locale === 'zh' ? '永久有效' : 'Permanent'
   const ms = seconds > 100_000_000_000 ? seconds : seconds * 1000
-  return new Date(ms).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  return new Date(ms).toLocaleString(locale === 'zh' ? 'zh-CN' : 'en-US', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
 function formatFetchedAt(value: string | null): string {

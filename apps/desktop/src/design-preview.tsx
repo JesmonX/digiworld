@@ -10,6 +10,10 @@ import { fixture } from './design-fixtures'
 import { getAccentTheme, pluginTheme, type ColorSchemeId } from './theme'
 import { DesignTemplate } from './design-template'
 
+if (typeof window !== 'undefined' && !localStorage.getItem('digiworld.locale.v1')) {
+  localStorage.setItem('digiworld.locale.v1', 'zh')
+}
+
 const names = ['keyboard-heatmap', 'agent-token-heatmap', 'mail-assistant', 'github-actions', 'server-monitor', 'calendar-todo']
 const labels = ['键盘热力图', 'Agent Overview', '邮件助手', 'Git Actions', 'Servers', '日历与 Todo']
 const previewState = new URLSearchParams(location.search).get('state')

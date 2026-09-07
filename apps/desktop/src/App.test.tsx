@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import { COLOR_SCHEME_STORAGE_KEY, FONT_THEME_STORAGE_KEY, FONT_WEIGHT_STORAGE_KEY, GLASS_STORAGE_KEY, THEME_STORAGE_KEY } from './theme'
+import { FONT_THEME_STORAGE_KEY, FONT_WEIGHT_STORAGE_KEY, GLASS_STORAGE_KEY, THEME_STORAGE_KEY } from './theme'
+import { LOCALE_STORAGE_KEY } from './lib/i18n'
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -46,11 +47,29 @@ vi.mock('./lib/api', () => ({
   },
 }))
 
+const LABEL_MAP: Record<string, string[]> = {
+  '设置': ['设置', 'Settings'],
+  'Settings': ['Settings', '设置'],
+  '功能库': ['功能库', 'Plugins Store', 'Store', 'Catalog'],
+  '概览': ['概览', 'Overview'],
+  '测试连接': ['测试连接', 'Test Connection'],
+  '测试中…': ['测试中…', 'Testing...'],
+  '保存': ['保存', 'Save'],
+  '检查全部插件': ['检查全部插件', 'Check All Plugins'],
+  '检查主程序': ['检查主程序', 'Check Digiworld Core', 'Check Core'],
+  '同意并更新 1 项': ['同意并更新 1 项', 'Agree & Update 1 item', 'Agree & Update 1 items', 'Agree & Update'],
+  '同意并更新': ['同意并更新', 'Agree & Update'],
+  '暂未适配当前系统': ['暂未适配当前系统', 'Not supported on current system'],
+}
+
 function button(container: HTMLElement, label: string) {
+  const candidates = LABEL_MAP[label] ?? [label]
   return Array.from(container.querySelectorAll('button')).find(item => (
-    item.textContent?.includes(label) ||
-    item.getAttribute('aria-label') === label ||
-    item.getAttribute('title') === label
+    candidates.some(cand =>
+      item.textContent?.includes(cand) ||
+      item.getAttribute('aria-label') === cand ||
+      item.getAttribute('title') === cand
+    )
   ))
 }
 
@@ -88,10 +107,10 @@ describe('workspace redesign', () => {
     expect(container.querySelector('[aria-label="已安装插件"]')).not.toBeNull()
     expect(container.querySelector('[aria-label="系统"]')).not.toBeNull()
     expect(container.querySelector('.rail-divider')).not.toBeNull()
-    expect(container.textContent).toContain('数字工作台')
-    expect(container.textContent).toContain('已安装功能')
+    expect(container.textContent).toContain('Digital Workspace')
+    expect(container.textContent).toContain('Installed Tools')
     expect(container.textContent).not.toContain('快捷操作')
-    expect(container.textContent).toContain('暂无异常')
+    expect(container.textContent).toContain('All systems normal')
     expect(container.querySelectorAll('.workspace-metric')).toHaveLength(3)
     expect(container.querySelectorAll('.plugin-row')).toHaveLength(1)
 
@@ -126,15 +145,15 @@ describe('explicit update consent', () => {
     mocks.testProxySettings.mockReturnValue(new Promise(() => {}))
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
-    await navigate(container, '设置')
+    await navigate(container, 'Settings')
 
     vi.useFakeTimers()
-    await act(async () => button(container, '测试连接')?.click())
-    expect(container.textContent).toContain('测试中…')
+    await act(async () => button(container, 'Test Connection')?.click())
+    expect(container.textContent).toContain('Testing...')
     await act(async () => { await vi.advanceTimersByTimeAsync(20_000) })
 
-    expect(container.textContent).toContain('代理测试超时')
-    expect(container.textContent).toContain('测试连接')
+    expect(container.textContent).toContain('Proxy test timed out')
+    expect(container.textContent).toContain('Test Connection')
     await act(async () => root.unmount())
   })
 
@@ -142,15 +161,15 @@ describe('explicit update consent', () => {
     mocks.checkPluginUpdates.mockReturnValue(new Promise(() => {}))
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
-    await navigate(container, '设置')
+    await navigate(container, 'Settings')
 
     vi.useFakeTimers()
-    await act(async () => button(container, '检查全部插件')?.click())
-    expect(container.textContent).toContain('检查中…')
+    await act(async () => button(container, 'Check All Plugins')?.click())
+    expect(container.textContent).toContain('Checking...')
     await act(async () => { await vi.advanceTimersByTimeAsync(35_000) })
 
-    expect(container.textContent).toContain('插件更新检查超时')
-    expect(container.textContent).toContain('检查全部插件')
+    expect(container.textContent).toContain('Plugin update check timed out')
+    expect(container.textContent).toContain('Check All Plugins')
     await act(async () => root.unmount())
   })
 
@@ -164,17 +183,17 @@ describe('explicit update consent', () => {
     }])
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
-    await navigate(container, '设置')
-    await act(async () => { button(container, '检查全部插件')?.click(); await flush() })
+    await navigate(container, 'Settings')
+    await act(async () => { button(container, 'Check All Plugins')?.click(); await flush() })
 
     expect(mocks.checkPluginUpdates).toHaveBeenCalledOnce()
     expect(mocks.installPluginUpdates).not.toHaveBeenCalled()
     expect(container.textContent).toContain('1.0.0 → 1.1.0')
-    expect(container.textContent).toContain('运行已配置的系统 Shell：运行用户选择的命令')
-    expect(container.textContent).toContain('移除 访问 OpenAI Codex 服务：读取限额')
-    expect(container.textContent).toContain('变更 本地插件存储：保存旧数据 → 保存聚合数据')
+    expect(container.textContent).toContain('Execute configured system shell: 运行用户选择的命令')
+    expect(container.textContent).toContain('Access OpenAI Codex service: 读取限额')
+    expect(container.textContent).toContain('Local plugin storage: 保存旧数据 → 保存聚合数据')
 
-    await act(async () => { button(container, '同意并更新 1 项')?.click(); await flush() })
+    await act(async () => { button(container, 'Agree & Update')?.click(); await flush() })
     expect(mocks.installPluginUpdates).toHaveBeenCalledWith([{ id: 'example.plugin', version: '1.1.0' }])
     await act(async () => root.unmount())
   })
@@ -182,7 +201,7 @@ describe('explicit update consent', () => {
   it('does not show the removed diagnostics export', async () => {
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
-    await navigate(container, '设置')
+    await navigate(container, 'Settings')
 
     expect(container.textContent).not.toContain('诊断信息')
     expect(container.textContent).not.toContain('导出版本、平台、代理模式和插件状态')
@@ -192,7 +211,7 @@ describe('explicit update consent', () => {
   it('does not render redundant explanatory text in settings', async () => {
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
-    await navigate(container, '设置')
+    await navigate(container, 'Settings')
 
     expect(container.textContent).not.toContain('在当前主题风格下自定义主色调与图表色彩')
     expect(container.textContent).not.toContain('高雅紫调，源自主题原生主色')
@@ -209,19 +228,18 @@ describe('explicit update consent', () => {
   })
 
   it('checks a core update without installing until the user confirms', async () => {
-    mocks.checkCoreUpdate.mockResolvedValue({ version: '0.2.3', notes: '更新说明' })
-    // Keep the promise pending so the test can inspect the installation call before restart.
+    mocks.checkCoreUpdate.mockResolvedValue({ version: '0.2.3', notes: 'Release Notes' })
     mocks.installCoreUpdate.mockReturnValue(new Promise(() => {}))
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
-    await navigate(container, '设置')
-    await act(async () => { button(container, '检查主程序')?.click(); await flush() })
+    await navigate(container, 'Settings')
+    await act(async () => { button(container, 'Check Digiworld Core')?.click(); await flush() })
 
     expect(mocks.checkCoreUpdate).toHaveBeenCalledOnce()
     expect(mocks.installCoreUpdate).not.toHaveBeenCalled()
-    expect(container.textContent).toContain('发现 Digiworld 0.2.3')
+    expect(container.textContent).toContain('0.2.3')
 
-    await act(async () => button(container, '同意并更新')?.click())
+    await act(async () => button(container, 'Agree & Update')?.click())
     expect(mocks.installCoreUpdate).toHaveBeenCalledWith('0.2.3')
     await act(async () => root.unmount())
   })
@@ -229,7 +247,7 @@ describe('explicit update consent', () => {
   it('applies and persists a font preset across the shell', async () => {
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
-    await navigate(container, '设置')
+    await navigate(container, 'Settings')
 
     const harmony = container.querySelector<HTMLButtonElement>('button[aria-label="HarmonyOS Sans SC"]')
     await act(async () => { harmony?.click(); await flush() })
@@ -256,7 +274,7 @@ describe('explicit update consent', () => {
   it('applies and persists the glass preference across the shell', async () => {
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
-    await navigate(container, '设置')
+    await navigate(container, 'Settings')
     const toggle = container.querySelector<HTMLButtonElement>('[aria-label="切换玻璃效果"]')!
     expect(toggle.getAttribute('aria-checked')).toBe('false')
     await act(async () => { toggle.click(); await flush() })
@@ -266,24 +284,24 @@ describe('explicit update consent', () => {
     await act(async () => root.unmount())
   })
 
-  it('applies and persists a color scheme across the shell', async () => {
+  it('applies and persists language preference across the shell', async () => {
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
-    await navigate(container, '设置')
+    await navigate(container, 'Settings')
 
-    const oceanButton = container.querySelector<HTMLButtonElement>('button[aria-label="海洋湛蓝"]')
-    expect(oceanButton).not.toBeNull()
-    await act(async () => { oceanButton?.click(); await flush() })
+    const zhButton = container.querySelector<HTMLButtonElement>('button[aria-label="Chinese (简体中文)"]')
+    expect(zhButton).not.toBeNull()
+    await act(async () => { zhButton?.click(); await flush() })
 
-    expect(container.querySelector<HTMLElement>('.app-window')?.style.getPropertyValue('--dw-accent')).toBe('#1e66f5')
-    expect(localStorage.getItem(COLOR_SCHEME_STORAGE_KEY)).toBe('ocean')
+    expect(localStorage.getItem(LOCALE_STORAGE_KEY)).toBe('zh')
+    expect(document.documentElement.lang).toBe('zh')
     await act(async () => root.unmount())
   })
 
   it('applies and persists theme selection via dropdown menu', async () => {
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
-    await navigate(container, '设置')
+    await navigate(container, 'Settings')
 
     const trigger = container.querySelector<HTMLButtonElement>('.theme-dropdown-trigger')
     expect(trigger).not.toBeNull()
@@ -295,16 +313,16 @@ describe('explicit update consent', () => {
     const listbox = container.querySelector('#theme-dropdown-listbox')
     expect(listbox).not.toBeNull()
 
-    // Select tokyo-night
-    const tokyoOption = container.querySelector<HTMLButtonElement>('[data-theme-id="tokyo-night"]')
-    expect(tokyoOption).not.toBeNull()
-    await act(async () => { tokyoOption?.click(); await flush() })
+    // Select dark
+    const darkOption = container.querySelector<HTMLButtonElement>('[data-theme-id="dark"]')
+    expect(darkOption).not.toBeNull()
+    await act(async () => { darkOption?.click(); await flush() })
 
     // Menu should close and theme should be persisted and applied
     expect(container.querySelector('#theme-dropdown-listbox')).toBeNull()
-    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('tokyo-night')
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark')
     expect(container.querySelector<HTMLElement>('.app-window')?.style.getPropertyValue('--dw-color-scheme')).toBe('dark')
-    expect(container.querySelector<HTMLElement>('.app-window')?.style.getPropertyValue('--dw-bg')).toBe('#1a1b26')
+    expect(container.querySelector<HTMLElement>('.app-window')?.style.getPropertyValue('--dw-bg')).toBe('#0c0e12')
 
     await act(async () => root.unmount())
   })
@@ -333,12 +351,12 @@ describe('explicit update consent', () => {
     })
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
-    await navigate(container, '功能库')
+    await navigate(container, 'Plugins Store')
     await flush()
 
     expect(container.textContent).toContain('未适配插件')
     const disabledBtn = container.querySelector<HTMLButtonElement>('button[disabled]')
-    expect(disabledBtn?.textContent).toContain('暂未适配当前系统')
+    expect(disabledBtn?.textContent).toContain('Not supported on current system')
     await act(async () => root.unmount())
   })
 
@@ -354,10 +372,10 @@ describe('explicit update consent', () => {
     })
     const root = createRoot(container)
     await act(async () => { root.render(<App />); await flush() })
-    await navigate(container, '功能库')
+    await navigate(container, 'Plugins Store')
     await flush()
 
-    expect(button(container, '暂未适配当前系统')?.disabled).toBe(true)
+    expect(button(container, 'Not supported on current system')?.disabled).toBe(true)
     await act(async () => root.unmount())
   })
 })

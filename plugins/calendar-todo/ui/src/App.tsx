@@ -13,6 +13,7 @@ import {
   formatDisplayMonth,
   monthDays,
 } from './date'
+import { t, type Locale } from './i18n'
 
 const bridge = createPluginBridge('io.github.jesmonx.digiworld.calendar-todo')
 
@@ -74,6 +75,9 @@ const blank = (cal = '', dk?: DateKey): Event => {
 }
 
 export default function App() {
+  const [locale, setLocale] = useState<Locale>(() => {
+    return (document.documentElement.lang?.startsWith('zh') ? 'zh' : 'en') as Locale
+  })
   const today = todayKey()
   const [account, setAccount] = useState<{ username: string; serverUrl: string; selectedCalendars: string[] } | null>(null)
   const [accountDraft, setAccountDraft] = useState({ username: '', serverUrl: 'https://caldav.icloud.com', selectedCalendars: [] as string[] })
@@ -148,6 +152,16 @@ export default function App() {
   useEffect(() => {
     void load()
     bridge.ready()
+
+    const unlistenLocale = bridge.on<{ locale: Locale }>('locale', ({ locale: nextLocale }) => {
+      if (nextLocale) {
+        setLocale(nextLocale)
+      }
+    })
+
+    return () => {
+      if (typeof unlistenLocale === 'function') unlistenLocale()
+    }
   }, [])
 
   useEffect(() => {
@@ -248,48 +262,50 @@ export default function App() {
     await load()
   }
 
-  if (!initialized) return <main className="connect"><Status>正在载入日历…</Status></main>
+  if (!initialized) return <main className="connect"><Status>{t('loadingCalendar', locale)}</Status></main>
   if (!account) {
     return (
       <main className="connect">
         <Card>
           <CalendarDays size={28} />
-          <h1>连接 iCloud 日历</h1>
-          <p>在 Apple Account 网站生成 App 专用密码。凭据只保存到系统凭据库。</p>
+          <h1>{t('connectTitle', locale)}</h1>
+          <p>{t('connectSubtitle', locale)}</p>
           <label>
-            Apple Account
+            {t('appleAccount', locale)}
             <Input type="email" value={accountDraft.username} onChange={e => setAccountDraft({ ...accountDraft, username: e.target.value })} />
           </label>
           <label>
-            App 专用密码
+            {t('appSpecificPassword', locale)}
             <Input type="password" value={secret} onChange={e => setSecret(e.target.value)} />
           </label>
           <Button variant="primary" onClick={() => void connect()} disabled={busy || !secret}>
-            {busy ? '连接中…' : '连接并发现日历'}
+            {busy ? t('connecting', locale) : t('connectButton', locale)}
           </Button>
-          {previousAccount && <Button onClick={() => { setAccount(previousAccount); setPreviousAccount(null); setError('') }}>取消</Button>}
+          {previousAccount && <Button onClick={() => { setAccount(previousAccount); setPreviousAccount(null); setError('') }}>{t('cancel', locale)}</Button>}
           {error && <Status tone="error">{error}</Status>}
         </Card>
       </main>
     )
   }
 
+  const weekdays = locale === 'zh' ? ['一', '二', '三', '四', '五', '六', '日'] : ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
+
   return (
     <PluginPage>
       <PageToolbar className="">
         <div className="tabs">
           <Button aria-pressed={tab === 'calendar'} onClick={() => setTab('calendar')}>
-            <CalendarDays size={15} />日历
+            <CalendarDays size={15} />{t('calendarTab', locale)}
           </Button>
           <Button aria-pressed={tab === 'todo'} onClick={() => setTab('todo')}>
-            <CheckSquare size={15} />Todo
+            <CheckSquare size={15} />{t('todoTab', locale)}
           </Button>
         </div>
         <Button onClick={() => void load(true)} disabled={busy}>
-          <RefreshCw size={15} />同步
+          <RefreshCw size={15} />{t('sync', locale)}
         </Button>
         <Button onClick={() => { setPreviousAccount(account); setAccountDraft(account); setAccount(null) }}>
-          <Settings size={15} />账号
+          <Settings size={15} />{t('account', locale)}
         </Button>
       </PageToolbar>
 
@@ -299,15 +315,15 @@ export default function App() {
         <SplitPane aside={<div className="calendar-sidebar">
             <Card className="month-card">
               <header className="month-header">
-                <h3>{formatDisplayMonth(viewYear, viewMonth)}</h3>
+                <h3>{formatDisplayMonth(viewYear, viewMonth, locale)}</h3>
                 <div className="month-nav">
-                  <Button aria-label="上一月" onClick={prevMonth}><ChevronLeft size={15} /></Button>
-                  <Button onClick={jumpToToday}>今天</Button>
-                  <Button aria-label="下一月" onClick={nextMonth}><ChevronRight size={15} /></Button>
+                  <Button aria-label={t('prevMonth', locale)} onClick={prevMonth}><ChevronLeft size={15} /></Button>
+                  <Button onClick={jumpToToday}>{t('today', locale)}</Button>
+                  <Button aria-label={t('nextMonth', locale)} onClick={nextMonth}><ChevronRight size={15} /></Button>
                   <Button
                     variant="primary"
-                    aria-label="新建日程"
-                    title="在选定日期新建日程"
+                    aria-label={t('newEvent', locale)}
+                    title={t('newEventTitle', locale)}
                     disabled={!cals.length}
                     onClick={() => createEventForDate(selectedDate || today)}
                   >
@@ -317,12 +333,12 @@ export default function App() {
               </header>
 
               <div className="calendar-weekdays" aria-hidden="true">
-                {['一', '二', '三', '四', '五', '六', '日'].map(w => (
+                {weekdays.map(w => (
                   <span key={w}>{w}</span>
                 ))}
               </div>
 
-              <div className="calendar-grid" role="grid" aria-label="月份日历">
+              <div className="calendar-grid" role="grid" aria-label={t('monthCalendarAria', locale)}>
                 {monthDays(viewYear, viewMonth).map(cell => {
                   const dayEvents = eventMap.get(cell.key) || []
                   const dotCount = Math.min(3, dayEvents.length)
@@ -334,7 +350,7 @@ export default function App() {
                       className={`calendar-cell ${cell.inMonth ? '' : 'other-month'} ${cell.isToday ? 'is-today' : ''} ${isSelected ? 'is-selected' : ''}`}
                       onClick={() => setSelectedDate(cell.key)}
                       onDoubleClick={() => createEventForDate(cell.key)}
-                      aria-label={`${cell.key}${dayEvents.length ? `，有 ${dayEvents.length} 个日程` : ''}`}
+                      aria-label={`${cell.key}${dayEvents.length ? ` (${dayEvents.length})` : ''}`}
                       aria-selected={isSelected}
                     >
                       <span className="cell-day">{cell.dayNum}</span>
@@ -351,7 +367,7 @@ export default function App() {
 
             <div className="calendar-meta-card">
               <div className="meta-head">
-                <small>{events.length} 个日程 · {cals.length} 个日历</small>
+                <small>{t('eventsCount', locale).replace('{events}', String(events.length)).replace('{cals}', String(cals.length))}</small>
               </div>
               <div className="calendar-picker">
                 {cals.map(c => (
@@ -370,13 +386,13 @@ export default function App() {
           <div className="calendar-agenda-pane">
             <header className="agenda-header">
               <div>
-                <strong>{selectedDate ? `${formatDisplayDate(selectedDate)}${selectedDate === today ? ' (今天)' : ''}` : '当前及之后日程'}</strong>
-                <small>{displayDays.reduce((acc, [, list]) => acc + list.length, 0)} 个日程</small>
+                <strong>{selectedDate ? `${formatDisplayDate(selectedDate, locale)}${selectedDate === today ? ` (${t('todayLabel', locale)})` : ''}` : t('upcomingEvents', locale)}</strong>
+                <small>{t('totalEventsCount', locale).replace('{count}', String(displayDays.reduce((acc, [, list]) => acc + list.length, 0)))}</small>
               </div>
               <div className="agenda-actions">
                 {selectedDate && (
                   <Button onClick={() => setSelectedDate(null)}>
-                    查看全部后续
+                    {t('viewAllUpcoming', locale)}
                   </Button>
                 )}
                 <Button
@@ -384,7 +400,7 @@ export default function App() {
                   onClick={() => createEventForDate(selectedDate || today)}
                   disabled={!cals.length}
                 >
-                  <Plus size={15} />新建日程
+                  <Plus size={15} />{t('newEvent', locale)}
                 </Button>
               </div>
             </header>
@@ -393,15 +409,15 @@ export default function App() {
               {displayDays.length ? (
                 displayDays.map(([day, list]) => (
                   <Card key={day} className="agenda-day-card">
-                    <time>{formatDisplayDate(day)}</time>
+                    <time>{formatDisplayDate(day, locale)}</time>
                     <div className="agenda-day-events">
                       {list.map(e => (
                         <Button key={`${e.href}-${e.id}`} className="event" onClick={() => setEdit(e)}>
                           <span>
-                            <strong>{e.title || '无标题'}</strong>
-                            <small>{e.allDay ? '全天' : formatTime(e.start)}{e.location ? ` · ${e.location}` : ''}</small>
+                            <strong>{e.title || t('untitled', locale)}</strong>
+                            <small>{e.allDay ? t('allDay', locale) : formatTime(e.start, locale)}{e.location ? ` · ${e.location}` : ''}</small>
                           </span>
-                          {e.recurring && <small>重复</small>}
+                          {e.recurring && <small>{t('recurring', locale)}</small>}
                         </Button>
                       ))}
                     </div>
@@ -409,7 +425,7 @@ export default function App() {
                 ))
               ) : (
                 <Status>
-                  {selectedDate ? `${formatDisplayDate(selectedDate)} 暂无日程` : '当前及之后暂无日程安排'}
+                  {selectedDate ? t('noEventsOnDate', locale).replace('{date}', formatDisplayDate(selectedDate, locale)) : t('noUpcomingEvents', locale)}
                 </Status>
               )}
             </section>
@@ -421,36 +437,36 @@ export default function App() {
             <Input
               value={todoText}
               onChange={e => setTodoText(e.target.value)}
-              placeholder="添加 Todo"
+              placeholder={t('addTodoPlaceholder', locale)}
               onKeyDown={e => { if (e.key === 'Enter') void saveTodo() }}
             />
-            <Input type="date" aria-label="截止日期" value={todoDue} onChange={e => setTodoDue(e.target.value)} />
+            <Input type="date" aria-label={t('dueDateAria', locale)} value={todoDue} onChange={e => setTodoDue(e.target.value)} />
             <Button variant="primary" onClick={() => void saveTodo()}><Plus size={15} /></Button>
           </Card>
-          {todos.map(t => (
-            <Card key={t.id} className={t.done ? 'done' : ''}>
-              <input type="checkbox" checked={t.done} onChange={() => void toggle(t)} />
-              <span>{t.title}{t.due && <small>截止 {t.due}</small>}</span>
-              <Button onClick={() => void removeTodo(t.id)}><Trash2 size={15} /></Button>
+          {todos.map(tItem => (
+            <Card key={tItem.id} className={tItem.done ? 'done' : ''}>
+              <input type="checkbox" checked={tItem.done} onChange={() => void toggle(tItem)} />
+              <span>{tItem.title}{tItem.due && <small>{t('dueLabel', locale).replace('{date}', tItem.due)}</small>}</span>
+              <Button onClick={() => void removeTodo(tItem.id)}><Trash2 size={15} /></Button>
             </Card>
           ))}
         </section>
       )}
 
       {edit && (
-        <Dialog open onClose={() => !busy && setEdit(null)} className="editor" aria-label={edit.href ? '编辑事件' : '新建事件'}>
+        <Dialog open onClose={() => !busy && setEdit(null)} className="editor" aria-label={edit.href ? t('editEvent', locale) : t('newEventHeading', locale)}>
           <header>
-            <h2>{edit.href ? '编辑事件' : '新建事件'}</h2>
+            <h2>{edit.href ? t('editEvent', locale) : t('newEventHeading', locale)}</h2>
             <Button onClick={() => setEdit(null)}><X size={16} /></Button>
           </header>
-          {edit.recurring && <Status>重复事件在这里仅供查看，请在 Apple 日历中编辑。</Status>}
-          {cals.find(calendar => calendar.id === edit.calendarId)?.readOnly && <Status>此日历为只读，事件仅供查看。</Status>}
+          {edit.recurring && <Status>{t('recurringNotice', locale)}</Status>}
+          {cals.find(calendar => calendar.id === edit.calendarId)?.readOnly && <Status>{t('readOnlyNotice', locale)}</Status>}
           <label>
-            标题
+            {t('eventTitle', locale)}
             <Input disabled={edit.recurring} value={edit.title} onChange={e => setEdit({ ...edit, title: e.target.value })} />
           </label>
           <label>
-            日历
+            {t('calendar', locale)}
             <Select disabled={!!edit.href || edit.recurring} value={edit.calendarId} onChange={e => setEdit({ ...edit, calendarId: e.target.value })}>
               {cals.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </Select>
@@ -480,34 +496,34 @@ export default function App() {
                 }
               }}
             />
-            全天
+            {t('allDayCheck', locale)}
           </label>
           <label>
-            开始
+            {t('start', locale)}
             <Input type={edit.allDay ? 'date' : 'datetime-local'} disabled={edit.recurring} value={fromIcalInput(edit.start, edit.allDay)} onChange={e => setEdit({ ...edit, start: toIcalInput(e.target.value, edit.allDay, edit.start.endsWith('Z')) })} />
-            {!edit.allDay && edit.startTimezone && <small>时区：{edit.startTimezone}</small>}
+            {!edit.allDay && edit.startTimezone && <small>{t('timezone', locale).replace('{tz}', edit.startTimezone)}</small>}
           </label>
           <label>
-            结束
+            {t('end', locale)}
             <Input type={edit.allDay ? 'date' : 'datetime-local'} disabled={edit.recurring} value={fromIcalInput(edit.end, edit.allDay)} onChange={e => setEdit({ ...edit, end: toIcalInput(e.target.value, edit.allDay, edit.end.endsWith('Z')) })} />
-            {!edit.allDay && edit.endTimezone && edit.endTimezone !== edit.startTimezone && <small>时区：{edit.endTimezone}</small>}
+            {!edit.allDay && edit.endTimezone && edit.endTimezone !== edit.startTimezone && <small>{t('timezone', locale).replace('{tz}', edit.endTimezone)}</small>}
           </label>
           <label>
-            地点
+            {t('location', locale)}
             <Input disabled={edit.recurring} value={edit.location} onChange={e => setEdit({ ...edit, location: e.target.value })} />
           </label>
           <label>
-            备注
+            {t('notes', locale)}
             <Textarea disabled={edit.recurring} value={edit.notes} onChange={e => setEdit({ ...edit, notes: e.target.value })} />
           </label>
           <footer>
             {edit.href && !edit.recurring ? (
-              <Button variant="danger" disabled={busy || cals.find(calendar => calendar.id === edit.calendarId)?.readOnly} onClick={() => void delEvent()}>删除</Button>
+              <Button variant="danger" disabled={busy || cals.find(calendar => calendar.id === edit.calendarId)?.readOnly} onClick={() => void delEvent()}>{t('delete', locale)}</Button>
             ) : <span />}
             <div>
-              <Button onClick={() => setEdit(null)}>取消</Button>
+              <Button onClick={() => setEdit(null)}>{t('cancel', locale)}</Button>
               <Button variant="primary" disabled={busy || edit.recurring || cals.find(calendar => calendar.id === edit.calendarId)?.readOnly || !edit.title || !edit.start || !edit.end} onClick={() => void saveEvent()}>
-                {busy ? '保存中…' : '保存'}
+                {busy ? t('saving', locale) : t('save', locale)}
               </Button>
             </div>
           </footer>
@@ -517,14 +533,15 @@ export default function App() {
   )
 }
 
-function formatTime(v: string) {
+function formatTime(v: string, locale: Locale = 'en') {
+  const loc = locale === 'zh' ? 'zh-CN' : 'en-US'
   if (/^\d{8}T\d{6}Z$/.test(v)) {
     const date = icalUtcDate(v)
-    return new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(date)
+    return new Intl.DateTimeFormat(loc, { hour: '2-digit', minute: '2-digit' }).format(date)
   }
   if (/^\d{8}T\d{6}$/.test(v)) return `${v.slice(9, 11)}:${v.slice(11, 13)}`
   const d = new Date(v)
-  return Number.isNaN(+d) ? v : new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(d)
+  return Number.isNaN(+d) ? v : new Intl.DateTimeFormat(loc, { hour: '2-digit', minute: '2-digit' }).format(d)
 }
 function fromIcalInput(value: string, allDay: boolean) {
   if (!allDay && /^\d{8}T\d{6}Z$/.test(value)) {

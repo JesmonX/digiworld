@@ -44,8 +44,8 @@ describe('PluginFrame theme', () => {
 
   it('sends the current theme when ready and after a live theme change', async () => {
     const root = createRoot(container)
-    const violet = pluginTheme(getAccentTheme('catppuccin-latte'))
-    const blue = pluginTheme(getAccentTheme('catppuccin-mocha'), getFontTheme('harmony'), 500, 'disabled')
+    const violet = pluginTheme(getAccentTheme('light'))
+    const blue = pluginTheme(getAccentTheme('dark'), getFontTheme('harmony'), 500, 'disabled')
     await act(async () => root.render(<PluginFrame pluginId="sample" html="<main />" theme={violet} />))
 
     const iframe = container.querySelector('iframe')!
@@ -65,7 +65,7 @@ describe('PluginFrame theme', () => {
       kind: 'theme', payload: blue,
     }), '*')
     expect(iframe.srcdoc).toContain('data-digiworld-host-design')
-    expect(iframe.srcdoc).toContain('--dw-bg:#eff1f5')
+    expect(iframe.srcdoc).toContain('--dw-bg:#f5f7fa')
     expect(blue['font-sans']).toContain('HarmonyOS Sans SC')
     expect(blue['weight-regular']).toBe('500')
 
@@ -74,7 +74,7 @@ describe('PluginFrame theme', () => {
 
   it('notifies plugin of visibility changes', async () => {
     const root = createRoot(container)
-    const theme = pluginTheme(getAccentTheme('catppuccin-latte'))
+    const theme = pluginTheme(getAccentTheme('light'))
     await act(async () => root.render(<PluginFrame pluginId="sample" html="<main />" theme={theme} active={true} />))
 
     const iframe = container.querySelector('iframe')!
@@ -97,7 +97,7 @@ describe('PluginFrame theme', () => {
   })
 
   it('guarantees host design styles win over bundled fallback styles in both full documents and fragments', () => {
-    const darkTheme = pluginTheme(getAccentTheme('catppuccin-mocha'))
+    const darkTheme = pluginTheme(getAccentTheme('dark'))
 
     // 1. Full document test
     const fullHtml = '<!doctype html><html lang="zh-CN"><head><title>Test</title><style>:root{--dw-success:#16835b;--dw-success-soft:#e8f5ee;}</style></head><body><div id="root"></div></body></html>'
@@ -106,7 +106,7 @@ describe('PluginFrame theme', () => {
     const fullBundledIndex = fullThemed.indexOf(':root{--dw-success:#16835b')
     const fullHostIndex = fullThemed.indexOf('data-digiworld-host-design')
     expect(fullHostIndex).toBeGreaterThan(fullBundledIndex)
-    expect(fullThemed).toContain(`--dw-success-soft:${darkTheme['surface-subtle']}`)
+    expect(fullThemed).toContain(`--dw-success-soft:${darkTheme['success-soft']}`)
 
     // 2. Fragment test (no <html> or <head>)
     const fragmentHtml = '<style>:root{--dw-success:#16835b;--dw-success-soft:#e8f5ee;}</style><div id="root"></div>'
@@ -115,11 +115,11 @@ describe('PluginFrame theme', () => {
     const fragBundledIndex = fragmentThemed.indexOf(':root{--dw-success:#16835b')
     const fragHostIndex = fragmentThemed.indexOf('data-digiworld-host-design')
     expect(fragHostIndex).toBeGreaterThan(fragBundledIndex)
-    expect(fragmentThemed).toContain(`--dw-success-soft:${darkTheme['surface-subtle']}`)
+    expect(fragmentThemed).toContain(`--dw-success-soft:${darkTheme['success-soft']}`)
   })
 
   it('provides layout defaults and correct glass attributes before plugin ready', () => {
-    const theme = { ...pluginTheme(getAccentTheme('catppuccin-mocha')), glass: 'enabled' as const }
+    const theme = { ...pluginTheme(getAccentTheme('dark')), glass: 'enabled' as const }
     for (const html of ['<main />', '<html data-dw-scheme="light"><head></head><body></body></html>']) {
       const source = withInitialTheme(html, theme)
       expect(source).toContain('data-digiworld-host-components')

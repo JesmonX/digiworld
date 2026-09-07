@@ -4,6 +4,7 @@ import { gotoWithRetry } from './nav'
 
 for (const theme of THEMES) for (const scheme of COLOR_SCHEMES) test(`${theme.id} ${scheme.id} readable semantic pairs`, async ({ page }) => {
   await gotoWithRetry(page, `/design.html?gallery&theme=${theme.id}&scheme=${scheme.id}`)
+  await expect(page.locator('.design-gallery')).toBeVisible()
   const pairs = await page.evaluate(() => {
     const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1
     const ctx = canvas.getContext('2d')!

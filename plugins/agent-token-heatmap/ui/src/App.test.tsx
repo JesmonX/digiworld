@@ -89,6 +89,7 @@ describe('token usage layout', () => {
   let container: HTMLDivElement
 
   beforeEach(() => {
+    document.documentElement.lang = 'zh'
     container = document.createElement('div')
     document.body.append(container)
     mocks.ready.mockReset()
@@ -102,7 +103,10 @@ describe('token usage layout', () => {
     })
   })
 
-  afterEach(() => container.remove())
+  afterEach(() => {
+    document.documentElement.lang = ''
+    container.remove()
+  })
 
   it('groups range totals with the heatmap and colors the remaining quota from the left', async () => {
     const root = createRoot(container)

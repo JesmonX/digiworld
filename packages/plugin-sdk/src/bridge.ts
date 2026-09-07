@@ -60,6 +60,12 @@ export function createPluginBridge(pluginId: string, options: PluginBridgeOption
     if (message.kind === 'theme' && typeof message.payload === 'object' && message.payload) {
       applyPluginTheme(message.payload as Partial<PluginTheme>)
     }
+
+    if (message.kind === 'locale' && typeof message.payload === 'object' && message.payload) {
+      const loc = (message.payload as { locale?: string }).locale ?? 'en'
+      document.documentElement.lang = loc
+      for (const listener of listeners.get('locale') ?? []) listener(loc)
+    }
   })
 
   function send(message: PluginToHostMessage): void {

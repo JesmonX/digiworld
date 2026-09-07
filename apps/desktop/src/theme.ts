@@ -52,7 +52,7 @@ export const FONT_THEMES: FontTheme[] = [
   },
 ]
 
-export const DEFAULT_ACCENT_THEME_ID: AccentThemeId = 'catppuccin-latte'
+export const DEFAULT_ACCENT_THEME_ID: AccentThemeId = 'light'
 export const DEFAULT_FONT_THEME_ID: FontThemeId = 'plex'
 export const DEFAULT_FONT_WEIGHT: FontWeight = 400
 export const THEME_STORAGE_KEY = 'digiworld.theme.v2'
@@ -77,7 +77,7 @@ export function saveColorSchemeId(id: ColorSchemeId, storage?: Pick<Storage, 'se
   }
 }
 
-export function getAccentTheme(id: AccentThemeId, schemeId: ColorSchemeId = DEFAULT_COLOR_SCHEME_ID): AccentTheme {
+export function getAccentTheme(id: string, schemeId: ColorSchemeId = DEFAULT_COLOR_SCHEME_ID): AccentTheme {
   return getTheme(id, schemeId)
 }
 
@@ -88,7 +88,9 @@ export function getFontTheme(id: FontThemeId): FontTheme {
 export function loadAccentThemeId(storage?: Pick<Storage, 'getItem'>): AccentThemeId {
   try {
     const value = (storage ?? window.localStorage).getItem(THEME_STORAGE_KEY)
-    return ACCENT_THEMES.some(theme => theme.id === value) ? value as AccentThemeId : DEFAULT_ACCENT_THEME_ID
+    if (value === 'dark' || value === 'catppuccin-mocha' || value === 'rose-pine-moon' || value === 'tokyo-night' || value === 'nord' || value === 'dracula') return 'dark'
+    if (value === 'light' || value === 'catppuccin-latte' || value === 'rose-pine-dawn' || value === 'tokyo-night-day' || value === 'github-light') return 'light'
+    return DEFAULT_ACCENT_THEME_ID
   } catch {
     return DEFAULT_ACCENT_THEME_ID
   }
