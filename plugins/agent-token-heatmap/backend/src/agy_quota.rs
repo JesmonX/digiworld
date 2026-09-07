@@ -177,26 +177,15 @@ pub fn parse_response(
     source_label: String,
 ) -> Result<AgyQuotaSnapshot> {
     let trimmed = raw_output.trim();
-    if let (Some(start), Some(end)) = (trimmed.find('{'), trimmed.rfind('}')) {
-        if start <= end {
-            let candidate = &trimmed[start..=end];
-            if let Ok(root) = serde_json::from_str::<AgyJsonRoot>(candidate) {
-                if let Some(cmd) = root.command {
-                    if let Some(data) = cmd.data {
-                        if let Some(raw_groups) = data.groups {
-                            if !raw_groups.is_empty() {
-                                return parse_json_groups(
-                                    raw_groups,
-                                    data.description,
-                                    source_id,
-                                    source_label,
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-        }
+    if let (Some(start), Some(end)) = (trimmed.find('{'), trimmed.rfind('}'))
+        && start <= end
+        && let Ok(root) = serde_json::from_str::<AgyJsonRoot>(&trimmed[start..=end])
+        && let Some(cmd) = root.command
+        && let Some(data) = cmd.data
+        && let Some(raw_groups) = data.groups
+        && !raw_groups.is_empty()
+    {
+        return parse_json_groups(raw_groups, data.description, source_id, source_label);
     }
 
     parse_text_output(trimmed, source_id, source_label)
@@ -257,10 +246,8 @@ fn parse_json_groups(
 
         buckets.sort_by_key(|b| b.window_duration_mins.unwrap_or(i64::MAX));
 
-        if g_idx == 0 || is_gemini {
-            if primary_windows.is_empty() || is_gemini {
-                primary_windows = buckets.clone();
-            }
+        if is_gemini || (g_idx == 0 && primary_windows.is_empty()) {
+            primary_windows = buckets.clone();
         }
 
         groups.push(AgyQuotaGroup {
@@ -449,7 +436,8 @@ mod tests {
                     ]
                 }
             }
-        }).to_string();
+        })
+        .to_string();
 
         let parsed = parse_response(&raw, "local".into(), "本机".into()).unwrap();
         assert_eq!(parsed.status, "ready");
@@ -461,7 +449,10 @@ mod tests {
         assert_eq!(parsed.windows[0].window_duration_mins, Some(300));
         assert_eq!(parsed.windows[0].remaining_percent, 86);
         assert_eq!(parsed.windows[0].used_percent, 14);
-        assert_eq!(parsed.windows[0].reset_time.as_deref(), Some("2026-09-07T15:52:25Z"));
+        assert_eq!(
+            parsed.windows[0].reset_time.as_deref(),
+            Some("2026-09-07T15:52:25Z")
+        );
         assert!(parsed.windows[0].resets_at.is_some());
 
         // Second window should be weekly
@@ -469,7 +460,10 @@ mod tests {
         assert_eq!(parsed.windows[1].window_duration_mins, Some(10080));
         assert_eq!(parsed.windows[1].remaining_percent, 38);
         assert_eq!(parsed.windows[1].used_percent, 62);
-        assert_eq!(parsed.windows[1].reset_time.as_deref(), Some("2026-09-11T04:56:07Z"));
+        assert_eq!(
+            parsed.windows[1].reset_time.as_deref(),
+            Some("2026-09-11T04:56:07Z")
+        );
         assert!(parsed.windows[1].resets_at.is_some());
     }
 

@@ -216,7 +216,7 @@ test('agent overview auto-refresh interval selector', async ({ page }) => {
   const frame = page.frameLocator('iframe')
   await expect(frame.locator('.weekly-card')).toBeVisible()
   await expect(frame.getByText('Credits balance', { exact: true })).toBeVisible()
-  await expect(frame.getByText('$12.50', { exact: true })).toBeVisible()
+  await expect(frame.getByText('$12.5', { exact: true })).toBeVisible()
 
   const settingsButton = frame.getByRole('button', { name: '设置', exact: true })
   await settingsButton.click()

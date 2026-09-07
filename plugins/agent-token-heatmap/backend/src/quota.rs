@@ -367,10 +367,10 @@ fn parse_response(
         bail!("Codex account did not return any rate-limit windows");
     }
     let mut credits = rate_limits.credits.clone();
-    if let Some(ref mut c) = credits {
-        if let Some(ref b) = c.balance {
-            c.balance = Some(format_credit_balance(b));
-        }
+    if let Some(ref mut c) = credits
+        && let Some(ref b) = c.balance
+    {
+        c.balance = Some(format_credit_balance(b));
     }
     Ok(CodexQuotaSnapshot {
         status: "ready".into(),

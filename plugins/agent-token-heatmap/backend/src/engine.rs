@@ -77,7 +77,10 @@ impl UsageEngine {
             .expect("database lock poisoned")
             .save_settings(&settings)?;
         *self.quota_cache.lock().expect("quota cache lock poisoned") = None;
-        *self.agy_quota_cache.lock().expect("agy quota cache lock poisoned") = None;
+        *self
+            .agy_quota_cache
+            .lock()
+            .expect("agy quota cache lock poisoned") = None;
         Ok(settings)
     }
 
@@ -186,16 +189,16 @@ impl UsageEngine {
                 .expect("agy quota cache lock poisoned")
                 .clone();
             if let Some(cached) = cached
-                && cached.is_fresh(
-                    settings.agy_quota.refresh_interval_seconds,
-                    Instant::now(),
-                )
+                && cached.is_fresh(settings.agy_quota.refresh_interval_seconds, Instant::now())
             {
                 return Ok(cached.snapshot);
             }
         }
         let snapshot = self.query_agy_quota(settings)?;
-        *self.agy_quota_cache.lock().expect("agy quota cache lock poisoned") = Some(CachedAgyQuota {
+        *self
+            .agy_quota_cache
+            .lock()
+            .expect("agy quota cache lock poisoned") = Some(CachedAgyQuota {
             snapshot: snapshot.clone(),
             cached_at: Instant::now(),
         });
@@ -417,8 +420,7 @@ fn normalize_settings(settings: &mut UsageSettings) -> Result<()> {
         settings.codex_quota.source_id = None;
     }
     settings.agy_quota.pre_command = settings.agy_quota.pre_command.trim().to_string();
-    if settings.agy_quota.pre_command.len() > 8192
-        || settings.agy_quota.pre_command.contains('\0')
+    if settings.agy_quota.pre_command.len() > 8192 || settings.agy_quota.pre_command.contains('\0')
     {
         bail!("Antigravity quota pre-command is invalid");
     }
