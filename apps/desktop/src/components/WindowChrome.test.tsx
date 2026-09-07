@@ -31,9 +31,9 @@ describe('WindowChrome', () => {
     await act(async () => root.render(<WindowChrome />))
 
     await act(async () => {
-      container.querySelector<HTMLButtonElement>('[aria-label="最小化"]')?.click()
-      container.querySelector<HTMLButtonElement>('[aria-label="最大化"]')?.click()
-      container.querySelector<HTMLButtonElement>('[aria-label="关闭"]')?.click()
+      container.querySelector<HTMLButtonElement>('[aria-label="Minimize"]')?.click()
+      container.querySelector<HTMLButtonElement>('[aria-label="Maximize"]')?.click()
+      container.querySelector<HTMLButtonElement>('[aria-label="Close window"]')?.click()
     })
 
     expect(windowMocks.minimize).toHaveBeenCalledOnce()
