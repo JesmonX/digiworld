@@ -13,6 +13,7 @@ import { Loading } from './components/Loading'
 import { HomePage } from './pages/HomePage'
 import { CatalogPage } from './pages/CatalogPage'
 import { loadLocale, saveLocale, t, type Locale } from './lib/i18n'
+import { pluginDisplayName } from './lib/pluginNames'
 import {
   api, type AppState, type CoreUpdateInfo, type PluginUpdateInfo, type ProxyMode,
   type ProxySettings, type UpdateProgress,
@@ -199,7 +200,7 @@ function App() {
   }
 
   const uninstall = async (plugin: PluginSummary) => {
-    const confirmMsg = t('removeConfirm', locale).replace('{name}', plugin.name)
+    const confirmMsg = t('removeConfirm', locale).replace('{name}', pluginDisplayName(plugin, locale))
     if (!window.confirm(confirmMsg)) return
     setBusy(plugin.id)
     setError(null)
@@ -222,7 +223,7 @@ function App() {
 
   const pageTitle = typeof page === 'string'
     ? { home: t('workspace', locale), catalog: t('catalog', locale), settings: t('settingsTitle', locale) }[page]
-    : selectedPlugin?.name ?? (locale === 'en' ? 'Plugin' : '插件')
+    : selectedPlugin ? pluginDisplayName(selectedPlugin, locale) : (locale === 'en' ? 'Plugin' : '插件')
   const pluginOpen = typeof page !== 'string'
 
   const primaryNavigation = [
@@ -231,7 +232,7 @@ function App() {
   ]
   const pluginNavigation = (state?.plugins ?? []).map(plugin => ({
     id: plugin.id,
-    label: plugin.name,
+    label: pluginDisplayName(plugin, locale),
     icon: <PluginIcon plugin={plugin} />,
     status: plugin.state,
     active: pluginOpen && page.pluginId === plugin.id,
@@ -757,7 +758,7 @@ function InstallDialog({ plugin, busy, progress, locale = 'en', onCancel, onConf
   return (
     <Dialog open onClose={() => { if (!busy) onCancel() }} className="modal" aria-labelledby="install-title">
         <div className="modal-icon"><ShieldCheck /></div>
-        <h2 id="install-title">{locale === 'zh' ? `安装 ${plugin.name}` : `Install ${plugin.name}`}</h2>
+        <h2 id="install-title">{locale === 'zh' ? `安装 ${pluginDisplayName(plugin, locale)}` : `Install ${pluginDisplayName(plugin, locale)}`}</h2>
         <div className="permission-dialog">
           {plugin.permissions.map(permission => (
             <div key={permission.id}>
@@ -769,7 +770,7 @@ function InstallDialog({ plugin, busy, progress, locale = 'en', onCancel, onConf
             </div>
           ))}
         </div>
-        {busy && <ProgressView progress={progress} fallbackName={plugin.name} locale={locale} />}
+        {busy && <ProgressView progress={progress} fallbackName={pluginDisplayName(plugin, locale)} locale={locale} />}
         <div className="modal-actions">
           <Button className="secondary" disabled={busy} onClick={onCancel}>{t('cancel', locale)}</Button>
           <Button className="primary" disabled={busy} onClick={onConfirm}>{busy ? <LoaderCircle className="spin" /> : <Download />}{t('installBtn', locale)}</Button>
@@ -793,7 +794,7 @@ function UpdateDialogView({ dialog, busy, progress, error, locale = 'en', onCanc
           <div className="update-list">
             {dialog.updates.map(update => (
               <div key={update.id} className={!update.compatible ? 'incompatible' : ''}>
-                <span><strong>{update.name}</strong><small>{update.currentVersion} → {update.version}</small>
+                <span><strong>{pluginDisplayName(update, locale)}</strong><small>{update.currentVersion} → {update.version}</small>
                   {update.permissionsChanged && (
                     <span className="permission-changes">
                       {update.addedPermissions.map(permission => <small key={`added:${permission.id}`}><b>{locale === 'zh' ? '新增' : 'Added'} {permissionLabel(permission.id, locale)}</b>: {permission.reason}</small>)}

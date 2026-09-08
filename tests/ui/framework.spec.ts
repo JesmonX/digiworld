@@ -22,7 +22,7 @@ test('host rail and content do not overlap and plugin page owns vertical scrolli
   const rail = await page.locator('.sidebar').boundingBox()
   const main = await page.locator('.main').boundingBox()
   expect(rail!.x + rail!.width).toBeLessThanOrEqual(main!.x)
-  await page.getByRole('button', { name: 'Servers', exact: true }).click()
+  await page.getByRole('button', { name: '服务器监控', exact: true }).click()
   const frame = page.frameLocator('iframe')
   await expect(frame.locator('.devices')).toBeVisible()
   const layout = await frame.locator('.dw-page').evaluate(el => ({ display: getComputedStyle(el).display, overflow: getComputedStyle(el).overflowY, height: el.clientHeight, viewport: innerHeight }))

@@ -44,6 +44,15 @@ pub struct PlatformArtifact {
     pub sha256: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalizedNames {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub zh: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub en: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PluginManifest {
@@ -54,6 +63,8 @@ pub struct PluginManifest {
     pub id: String,
     pub version: String,
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub localized_names: Option<LocalizedNames>,
     pub description: String,
     pub author: String,
     pub license: String,
@@ -83,6 +94,8 @@ pub struct CatalogPlugin {
     pub id: String,
     pub version: String,
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub localized_names: Option<LocalizedNames>,
     pub description: String,
     pub author: String,
     pub icon: Option<String>,
@@ -108,6 +121,8 @@ pub struct PluginSummary {
     pub id: String,
     pub version: String,
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub localized_names: Option<LocalizedNames>,
     pub description: String,
     pub icon: Option<String>,
     pub enabled: bool,
@@ -140,6 +155,8 @@ pub struct UpdateInfo {
 pub struct PluginUpdateInfo {
     pub id: String,
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub localized_names: Option<LocalizedNames>,
     pub current_version: String,
     pub version: String,
     pub min_core_version: String,

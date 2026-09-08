@@ -95,6 +95,9 @@ export const DICTIONARY = {
 
   // Catalog
   availableTools: { en: 'Available Tools', zh: '可用功能' },
+  searchPlugins: { en: 'Search plugins', zh: '搜索插件' },
+  searchPluginsPlaceholder: { en: 'Search by plugin name', zh: '按插件名称搜索' },
+  noPluginSearchResults: { en: 'No plugins match this search.', zh: '没有匹配的插件。' },
   refreshStore: { en: 'Refresh Store', zh: '刷新功能库' },
   statusInstalled: { en: 'Installed', zh: '已安装' },
   statusAvailable: { en: 'Available', zh: '可安装' },

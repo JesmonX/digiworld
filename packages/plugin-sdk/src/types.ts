@@ -17,6 +17,11 @@ export interface PlatformArtifact {
   sha256: string
 }
 
+export interface LocalizedNames {
+  zh?: string
+  en?: string
+}
+
 export interface PluginManifest {
   uiDesignVersion?: number
   schemaVersion: typeof MANIFEST_SCHEMA_VERSION
@@ -24,6 +29,7 @@ export interface PluginManifest {
   id: string
   version: string
   name: string
+  localizedNames?: LocalizedNames
   description: string
   author: string
   license: string
@@ -51,6 +57,7 @@ export interface CatalogPlugin {
   id: string
   version: string
   name: string
+  localizedNames?: LocalizedNames
   description: string
   author: string
   icon?: string
@@ -134,6 +141,7 @@ export interface PluginSummary {
   id: string
   version: string
   name: string
+  localizedNames?: LocalizedNames
   description: string
   icon?: string
   enabled: boolean

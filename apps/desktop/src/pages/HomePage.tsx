@@ -4,6 +4,7 @@ import type { PluginSummary } from '@digiworld/plugin-sdk'
 import { PluginIcon } from '../components/PluginIcon'
 import { stateLabel } from '../components/PluginStatus'
 import { t, type Locale } from '../lib/i18n'
+import { pluginDisplayName } from '../lib/pluginNames'
 
 export function HomePage({
   plugins,
@@ -87,7 +88,7 @@ export function HomePage({
                 <span className="row-icon"><PluginIcon plugin={plugin} /></span>
                 <span className="plugin-row-copy">
                   <span className="plugin-row-heading">
-                    <strong>{plugin.name}</strong>
+                    <strong>{pluginDisplayName(plugin, locale)}</strong>
                     <ChevronRight className="row-chevron" size={15} />
                   </span>
                   <small>{plugin.description || t('openTool', locale)}</small>

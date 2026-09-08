@@ -1,9 +1,11 @@
-import { Button, Panel } from '@digiworld/design-system/react'
-import { ChevronRight, Download, LoaderCircle, RefreshCw } from 'lucide-react'
+import { Button, Input, Panel } from '@digiworld/design-system/react'
+import { useMemo, useState } from 'react'
+import { ChevronRight, Download, LoaderCircle, RefreshCw, Search } from 'lucide-react'
 import type { CatalogIndex, CatalogPlugin, PluginSummary } from '@digiworld/plugin-sdk'
 import { Loading } from '../components/Loading'
 import { PluginIcon } from '../components/PluginIcon'
 import { t, type Locale } from '../lib/i18n'
+import { pluginDisplayName, pluginSearchNames } from '../lib/pluginNames'
 
 export function CatalogPage({
   catalog,
@@ -24,17 +26,30 @@ export function CatalogPage({
   currentTarget?: string | undefined
   locale?: Locale
 }) {
+  const [query, setQuery] = useState('')
+  const plugins = catalog?.plugins ?? []
+  const filteredPlugins = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase()
+    if (!normalized) return plugins
+    return plugins.filter(plugin => pluginSearchNames(plugin).some(name => name.toLocaleLowerCase().includes(normalized)))
+  }, [plugins, query])
   if (!catalog) return <Loading label={t('loadingPlugin', locale)} />
   return (
     <div>
       <div className="section-heading">
         <h2>{t('availableTools', locale)}</h2>
-        <Button className="icon-button" aria-label={t('refreshStore', locale)} title={t('refresh', locale)} onClick={onRefresh}>
-          <RefreshCw />
-        </Button>
+        <div className="catalog-actions">
+          <label className="catalog-search">
+            <Search size={15} />
+            <Input aria-label={t('searchPlugins', locale)} value={query} onChange={event => setQuery(event.target.value)} placeholder={t('searchPluginsPlaceholder', locale)} />
+          </label>
+          <Button className="icon-button" aria-label={t('refreshStore', locale)} title={t('refresh', locale)} onClick={onRefresh}>
+            <RefreshCw />
+          </Button>
+        </div>
       </div>
-      <div className="catalog-grid">
-        {catalog.plugins.map(plugin => {
+      {filteredPlugins.length === 0 ? <p className="catalog-empty">{t('noPluginSearchResults', locale)}</p> : <div className="catalog-grid">
+        {filteredPlugins.map(plugin => {
           const current = installed.get(plugin.id)
           const supported = Boolean(currentTarget && plugin.artifacts.some(artifact => artifact.target === currentTarget))
           const unsupportedTitle = currentTarget
@@ -50,7 +65,7 @@ export function CatalogPage({
                   <small>v{plugin.version}</small>
                 </div>
               </div>
-              <h3>{plugin.name}</h3>
+              <h3>{pluginDisplayName(plugin, locale)}</h3>
               <p>{plugin.description}</p>
               {current
                 ? <Button className="secondary full" onClick={() => onOpen(plugin.id)}>{t('openBtn', locale)} <ChevronRight /></Button>
@@ -60,7 +75,7 @@ export function CatalogPage({
             </Panel>
           )
         })}
-      </div>
+      </div>}
     </div>
   )
 }

@@ -177,6 +177,7 @@ impl Store {
                 id: manifest.id,
                 version: manifest.version,
                 name: manifest.name,
+                localized_names: manifest.localized_names,
                 description: manifest.description,
                 icon: manifest.icon,
                 enabled,

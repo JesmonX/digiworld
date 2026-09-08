@@ -26,8 +26,8 @@ const output = {
   schemaVersion: 1,
   sequence: Number(process.env.DIGIWORLD_CATALOG_SEQUENCE ?? Math.floor(Date.now() / 1000)),
   generatedAt: new Date().toISOString(),
-  plugins: [...grouped.values()].map(({ id, version, name, description, author, icon, minCoreVersion, permissions, artifacts, uiDesignVersion }) => ({
-    id, version, name, description, author, icon, minCoreVersion, permissions, uiDesignVersion,
+  plugins: [...grouped.values()].map(({ id, version, name, localizedNames, description, author, icon, minCoreVersion, permissions, artifacts, uiDesignVersion }) => ({
+    id, version, name, localizedNames, description, author, icon, minCoreVersion, permissions, uiDesignVersion,
     artifacts: artifacts.sort((left, right) => left.target.localeCompare(right.target)),
   })).sort((left, right) => left.id.localeCompare(right.id)),
 }

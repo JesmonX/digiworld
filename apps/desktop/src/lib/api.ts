@@ -38,6 +38,7 @@ export interface CoreUpdateInfo {
 export interface PluginUpdateInfo {
   id: string
   name: string
+  localizedNames?: { zh?: string; en?: string }
   currentVersion: string
   version: string
   minCoreVersion: string

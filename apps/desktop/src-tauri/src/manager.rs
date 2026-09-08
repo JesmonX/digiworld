@@ -162,6 +162,7 @@ impl PluginManager {
             updates.push(PluginUpdateInfo {
                 id: entry.id.clone(),
                 name: entry.name.clone(),
+                localized_names: entry.localized_names.clone(),
                 current_version: current.version,
                 version: entry.version.clone(),
                 min_core_version: entry.min_core_version.clone(),
