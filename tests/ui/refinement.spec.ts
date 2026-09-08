@@ -133,6 +133,7 @@ test('quota card keeps one outer size while Codex and AGY content changes', asyn
   expect(Math.abs(codex!.width - agy!.width)).toBeLessThanOrEqual(1)
   expect(Math.abs(codex!.height - agy!.height)).toBeLessThanOrEqual(1)
   await expect(frame.locator('.quota-pane[aria-hidden="true"]')).toHaveAttribute('inert', '')
+  await expect(frame.locator('.quota-pane[aria-hidden="true"] .quota-reset-item.active')).toBeHidden()
 })
 
 test('reset pages reserve the tallest title across carousel switches', async ({ page }) => {
