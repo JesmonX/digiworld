@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import App, { formatCardPeriod, formatCreditBalance } from './App'
+import App, { QuotaCard, formatCardPeriod, formatCreditBalance } from './App'
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -169,6 +169,21 @@ async function flush() {
 
 describe('token usage layout', () => {
   let container: HTMLDivElement
+
+  it('keeps the AGY pane content when only AGY is configured', async () => {
+    const root = createRoot(container)
+    await act(async () => {
+      root.render(<QuotaCard codexConfigured={false} agyConfigured agyQuota={agyQuota as any} onConfigure={() => {}} />)
+    })
+    const agyPane = container.querySelectorAll('.quota-pane')[1]!
+    const before = agyPane.textContent
+    expect(agyPane.getAttribute('aria-hidden')).toBe('true')
+    expect(agyPane.querySelectorAll('.quota-agy-group').length).toBeGreaterThan(0)
+    await act(async () => { container.querySelector<HTMLButtonElement>('.quota-header-actions .quota-nav-btn')!.click() })
+    expect(agyPane.getAttribute('aria-hidden')).toBe('false')
+    expect(agyPane.textContent).toBe(before)
+    await act(async () => root.unmount())
+  })
 
   beforeEach(() => {
     vi.stubGlobal('ResizeObserver', class {
@@ -542,8 +557,10 @@ describe('token usage layout', () => {
     expect(quotaResets).not.toBeNull()
     expect(quotaResets.textContent).toContain('2 张可用')
 
-    // Only ONE card is rendered in the DOM
-    const resetItems = container.querySelectorAll('.quota-reset-item')
+    // All cards reserve space, but only one is visible and accessible.
+    expect(container.querySelectorAll('.quota-reset-item')).toHaveLength(2)
+    expect(container.querySelector('.quota-reset-item[aria-hidden="true"]')?.hasAttribute('inert')).toBe(true)
+    const resetItems = container.querySelectorAll('.quota-reset-item.active')
     expect(resetItems).toHaveLength(1)
     expect(resetItems[0]?.textContent).toContain('重置卡 A')
     expect(resetItems[0]?.textContent).not.toContain('重置卡 B')
@@ -562,10 +579,9 @@ describe('token usage layout', () => {
       await flush()
     })
 
-    // Still only ONE card rendered, now showing Card B
-    expect(container.querySelectorAll('.quota-reset-item')).toHaveLength(1)
-    expect(container.querySelector('.quota-reset-item')?.textContent).toContain('重置卡 B')
-    expect(container.querySelector('.quota-reset-item')?.textContent).not.toContain('重置卡 A')
+    expect(container.querySelectorAll('.quota-reset-item')).toHaveLength(2)
+    expect(container.querySelector('.quota-reset-item.active')?.textContent).toContain('重置卡 B')
+    expect(container.querySelector('.quota-reset-item.active')?.textContent).not.toContain('重置卡 A')
     expect(pageBadge.textContent).toBe('2/2')
 
     // Click prev button
@@ -576,8 +592,8 @@ describe('token usage layout', () => {
       await flush()
     })
 
-    expect(container.querySelectorAll('.quota-reset-item')).toHaveLength(1)
-    expect(container.querySelector('.quota-reset-item')?.textContent).toContain('重置卡 A')
+    expect(container.querySelectorAll('.quota-reset-item')).toHaveLength(2)
+    expect(container.querySelector('.quota-reset-item.active')?.textContent).toContain('重置卡 A')
     expect(pageBadge.textContent).toBe('1/2')
 
     await act(async () => root.unmount())

@@ -665,7 +665,7 @@ interface QuotaCardProps {
   onConfigure(): void
 }
 
-function QuotaCard(props: QuotaCardProps) {
+export function QuotaCard(props: QuotaCardProps) {
   const {
     quota,
     loading = false,
@@ -719,7 +719,6 @@ function QuotaCard(props: QuotaCardProps) {
   const availableResets = resetSummary?.availableCount ?? 0
   const credits = (resetSummary?.credits ?? []).filter(credit => credit.status !== 'redeemed')
   const safeCreditIndex = credits.length > 0 ? Math.min(activeCreditIndex, credits.length - 1) : 0
-  const currentCredit = credits[safeCreditIndex]
   const handlePrevCredit = () => {
     setActiveCreditIndex(current => (credits.length > 0 ? (current - 1 + credits.length) % credits.length : 0))
   }
@@ -861,16 +860,16 @@ function QuotaCard(props: QuotaCardProps) {
                   </span>
                 </div>
               </div>
-              {credits.length > 0 && currentCredit && (
+              {credits.length > 0 && (
                 <div className="quota-reset-items">
-                  <div key={currentCredit.id || safeCreditIndex} className="quota-reset-item">
+                  {credits.map((credit, index) => <div key={credit.id || index} className={`quota-reset-item ${index === safeCreditIndex ? 'active' : ''}`} aria-hidden={index !== safeCreditIndex} inert={index !== safeCreditIndex ? true : undefined}>
                     <div className="quota-reset-item-name">
-                      <span>{currentCredit.title || t('defaultResetCard', locale)}</span>
+                      <span>{credit.title || t('defaultResetCard', locale)}</span>
                     </div>
                     <div className="quota-reset-item-dates">
-                      <span>{formatCardPeriod(currentCredit.grantedAt, currentCredit.expiresAt, locale)}</span>
+                      <span>{formatCardPeriod(credit.grantedAt, credit.expiresAt, locale)}</span>
                     </div>
-                  </div>
+                  </div>)}
                 </div>
               )}
             </div>
@@ -884,7 +883,7 @@ function QuotaCard(props: QuotaCardProps) {
         )}
       </div>
       <div className={`quota-pane ${!isCodex ? 'active' : ''}`} aria-hidden={isCodex} inert={isCodex ? true : undefined}>
-        {!currentConfigured || agyQuota?.status === 'unconfigured' ? (
+        {!agyConfigured || agyQuota?.status === 'unconfigured' ? (
           <div className="quota-empty">
             <Gauge />
             <span>{locale === 'zh' ? '尚未选择限额查询设备' : 'No device configured for quota queries'}</span>

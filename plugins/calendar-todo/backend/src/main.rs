@@ -126,7 +126,9 @@ struct XmlNode {
 
 fn parse_xml_tree(xml: &str) -> Result<Vec<XmlNode>> {
     let mut reader = NsReader::from_str(xml);
-    reader.config_mut().trim_text(true);
+    // Entity references split text events; trimming each chunk would erase
+    // spaces around an ampersand or numeric character reference.
+    reader.config_mut().trim_text(false);
     let mut roots = Vec::new();
     let mut stack: Vec<XmlNode> = Vec::new();
     let mut buffer = Vec::new();
@@ -190,6 +192,18 @@ fn parse_xml_tree(xml: &str) -> Result<Vec<XmlNode>> {
             XmlEvent::CData(text) => {
                 if let Some(node) = stack.last_mut() {
                     node.text.push_str(&text.decode()?);
+                }
+            }
+            XmlEvent::GeneralRef(reference) => {
+                if let Some(node) = stack.last_mut() {
+                    if let Some(character) = reference.resolve_char_ref()? {
+                        node.text.push(character);
+                    } else {
+                        let name = reference.decode()?;
+                        let value = quick_xml::escape::resolve_predefined_entity(&name)
+                            .context("不支持的 XML 实体引用")?;
+                        node.text.push_str(value);
+                    }
                 }
             }
             XmlEvent::End(_) => {
@@ -808,19 +822,26 @@ impl App {
         Ok(saved)
     }
     fn event_delete(&self, e: &Event, overwrite: bool) -> Result<()> {
+        self.event_delete_authenticated(e, overwrite, &self.account()?.username, &self.pass()?)
+    }
+
+    fn event_delete_authenticated(
+        &self,
+        e: &Event,
+        overwrite: bool,
+        username: &str,
+        password: &str,
+    ) -> Result<()> {
         if e.recurring {
             bail!("重复事件请在 Apple 日历中删除")
         }
         let _calendar = self.calendar_for_operation(&e.calendar_id, CalendarOperation::Delete)?;
-        if self.refresh_resource_capability(&e.href, CalendarOperation::Delete)?
-            == Capability::Denied
-        {
-            bail!("此事件无删除权限")
-        }
+        // DAV:unbind is checked on the parent collection, not the event.
+        // The server still enforces resource-specific constraints on DELETE.
         let mut r = self
             .http
             .delete(&e.href)
-            .basic_auth(self.account()?.username, Some(self.pass()?));
+            .basic_auth(username, Some(password));
         if !overwrite {
             r = r.header("If-Match", format!("\"{}\"", e.etag))
         }
@@ -1221,6 +1242,87 @@ mod tests {
         assert_eq!(
             capabilities_from_xml(xml).unwrap(),
             CalendarCapabilities::default()
+        );
+    }
+
+    #[test]
+    fn xml_entities_preserve_names_and_discovery_urls() {
+        let xml = r#"<d:multistatus xmlns:d="DAV:"><d:response><d:propstat><d:prop>
+          <d:displayname>Work &amp; Home&#32;&#x4E2D;&lt;&gt;&quot;&apos;</d:displayname>
+          <d:current-user-principal><d:href>/p?a=1&amp;b=&#50;</d:href></d:current-user-principal>
+          </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>"#;
+        let roots = parse_xml_tree(xml).unwrap();
+        assert_eq!(
+            xml_text(xml_descendants(&roots, DAV_NS, "displayname")[0]),
+            "Work & Home 中<>\"'"
+        );
+        assert_eq!(
+            property_child_text(xml, DAV_NS, "current-user-principal", DAV_NS, "href")
+                .unwrap()
+                .as_deref(),
+            Some("/p?a=1&b=2")
+        );
+        assert!(parse_xml_tree("<name>&undefined;</name>").is_err());
+    }
+
+    #[test]
+    fn delete_uses_parent_unbind_without_probing_event_privileges() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+                .unwrap();
+            let mut request = Vec::new();
+            let mut byte = [0];
+            while !request.ends_with(b"\r\n\r\n") {
+                assert_eq!(stream.read(&mut byte).unwrap(), 1);
+                request.push(byte[0]);
+            }
+            stream
+                .write_all(b"HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n")
+                .unwrap();
+            String::from_utf8(request).unwrap()
+        });
+        let dir =
+            std::env::temp_dir().join(format!("digiworld-delete-test-{}", uuid::Uuid::new_v4()));
+        fs::create_dir(&dir).unwrap();
+        let app = App {
+            dir: dir.clone(),
+            http: Client::builder()
+                .no_proxy()
+                .timeout(std::time::Duration::from_secs(5))
+                .build()
+                .unwrap(),
+        };
+        let capabilities = CalendarCapabilities {
+            create: Capability::Denied,
+            update: Capability::Denied,
+            delete: Capability::Allowed,
+        };
+        write(
+            &dir.join("calendars.json"),
+            &vec![Calendar {
+                id: "cal".into(),
+                name: "Test".into(),
+                href: format!("{base}/cal/"),
+                read_only: false,
+                capabilities,
+            }],
+        )
+        .unwrap();
+        let event: Event = serde_json::from_value(json!({"id":"event", "calendarId":"cal", "href":format!("{base}/cal/event.ics"), "etag":"revision-1", "title":"Test", "start":"", "end":"", "allDay":false, "location":"", "notes":""})).unwrap();
+        let result = app.event_delete_authenticated(&event, false, "test", "test");
+        let request = server.join().unwrap();
+        fs::remove_dir_all(&dir).unwrap();
+        result.unwrap();
+        assert!(request.starts_with("DELETE /cal/event.ics HTTP/1.1"));
+        assert!(
+            request
+                .to_ascii_lowercase()
+                .contains("if-match: \"revision-1\"")
         );
     }
 }

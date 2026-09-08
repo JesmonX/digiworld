@@ -1,8 +1,6 @@
 use crate::credentials;
 use crate::database::Database;
-use crate::model::{
-    Account, AccountInput, AttachmentInfo, MessagePage, ParsedMessage, Settings, SyncStatus,
-};
+use crate::model::{Account, AccountInput, AttachmentInfo, MessagePage, Settings, SyncStatus};
 use crate::{parser, transport};
 use anyhow::{Context, Result, anyhow, bail};
 use imap::types::Flag;
@@ -378,13 +376,10 @@ impl MailEngine {
             }
         }
 
-        let criteria = if effective_baseline && !reconcile && old_last_uid > 0 {
-            format!("UID {}:*", old_last_uid.saturating_add(1))
-        } else {
-            "ALL".to_string()
-        };
+        // One UID snapshot defines both phases. New arrivals are indexed on the
+        // next pass; failed header fetches remain eligible regardless of cursor.
         let mut uids = session
-            .uid_search(criteria)
+            .uid_search("ALL")
             .context("无法读取 INBOX 邮件索引")?
             .into_iter()
             .collect::<Vec<_>>();
@@ -397,11 +392,7 @@ impl MailEngine {
             .database
             .existing_uids(id, uid_validity)
             .unwrap_or_default();
-        let uids_to_index: Vec<u32> = uids
-            .iter()
-            .copied()
-            .filter(|uid| !existing_uids.contains(uid))
-            .collect();
+        let uids_to_index = missing_header_uids(&uids, &existing_uids);
 
         self.database
             .begin_sync(id, "indexing", uids.len() as u64)?;
@@ -418,7 +409,7 @@ impl MailEngine {
                 let Some(uid) = fetch.uid else { return Ok(()) };
                 let size = fetch.size.unwrap_or(0) as u64;
                 let seen = fetch.flags().iter().any(|flag| matches!(flag, Flag::Seen));
-                let header = fetch.header().unwrap_or_default();
+                let header = fetch.header().context("邮件服务器未返回邮件头")?;
                 let parsed = parser::parse(header);
                 self.database
                     .upsert_message(id, uid_validity, uid, size, seen, &parsed, false)?;
@@ -471,12 +462,8 @@ impl MailEngine {
         // Body progress describes the current server mailbox, not only the
         // incremental header batch above.  This keeps a cached 1,799-message
         // mailbox at 1,799/1,799 on later syncs and avoids re-fetching bodies.
-        let mut body_server_uids = session
-            .uid_search("ALL")
-            .context("无法读取 INBOX 正文 UID 集合")?
-            .into_iter()
-            .collect::<Vec<_>>();
-        body_server_uids.sort_unstable_by(|left, right| right.cmp(left));
+        let body_server_uids = uids;
+        let indexed_uids = self.database.existing_uids(id, uid_validity)?;
         let body_server_uid_set: HashSet<u32> = body_server_uids.iter().copied().collect();
         let cached_body_uids = self.database.cached_body_uids(id, uid_validity)?;
         let retry_states = self.database.body_retry_states(id, uid_validity)?;
@@ -485,7 +472,7 @@ impl MailEngine {
             .iter()
             .copied()
             .filter(|uid| {
-                if cached_body_uids.contains(uid) {
+                if !indexed_uids.contains(uid) || cached_body_uids.contains(uid) {
                     return false;
                 }
                 let Some((_, next_retry_at, _)) = retry_states.get(uid) else {
@@ -570,19 +557,9 @@ impl MailEngine {
                         &plan.attachments,
                     )?;
                     if !updated {
-                        let mut parsed = empty_message();
-                        parsed.body = body;
-                        parsed.body_truncated = truncated;
-                        parsed.attachments = plan.attachments.clone();
-                        self.database.upsert_message(
-                            id,
-                            uid_validity,
-                            *uid,
-                            0,
-                            false,
-                            &parsed,
-                            true,
-                        )?;
+                        // A removed/missing header must be re-indexed, never
+                        // replaced by a permanently incomplete placeholder.
+                        return Err(anyhow!("正文对应的邮件头不存在，请重新同步"));
                     }
                     self.database.clear_body_retry(id, uid_validity, *uid)?;
                     body_completed += 1;
@@ -858,16 +835,12 @@ fn retry_due_at(next_sync_at: Option<&str>, now: chrono::DateTime<chrono::Utc>) 
         .map(|next| now >= next.with_timezone(&chrono::Utc))
 }
 
-fn empty_message() -> ParsedMessage {
-    ParsedMessage {
-        subject: String::new(),
-        sender: String::new(),
-        recipients: String::new(),
-        received_at: None,
-        body: String::new(),
-        body_truncated: false,
-        attachments: vec![],
-    }
+fn missing_header_uids(server_uids: &[u32], indexed: &HashSet<u32>) -> Vec<u32> {
+    server_uids
+        .iter()
+        .copied()
+        .filter(|uid| !indexed.contains(uid))
+        .collect()
 }
 
 fn validate_account(input: &AccountInput) -> Result<()> {
@@ -959,6 +932,23 @@ pub fn format_sequence_set(uids: &[u32]) -> String {
 mod engine_tests {
     use super::*;
 
+    #[test]
+    fn new_arrivals_and_failed_headers_are_indexed_on_the_next_snapshot() {
+        let first_snapshot = vec![102, 101];
+        let mut indexed = HashSet::from([101]);
+        assert_eq!(missing_header_uids(&first_snapshot, &indexed), vec![102]);
+        // UID 103 arrives while processing bodies from the first snapshot.
+        // It cannot get a placeholder or move that snapshot's cursor forward.
+        assert_eq!(first_snapshot.iter().max(), Some(&102));
+        let second_snapshot = vec![103, 102, 101];
+        // Even if the cursor was advanced, failed UID 102 remains retryable.
+        assert_eq!(
+            missing_header_uids(&second_snapshot, &indexed),
+            vec![103, 102]
+        );
+        indexed.extend([102, 103]);
+        assert!(missing_header_uids(&second_snapshot, &indexed).is_empty());
+    }
     #[test]
     fn formats_sequence_set_ascending_and_ranges() {
         assert_eq!(format_sequence_set(&[]), "");

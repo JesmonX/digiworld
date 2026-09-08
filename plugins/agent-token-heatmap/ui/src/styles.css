@@ -104,7 +104,9 @@ button svg { width: 14px; height: 14px; }
 .quota-resets-badge { font-size: var(--type-caption); padding: 1px 7px; border-radius: 999px; }
 .quota-resets-badge.active { background: var(--dw-accent-soft); color: var(--dw-accent-strong); font-weight: var(--weight-semibold); }
 .quota-resets-badge.zero { background: var(--dw-surface-subtle); color: var(--dw-text-muted); }
-.quota-reset-items { display: flex; flex-direction: column; gap: 5px; }
+.quota-reset-items { display: grid; min-width: 0; }
+.quota-reset-items > .quota-reset-item { grid-area: 1 / 1; visibility: hidden; pointer-events: none; min-width: 0; }
+.quota-reset-items > .quota-reset-item.active { visibility: visible; pointer-events: auto; }
 .quota-reset-item { padding: 4px 7px; border-radius: var(--dw-radius-sm); background: var(--dw-surface-subtle); border: 1px solid color-mix(in srgb, var(--dw-border) 60%, transparent); font-size: var(--type-caption); display: flex; flex-direction: column; gap: 2px; }
 .quota-reset-item-name { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-weight: var(--weight-medium); color: var(--dw-text); }
 .quota-reset-item-dates { display: flex; align-items: center; color: var(--dw-text-muted); font-size: var(--type-caption); white-space: normal; overflow-wrap: anywhere; line-height: 1.3; }

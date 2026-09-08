@@ -1,5 +1,6 @@
 import type { CatalogPlugin, LocalizedNames, PluginSummary } from '@digiworld/plugin-sdk'
 import type { Locale } from './i18n'
+import type { UpdateProgress } from './api'
 
 type NamedPlugin = Pick<CatalogPlugin | PluginSummary, 'id' | 'name'> & { localizedNames?: LocalizedNames }
 
@@ -18,4 +19,12 @@ export function pluginDisplayName(plugin: NamedPlugin, locale: Locale): string {
 
 export function pluginSearchNames(plugin: NamedPlugin): string[] {
   return [...new Set([plugin.name, plugin.localizedNames?.zh, plugin.localizedNames?.en, BUILT_IN_NAMES[plugin.id]?.zh, BUILT_IN_NAMES[plugin.id]?.en].filter((name): name is string => Boolean(name)))]
+}
+
+export function progressDisplayName(progress: UpdateProgress | null, plugins: readonly NamedPlugin[], fallback: string, locale: Locale): string {
+  if (!progress) return fallback
+  if (progress.operation === 'core-update') return progress.itemName || fallback
+  if (!progress.itemId) return fallback
+  const plugin = plugins.find(item => item.id === progress.itemId)
+  return pluginDisplayName(plugin ?? { id: progress.itemId, name: progress.itemName || fallback }, locale)
 }

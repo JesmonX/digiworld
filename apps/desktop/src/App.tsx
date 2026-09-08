@@ -13,7 +13,7 @@ import { Loading } from './components/Loading'
 import { HomePage } from './pages/HomePage'
 import { CatalogPage } from './pages/CatalogPage'
 import { loadLocale, saveLocale, t, type Locale } from './lib/i18n'
-import { pluginDisplayName } from './lib/pluginNames'
+import { pluginDisplayName, progressDisplayName } from './lib/pluginNames'
 import {
   api, type AppState, type CoreUpdateInfo, type PluginUpdateInfo, type ProxyMode,
   type ProxySettings, type UpdateProgress,
@@ -770,7 +770,7 @@ function InstallDialog({ plugin, busy, progress, locale = 'en', onCancel, onConf
             </div>
           ))}
         </div>
-        {busy && <ProgressView progress={progress} fallbackName={pluginDisplayName(plugin, locale)} locale={locale} />}
+        {busy && <ProgressView progress={progress} fallbackName={progressDisplayName(progress, [plugin], pluginDisplayName(plugin, locale), locale)} locale={locale} />}
         <div className="modal-actions">
           <Button className="secondary" disabled={busy} onClick={onCancel}>{t('cancel', locale)}</Button>
           <Button className="primary" disabled={busy} onClick={onConfirm}>{busy ? <LoaderCircle className="spin" /> : <Download />}{t('installBtn', locale)}</Button>
@@ -817,7 +817,7 @@ function UpdateDialogView({ dialog, busy, progress, error, locale = 'en', onCanc
           </div>
         )}
         {!busy && <p className="consent-copy">{locale === 'zh' ? '检查更新不会自动安装。点击下方按钮后才会通过当前代理下载并安装。' : 'Updates will only be downloaded and installed after your confirmation.'}</p>}
-        {busy && <ProgressView progress={matchingProgress} fallbackName={isPlugins ? (locale === 'zh' ? '插件更新' : 'Plugin Updates') : `Digiworld ${dialog.update.version}`} locale={locale} />}
+        {busy && <ProgressView progress={matchingProgress} fallbackName={progressDisplayName(matchingProgress, isPlugins ? dialog.updates : [], isPlugins ? (locale === 'zh' ? '插件更新' : 'Plugin Updates') : `Digiworld ${dialog.update.version}`, locale)} locale={locale} />}
         {error && <Status tone="error" className="update-error"><CircleAlert />{error}</Status>}
         <div className="modal-actions">
           <Button className="secondary" disabled={busy} onClick={onCancel}>{t('cancel', locale)}</Button>
@@ -854,7 +854,7 @@ function ProgressView({ progress, fallbackName, locale = 'en' }: { progress: Upd
   const itemCount = progress && progress.totalItems > 1 ? ` · ${Math.min(currentItem, progress.totalItems)}/${progress.totalItems}` : ''
   return (
     <div className="update-progress" aria-live="polite">
-      <div><strong>{stageLabel}{itemCount}</strong><span>{progress?.itemName ?? fallbackName}</span></div>
+      <div><strong>{stageLabel}{itemCount}</strong><span>{fallbackName}</span></div>
       <div className={`progress-track ${percent === null ? 'indeterminate' : ''}`} role="progressbar" aria-label={`${t('updateProgress', locale)}: ${stageLabel}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent ?? undefined}>
         <span style={percent === null ? undefined : { width: `${percent}%` }} />
       </div>

@@ -135,6 +135,28 @@ test('quota card keeps one outer size while Codex and AGY content changes', asyn
   await expect(frame.locator('.quota-pane[aria-hidden="true"]')).toHaveAttribute('inert', '')
 })
 
+test('reset pages reserve the tallest title across carousel switches', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 600 })
+  await gotoWithRetry(page, '/design.html')
+  await page.getByRole('button', { name: 'Agent 概览', exact: true }).click()
+  const frame = page.frameLocator('iframe')
+  const card = frame.locator('.quota-card')
+  const items = card.locator('.quota-reset-item')
+  await expect(items).toHaveCount(2)
+  // Exercise a title taller than either provider's other content.
+  await items.nth(1).locator('.quota-reset-item-name span').evaluate(node => {
+    node.textContent = 'Full reset with long eligibility and validity information '.repeat(20)
+  })
+  const before = await card.boundingBox()
+  await frame.getByRole('button', { name: '下一张重置卡', exact: true }).click()
+  const after = await card.boundingBox()
+  expect(before).not.toBeNull()
+  expect(after).not.toBeNull()
+  expect(Math.abs(before!.height - after!.height)).toBeLessThanOrEqual(1)
+  await expect(items.nth(0)).toHaveAttribute('inert', '')
+  await expect(items.nth(1)).toHaveAttribute('aria-hidden', 'false')
+})
+
 test('agent accent tooltips remain themed and readable across schemes and modes', async ({ page }) => {
   for (const theme of THEMES) for (const scheme of COLOR_SCHEMES) {
     await page.addInitScript(({ theme, scheme }) => {

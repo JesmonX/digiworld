@@ -1,6 +1,6 @@
 {
   "id": "io.github.jesmonx.digiworld.calendar-todo",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "uiDesignVersion": 1,
   "name": "日历与 Todo",
   "localizedNames": { "zh": "日历与待办", "en": "Calendar & Todo" },
