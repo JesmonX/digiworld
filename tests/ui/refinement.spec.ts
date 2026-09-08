@@ -266,6 +266,8 @@ test('keyboard counts stay readable on every dark color scheme', async ({ page }
     await gotoWithRetry(page, '/design.html')
     await page.getByRole('button', { name: '键盘热力图', exact: true }).click()
     const frame = page.frameLocator('iframe')
+    await expect(frame.locator('.keyboard-board')).toBeVisible()
+    await expect(frame.locator('.key.has-count small').first()).toBeVisible()
     const readable = await frame.locator('.key.has-count small').evaluateAll(nodes => {
       const parse = (value: string) => value.match(/rgba?\(([^)]+)\)/)?.[1]?.split(',').map(channel => Number.parseFloat(channel.trim()) / 255).slice(0, 3) ?? []
       const luminance = (value: string) => parse(value).map((channel, index) => (channel <= .03928 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4) * [0.2126, 0.7152, 0.0722][index]!).reduce((sum, item) => sum + item, 0)
