@@ -44,7 +44,7 @@ pub struct PlatformArtifact {
     pub sha256: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LocalizedNames {
     #[serde(default, skip_serializing_if = "Option::is_none")]
