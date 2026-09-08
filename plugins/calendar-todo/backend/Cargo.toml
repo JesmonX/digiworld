@@ -12,6 +12,7 @@ serde_json.workspace = true
 tracing-subscriber.workspace = true
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
 regex = "1.11"
+quick-xml = "0.41"
 uuid = { version = "1.18", features = ["v4"] }
 [target.'cfg(target_os = "windows")'.dependencies]
 keyring = { version = "3.6", features = ["windows-native"] }

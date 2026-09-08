@@ -38,6 +38,7 @@ export const DICTIONARY = {
   progress: { en: 'Progress', zh: '流程进度' },
   currentStep: { en: 'Running: {step}', zh: '当前步骤：{step}' },
   waitingForStep: { en: 'Waiting for a step', zh: '等待步骤开始' },
+  detailsUpdating: { en: 'Step details are still updating', zh: '步骤详情更新中' },
   allStepsComplete: { en: 'All steps ended', zh: '所有步骤已结束' },
   showJobs: { en: 'Show jobs and steps', zh: '展开 Job 与步骤' },
   hideJobs: { en: 'Hide jobs and steps', zh: '收起 Job 与步骤' },

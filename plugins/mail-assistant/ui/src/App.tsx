@@ -16,6 +16,7 @@ interface Account {
   id: string; provider: Provider; label: string; email: string; username: string; host: string; port: number
   useProxy: boolean
   hasCredential: boolean; syncPhase: string; indexed: number; total: number; baselineComplete: boolean
+  bodyTotal?: number; bodyCompleted?: number; bodyAttempted?: number; bodyFailed?: number; bodyPending?: number; bodyRetryCount?: number; bodyNextRetryAt?: string; bodyLastErrorCategory?: string
   lastSuccessAt?: string; lastError?: string; nextSyncAt?: string
 }
 interface MailSummary {
@@ -138,7 +139,7 @@ export default function App() {
   const syncNow = async () => {
     setBusy('sync'); setError('')
     try {
-      await bridge.request('mail.sync.start', { accountId: accountId || undefined })
+      await bridge.request('mail.sync.start', { accountId: accountId || undefined, manualRetry: true })
       await refreshStatus()
     } catch (reason) { setError(errorText(reason)) } finally { setBusy('') }
   }
@@ -240,7 +241,7 @@ export default function App() {
       <aside className="dw-card accounts">
         <Button className={!accountId ? 'active' : ''} onClick={() => setAccountId('')}><Inbox size={17} /><span>{t('allInboxes', locale)}</span></Button>
         {accounts.map(account => <Button key={account.id} title={`${account.label} · ${account.email}${account.lastError ? ` · ${account.lastError}` : ''}`} className={accountId === account.id ? 'active' : ''} onClick={() => { setAccountId(account.id); setActionNotice('') }} onDoubleClick={() => editAccount(account)}>
-          <Mail size={17} /><span><strong data-tooltip={account.label}>{account.label}</strong><small data-tooltip={account.lastError || account.email}>{syncing.includes(account.id) ? `${account.syncPhase === 'indexing' ? t('indexing', locale) : t('bodyPhase', locale)} ${account.indexed}/${account.total}` : account.lastError || account.email}</small></span>
+          <Mail size={17} /><span><strong data-tooltip={account.label}>{account.label}</strong><small data-tooltip={account.lastError || account.email}>{syncing.includes(account.id) ? account.syncPhase === 'indexing' ? `${t('indexing', locale)} ${account.indexed}/${account.total}` : `${t('bodyPhase', locale)} ${account.bodyCompleted ?? 0}/${account.bodyTotal ?? 0}${account.bodyFailed ? ` · ${t('bodyFailed', locale)} ${account.bodyFailed}` : ''}` : account.lastError || (account.bodyTotal ? `${t('bodyPhase', locale)} ${account.bodyCompleted ?? 0}/${account.bodyTotal}` : account.email)}</small></span>
           {syncing.includes(account.id) ? <LoaderCircle className="spin" size={14} /> : account.lastError ? <span aria-label={t('syncFailed', locale)} data-tooltip={account.lastError || account.email}><AlertCircle className="warn" size={14} /></span> : null}
         </Button>)}
         {currentAccount && <Button className="manage" onClick={() => editAccount(currentAccount)}><Settings size={15} />{t('accountSettings', locale)}</Button>}
@@ -346,4 +347,3 @@ function buildEmailHtmlDoc(html: string): string {
   }
   return `<!DOCTYPE html><html><head><meta charset="utf-8">${baseTag}${defaultStyle}</head><body>${html}</body></html>`
 }
-

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { PluginPage, PageToolbar, Button, Input, Card, Status, Dialog } from '@digiworld/design-system/react'
 import { createPluginBridge } from '@digiworld/plugin-sdk'
 import { Github, RefreshCw, Settings, ExternalLink, CheckCircle2, XCircle, LoaderCircle, Clock3, CircleSlash2, Search, X } from 'lucide-react'
@@ -14,28 +14,48 @@ export type Run = { id: number; repository: string; name: string; title: string;
 const TERMINAL_CONCLUSIONS = new Set(['success', 'failure', 'cancelled', 'skipped', 'neutral', 'timed_out', 'action_required', 'stale'])
 const isFinished = (status?: string, conclusion?: string | null) => status === 'completed' || Boolean(conclusion && TERMINAL_CONCLUSIONS.has(conclusion))
 
-export function runProgress(run: Run, jobs = run.jobs, loaded = run.jobsLoaded ?? jobs.length > 0) {
-  if (!loaded) {
-    const total = 1
-    const done = run.status === 'completed' ? 1 : 0
-    return { done, total, current: undefined as string | undefined, percent: done * 100 }
-  }
+export type RunProgress = {
+  done: number
+  total: number
+  current?: string | undefined
+  percent: number
+  terminal: boolean
+  detailsPending: boolean
+}
+
+export function runProgress(run: Run, jobs = run.jobs, loaded = run.jobsLoaded ?? jobs.length > 0): RunProgress {
+  const terminal = isFinished(run.status, run.conclusion)
   const steps = jobs.flatMap(job => job.steps ?? [])
+  if (terminal) {
+    const detailItems = steps.length > 0 ? steps : jobs
+    const done = detailItems.filter(item => isFinished(item.status, item.conclusion)).length
+    return {
+      done,
+      total: detailItems.length,
+      current: undefined,
+      percent: 100,
+      terminal: true,
+      detailsPending: !loaded || detailItems.some(item => !isFinished(item.status, item.conclusion)),
+    }
+  }
+  if (!loaded) {
+    return { done: 0, total: 0, current: undefined, percent: 0, terminal: false, detailsPending: false }
+  }
   if (steps.length > 0) {
     const done = steps.filter(step => isFinished(step.status, step.conclusion)).length
     const current = steps.find(step => !isFinished(step.status, step.conclusion))?.name
-    return { done, total: steps.length, current, percent: done / steps.length * 100 }
+    return { done, total: steps.length, current, percent: done / steps.length * 100, terminal: false, detailsPending: false }
   }
   if (jobs.length > 0) {
     const done = jobs.filter(job => isFinished(job.status, job.conclusion)).length
     const current = jobs.find(job => !isFinished(job.status, job.conclusion))?.name
-    return { done, total: jobs.length, current, percent: done / jobs.length * 100 }
+    return { done, total: jobs.length, current, percent: done / jobs.length * 100, terminal: false, detailsPending: false }
   }
-  const done = run.status === 'completed' ? 1 : 0
-  return { done, total: 1, current: undefined as string | undefined, percent: done * 100 }
+  return { done: 0, total: 0, current: undefined, percent: 0, terminal: false, detailsPending: false }
 }
 
 type JobState = { jobs: Job[]; loaded: boolean; loading: boolean; error?: string }
+const runKey = (run: Run) => `${run.repository}:${run.id}:${run.attempt ?? 1}`
 
 const dateText = (value?: string, locale: Locale = 'en') => {
   if (!value) return '—'
@@ -44,7 +64,7 @@ const dateText = (value?: string, locale: Locale = 'en') => {
 }
 
 const statusText = (status: string, conclusion: string | null | undefined, locale: Locale) => {
-  if (status !== 'completed') return status === 'queued' || status === 'waiting' ? t('queued', locale) : t('running', locale)
+  if (!isFinished(status, conclusion)) return status === 'queued' || status === 'waiting' ? t('queued', locale) : t('running', locale)
   const map: Record<string, keyof typeof DICTIONARY> = {
     success: 'success',
     failure: 'failure',
@@ -59,7 +79,7 @@ const statusText = (status: string, conclusion: string | null | undefined, local
 }
 
 function RunIcon({ run }: { run: Run }) {
-  if (run.status !== 'completed') return run.status === 'queued' || run.status === 'waiting' ? <Clock3 className="queued" /> : <LoaderCircle className="spin" />
+  if (!isFinished(run.status, run.conclusion)) return run.status === 'queued' || run.status === 'waiting' ? <Clock3 className="queued" /> : <LoaderCircle className="spin" />
   if (run.conclusion === 'success') return <CheckCircle2 className="ok" />
   if (run.conclusion === 'cancelled' || run.conclusion === 'skipped') return <CircleSlash2 className="muted" />
   return <XCircle className="bad" />
@@ -114,36 +134,53 @@ export default function App() {
   const [error, setError] = useState('')
   const [updatedAt, setUpdatedAt] = useState('')
   const [expandedRuns, setExpandedRuns] = useState<Set<number>>(() => new Set())
-  const [jobStates, setJobStates] = useState<Record<number, JobState>>({})
+  const [jobStates, setJobStates] = useState<Record<string, JobState>>({})
+  const runsRef = useRef<Run[]>([])
+  const jobRequestTokens = useRef<Record<string, number>>({})
+
+  const loadJobs = async (run: Run, force = false) => {
+    const key = runKey(run)
+    const current = jobStates[key]
+    if (!force && (current?.loaded || current?.loading)) return
+    const requestToken = (jobRequestTokens.current[key] ?? 0) + 1
+    jobRequestTokens.current[key] = requestToken
+    setJobStates(value => ({ ...value, [key]: { jobs: value[key]?.jobs ?? run.jobs, loaded: false, loading: true } }))
+    try {
+      const data = await bridge.request<{ jobs: Job[] }>('git.run.jobs', { repository: run.repository, runId: run.id, attempt: run.attempt ?? 1 })
+      if (jobRequestTokens.current[key] !== requestToken) return
+      const currentRun = runsRef.current.find(item => runKey(item) === key)
+      if (!currentRun || runKey(currentRun) !== key) return
+      setJobStates(value => ({ ...value, [key]: { jobs: data.jobs, loaded: true, loading: false } }))
+    } catch (reason) {
+      if (jobRequestTokens.current[key] !== requestToken) return
+      setJobStates(value => ({ ...value, [key]: { ...(value[key] ?? { jobs: run.jobs }), loaded: false, loading: false, error: String(reason) } }))
+    }
+  }
 
   const loadRuns = async () => {
     const data = await bridge.request<{ runs: Run[]; updatedAt?: string }>('git.runs.snapshot')
+    const previousRuns = runsRef.current
+    runsRef.current = data.runs
     setRuns(data.runs)
     setUpdatedAt(data.updatedAt ?? '')
+    const terminalRefreshes = data.runs.filter(run => previousRuns.some(item => runKey(item) === runKey(run) && !isFinished(item.status, item.conclusion) && isFinished(run.status, run.conclusion)))
     setJobStates(current => {
-      const next = { ...current }
+      const next: Record<string, JobState> = {}
       for (const run of data.runs) {
-        const previous = next[run.id]
+        const key = runKey(run)
+        const previous = current[key]
+        const hadTerminalTransition = terminalRefreshes.some(item => runKey(item) === key)
         if (run.jobsLoaded || run.jobs.length > 0) {
-          next[run.id] = { jobs: run.jobs, loaded: true, loading: previous?.loading ?? false, ...(previous?.error ? { error: previous.error } : {}) }
-        } else if (!previous) {
-          next[run.id] = { jobs: [], loaded: false, loading: false }
+          next[key] = { jobs: run.jobs, loaded: true, loading: previous?.loading ?? false, ...(previous?.error ? { error: previous.error } : {}) }
+        } else if (previous) {
+          next[key] = hadTerminalTransition ? { jobs: [], loaded: false, loading: false } : previous
+        } else {
+          next[key] = { jobs: [], loaded: false, loading: false }
         }
       }
       return next
     })
-  }
-
-  const loadJobs = async (run: Run) => {
-    const current = jobStates[run.id]
-    if (current?.loaded || current?.loading) return
-    setJobStates(value => ({ ...value, [run.id]: { jobs: value[run.id]?.jobs ?? [], loaded: false, loading: true } }))
-    try {
-      const data = await bridge.request<{ jobs: Job[] }>('git.run.jobs', { repository: run.repository, runId: run.id })
-      setJobStates(value => ({ ...value, [run.id]: { jobs: data.jobs, loaded: true, loading: false } }))
-    } catch (reason) {
-      setJobStates(value => ({ ...value, [run.id]: { ...(value[run.id] ?? { jobs: [] }), loaded: false, loading: false, error: String(reason) } }))
-    }
+    for (const run of terminalRefreshes) void loadJobs(run, true)
   }
 
   const toggleRun = (run: Run) => {
@@ -154,7 +191,10 @@ export default function App() {
       else next.add(run.id)
       return next
     })
-    if (opening && !jobStates[run.id]?.loaded && run.jobs.length === 0) void loadJobs(run)
+    const key = runKey(run)
+    if (opening && (!jobStates[key]?.loaded || isFinished(run.status, run.conclusion))) {
+      void loadJobs(run, isFinished(run.status, run.conclusion))
+    }
   }
 
   const load = async () => {
@@ -297,7 +337,7 @@ export default function App() {
           <Status>{selected.length ? t('noRuns', locale) : t('noReposSelected', locale)}</Status>
         ) : (
           runs.map(run => {
-            const state = jobStates[run.id] ?? { jobs: run.jobs, loaded: run.jobsLoaded ?? run.jobs.length > 0, loading: false }
+            const state = jobStates[runKey(run)] ?? { jobs: run.jobs, loaded: run.jobsLoaded ?? run.jobs.length > 0, loading: false }
             const progress = runProgress(run, state.loaded ? state.jobs : run.jobs, state.loaded)
             const expanded = expandedRuns.has(run.id)
             return (
@@ -320,9 +360,9 @@ export default function App() {
                   {(run.attempt ?? 1) > 1 && <span>{t('attempt', locale).replace('{attempt}', String(run.attempt))}</span>}
                 </div>
                 <div className="run-progress">
-                  <div className="run-progress-head"><span>{t('progress', locale)}</span><strong>{progress.done}/{progress.total}</strong></div>
+                  <div className="run-progress-head"><span>{t('progress', locale)}</span><strong>{progress.total > 0 ? `${progress.done}/${progress.total}` : '—'}</strong></div>
                   <div className="run-progress-track" role="progressbar" aria-label={t('progress', locale)} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress.percent)}><span style={{ width: `${Math.max(0, Math.min(100, progress.percent))}%` }} /></div>
-                  <small>{progress.current ? t('currentStep', locale).replace('{step}', progress.current) : progress.percent >= 100 ? t('allStepsComplete', locale) : t('waitingForStep', locale)}</small>
+                  <small>{progress.detailsPending ? t('detailsUpdating', locale) : progress.current ? t('currentStep', locale).replace('{step}', progress.current) : progress.terminal ? (run.conclusion === 'success' ? t('allStepsComplete', locale) : statusText(run.status, run.conclusion, locale)) : t('waitingForStep', locale)}</small>
                 </div>
                 <Button className="run-details-toggle" aria-expanded={expanded} aria-controls={`run-details-${run.id}`} onClick={() => toggleRun(run)}>
                   {expanded ? t('hideJobs', locale) : t('showJobs', locale)}

@@ -19,6 +19,7 @@ export const DICTIONARY = {
   syncFailed: { en: 'Sync failed', zh: '同步失败' },
   indexing: { en: 'Index', zh: '索引' },
   bodyPhase: { en: 'Body', zh: '正文' },
+  bodyFailed: { en: 'failed', zh: '失败' },
   messageListAria: { en: 'Message list', zh: '邮件列表' },
   backToList: { en: 'Back to message list', zh: '返回邮件列表' },
   loadingMessages: { en: 'Loading emails...', zh: '正在载入邮件' },

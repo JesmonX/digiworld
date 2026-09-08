@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Duration, Utc};
+use quick_xml::{NsReader, XmlVersion, events::Event as XmlEvent, name::ResolveResult};
 use regex::Regex;
 use reqwest::{
     Method,
@@ -42,6 +43,32 @@ struct Calendar {
     href: String,
     #[serde(default)]
     read_only: bool,
+    #[serde(default)]
+    capabilities: CalendarCapabilities,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+enum Capability {
+    Allowed,
+    Denied,
+    #[default]
+    Unknown,
+}
+
+#[derive(Clone, Copy)]
+enum CalendarOperation {
+    Create,
+    Update,
+    Delete,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+struct CalendarCapabilities {
+    create: Capability,
+    update: Capability,
+    delete: Capability,
 }
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -83,6 +110,267 @@ struct CalendarReportError {
     status: u16,
     detail: String,
     retryable: bool,
+}
+
+const DAV_NS: &[u8] = b"DAV:";
+const CALDAV_NS: &[u8] = b"urn:ietf:params:xml:ns:caldav";
+
+#[derive(Debug, Clone)]
+struct XmlNode {
+    namespace: Vec<u8>,
+    local: String,
+    text: String,
+    attributes: Vec<(String, String)>,
+    children: Vec<XmlNode>,
+}
+
+fn parse_xml_tree(xml: &str) -> Result<Vec<XmlNode>> {
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    let mut roots = Vec::new();
+    let mut stack: Vec<XmlNode> = Vec::new();
+    let mut buffer = Vec::new();
+    loop {
+        let decoder = reader.decoder();
+        let (resolved, event) = reader.read_resolved_event_into(&mut buffer)?;
+        match event {
+            XmlEvent::Start(element) => {
+                let mut attributes = Vec::new();
+                for attribute in element.attributes().with_checks(false) {
+                    let attribute = attribute?;
+                    attributes.push((
+                        String::from_utf8_lossy(attribute.key.local_name().as_ref()).into_owned(),
+                        attribute
+                            .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?
+                            .into_owned(),
+                    ));
+                }
+                stack.push(XmlNode {
+                    namespace: match resolved {
+                        ResolveResult::Bound(namespace) => namespace.as_ref().to_vec(),
+                        _ => Vec::new(),
+                    },
+                    local: String::from_utf8_lossy(element.local_name().as_ref()).into_owned(),
+                    text: String::new(),
+                    attributes,
+                    children: Vec::new(),
+                });
+            }
+            XmlEvent::Empty(element) => {
+                let mut attributes = Vec::new();
+                for attribute in element.attributes().with_checks(false) {
+                    let attribute = attribute?;
+                    attributes.push((
+                        String::from_utf8_lossy(attribute.key.local_name().as_ref()).into_owned(),
+                        attribute
+                            .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)?
+                            .into_owned(),
+                    ));
+                }
+                attach_xml_node(
+                    &mut roots,
+                    &mut stack,
+                    XmlNode {
+                        namespace: match resolved {
+                            ResolveResult::Bound(namespace) => namespace.as_ref().to_vec(),
+                            _ => Vec::new(),
+                        },
+                        local: String::from_utf8_lossy(element.local_name().as_ref()).into_owned(),
+                        text: String::new(),
+                        attributes,
+                        children: Vec::new(),
+                    },
+                );
+            }
+            XmlEvent::Text(text) => {
+                if let Some(node) = stack.last_mut() {
+                    node.text.push_str(&text.decode()?);
+                }
+            }
+            XmlEvent::CData(text) => {
+                if let Some(node) = stack.last_mut() {
+                    node.text.push_str(&text.decode()?);
+                }
+            }
+            XmlEvent::End(_) => {
+                if let Some(node) = stack.pop() {
+                    attach_xml_node(&mut roots, &mut stack, node);
+                }
+            }
+            XmlEvent::Eof => break,
+            _ => {}
+        }
+        buffer.clear();
+    }
+    Ok(roots)
+}
+
+fn attach_xml_node(roots: &mut Vec<XmlNode>, stack: &mut [XmlNode], node: XmlNode) {
+    if let Some(parent) = stack.last_mut() {
+        parent.children.push(node);
+    } else {
+        roots.push(node);
+    }
+}
+
+fn collect_xml_descendants<'a>(
+    nodes: &'a [XmlNode],
+    namespace: &[u8],
+    local: &str,
+    result: &mut Vec<&'a XmlNode>,
+) {
+    for node in nodes {
+        if node.namespace == namespace && node.local == local {
+            result.push(node);
+        }
+        collect_xml_descendants(&node.children, namespace, local, result);
+    }
+}
+
+fn xml_descendants<'a>(nodes: &'a [XmlNode], namespace: &[u8], local: &str) -> Vec<&'a XmlNode> {
+    let mut result = Vec::new();
+    collect_xml_descendants(nodes, namespace, local, &mut result);
+    result
+}
+
+fn xml_text(node: &XmlNode) -> String {
+    let mut value = node.text.clone();
+    for child in &node.children {
+        value.push_str(&xml_text(child));
+    }
+    value.trim().to_string()
+}
+
+fn successful_properties(response: &XmlNode) -> Vec<&XmlNode> {
+    response
+        .children
+        .iter()
+        .filter(|propstat| propstat.namespace == DAV_NS && propstat.local == "propstat")
+        .filter(|propstat| {
+            propstat
+                .children
+                .iter()
+                .find(|node| node.namespace == DAV_NS && node.local == "status")
+                .map(xml_text)
+                .is_some_and(|status| {
+                    status
+                        .split_whitespace()
+                        .nth(1)
+                        .is_some_and(|code| code.starts_with('2'))
+                })
+        })
+        .filter_map(|propstat| {
+            propstat
+                .children
+                .iter()
+                .find(|node| node.namespace == DAV_NS && node.local == "prop")
+        })
+        .collect()
+}
+
+fn response_nodes(xml: &str) -> Result<Vec<XmlNode>> {
+    let roots = parse_xml_tree(xml)?;
+    Ok(xml_descendants(&roots, DAV_NS, "response")
+        .into_iter()
+        .cloned()
+        .collect())
+}
+
+fn property_child_text(
+    xml: &str,
+    property_namespace: &[u8],
+    property: &str,
+    child_namespace: &[u8],
+    child: &str,
+) -> Result<Option<String>> {
+    let roots = parse_xml_tree(xml)?;
+    for response in xml_descendants(&roots, DAV_NS, "response") {
+        for prop in successful_properties(response) {
+            for property_node in xml_descendants(&prop.children, property_namespace, property) {
+                if let Some(value) =
+                    xml_descendants(&property_node.children, child_namespace, child).first()
+                {
+                    return Ok(Some(xml_text(value)));
+                }
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn capability_for_response(response: &XmlNode) -> CalendarCapabilities {
+    let privilege_set = successful_properties(response)
+        .into_iter()
+        .flat_map(|prop| xml_descendants(&prop.children, DAV_NS, "current-user-privilege-set"))
+        .next();
+    let Some(privilege_set) = privilege_set else {
+        return CalendarCapabilities::default();
+    };
+    let privileges = xml_descendants(&privilege_set.children, DAV_NS, "privilege");
+    if privileges.is_empty() {
+        return CalendarCapabilities::default();
+    }
+    let names = privileges
+        .iter()
+        .flat_map(|privilege| {
+            let mut nodes = vec![*privilege];
+            collect_xml_descendants(&privilege.children, DAV_NS, "all", &mut nodes);
+            collect_xml_descendants(&privilege.children, DAV_NS, "write", &mut nodes);
+            collect_xml_descendants(&privilege.children, DAV_NS, "write-content", &mut nodes);
+            collect_xml_descendants(&privilege.children, DAV_NS, "write-properties", &mut nodes);
+            collect_xml_descendants(&privilege.children, DAV_NS, "bind", &mut nodes);
+            collect_xml_descendants(&privilege.children, DAV_NS, "unbind", &mut nodes);
+            nodes
+        })
+        .map(|node| node.local.as_str())
+        .collect::<std::collections::HashSet<_>>();
+    let all = names.contains("all") || names.contains("write");
+    CalendarCapabilities {
+        create: if all || names.contains("bind") {
+            Capability::Allowed
+        } else {
+            Capability::Denied
+        },
+        update: if all || names.contains("write-content") || names.contains("write-properties") {
+            Capability::Allowed
+        } else {
+            Capability::Denied
+        },
+        delete: if all || names.contains("unbind") {
+            Capability::Allowed
+        } else {
+            Capability::Denied
+        },
+    }
+}
+
+fn capabilities_from_xml(xml: &str) -> Result<CalendarCapabilities> {
+    let responses = response_nodes(xml)?;
+    Ok(responses
+        .first()
+        .map(capability_for_response)
+        .unwrap_or_default())
+}
+
+fn read_only_for(capabilities: CalendarCapabilities) -> bool {
+    capabilities.create == Capability::Denied
+        && capabilities.update == Capability::Denied
+        && capabilities.delete == Capability::Denied
+}
+
+fn operation_capability(
+    capabilities: CalendarCapabilities,
+    operation: CalendarOperation,
+) -> Capability {
+    match operation {
+        CalendarOperation::Create => capabilities.create,
+        CalendarOperation::Update => capabilities.update,
+        CalendarOperation::Delete => capabilities.delete,
+    }
+}
+
+fn is_authentication_error(error: &anyhow::Error) -> bool {
+    error.to_string().contains("认证失败（401）")
 }
 
 fn sync_range() -> (DateTime<Utc>, DateTime<Utc>) {
@@ -161,7 +449,11 @@ impl App {
         let status = z.status();
         let text = z.text()?;
         if !status.is_success() && status.as_u16() != 207 {
-            bail!("CalDAV 发现失败 {status}")
+            match status.as_u16() {
+                401 => bail!("认证失败（401）"),
+                403 => bail!("权限拒绝（403）"),
+                _ => bail!("CalDAV 发现失败 {status}"),
+            }
         }
         Ok(text)
     }
@@ -169,18 +461,19 @@ impl App {
         let a = self.account()?;
         let root = format!("{}/", a.server_url.trim_end_matches('/'));
         let principal_doc = self.propfind(&root, "0", "<d:current-user-principal/>")?;
-        let principal_block = blocks(&principal_doc, "current-user-principal")
-            .into_iter()
-            .next()
-            .context("CalDAV 未返回当前用户 principal")?;
-        let principal_href = tag(&principal_block, "href").context("CalDAV principal 缺少地址")?;
+        let principal_href = property_child_text(
+            &principal_doc,
+            DAV_NS,
+            "current-user-principal",
+            DAV_NS,
+            "href",
+        )?
+        .context("CalDAV principal 缺少地址")?;
         let principal = resolve_url(&root, &principal_href)?;
         let home_doc = self.propfind(&principal, "0", "<c:calendar-home-set/>")?;
-        let home_block = blocks(&home_doc, "calendar-home-set")
-            .into_iter()
-            .next()
-            .context("CalDAV 未返回日历目录")?;
-        let home_href = tag(&home_block, "href").context("CalDAV 日历目录缺少地址")?;
+        let home_href =
+            property_child_text(&home_doc, CALDAV_NS, "calendar-home-set", DAV_NS, "href")?
+                .context("CalDAV 日历目录缺少地址")?;
         let home = resolve_url(&principal, &home_href)?;
 
         let text = self.propfind(
@@ -190,22 +483,45 @@ impl App {
         )?;
         let clean_home_url = home.trim_end_matches('/');
         let mut out = vec![];
-        for block in blocks(&text, "response") {
-            let rt = blocks(&block, "resourcetype")
-                .into_iter()
-                .next()
+        for response in response_nodes(&text)? {
+            let properties = successful_properties(&response);
+            let resource_type = properties
+                .iter()
+                .flat_map(|prop| xml_descendants(&prop.children, DAV_NS, "resourcetype"))
+                .next();
+            if !resource_type.is_some_and(|node| {
+                !xml_descendants(&node.children, CALDAV_NS, "calendar").is_empty()
+            }) {
+                continue;
+            }
+            let component_set = properties
+                .iter()
+                .flat_map(|prop| {
+                    xml_descendants(
+                        &prop.children,
+                        CALDAV_NS,
+                        "supported-calendar-component-set",
+                    )
+                })
+                .next();
+            if let Some(component_set) = component_set {
+                let has_vevent = xml_descendants(&component_set.children, CALDAV_NS, "comp")
+                    .iter()
+                    .any(|component| {
+                        component.attributes.iter().any(|(name, value)| {
+                            name == "name" && value.eq_ignore_ascii_case("VEVENT")
+                        })
+                    });
+                if !has_vevent {
+                    continue;
+                }
+            }
+            let href = response
+                .children
+                .iter()
+                .find(|node| node.namespace == DAV_NS && node.local == "href")
+                .map(xml_text)
                 .unwrap_or_default();
-            if !rt.contains("calendar") {
-                continue;
-            }
-            if let Some(comps) = blocks(&block, "supported-calendar-component-set")
-                .into_iter()
-                .next()
-                && !comps.contains("VEVENT")
-            {
-                continue;
-            }
-            let href = tag(&block, "href").unwrap_or_default();
             if href.is_empty() {
                 continue;
             }
@@ -214,13 +530,20 @@ impl App {
             if clean_cal_url == clean_home_url || clean_cal_url.ends_with("/calendars") {
                 continue;
             }
-            let name = tag(&block, "displayname").unwrap_or_else(|| href.clone());
-            let read_only = !block.contains("<d:write") && !block.contains(":write");
+            let name = properties
+                .iter()
+                .flat_map(|prop| xml_descendants(&prop.children, DAV_NS, "displayname"))
+                .next()
+                .map(xml_text)
+                .filter(|value| !value.is_empty())
+                .unwrap_or_else(|| href.clone());
+            let capabilities = capability_for_response(&response);
             out.push(Calendar {
                 id: href.clone(),
                 name,
                 href: cal_url,
-                read_only,
+                read_only: read_only_for(capabilities),
+                capabilities,
             })
         }
         if out.is_empty() {
@@ -369,19 +692,78 @@ impl App {
             json!({"calendars":chosen,"events":events,"warnings":warnings,"syncedAt":Utc::now().to_rfc3339()}),
         )
     }
+    fn refresh_calendar_capabilities(&self, calendar: &Calendar) -> Result<CalendarCapabilities> {
+        let xml = self.propfind(&calendar.href, "0", "<d:current-user-privilege-set/>")?;
+        capabilities_from_xml(&xml)
+    }
+
+    fn refresh_resource_capability(
+        &self,
+        href: &str,
+        operation: CalendarOperation,
+    ) -> Result<Capability> {
+        let xml = match self.propfind(href, "0", "<d:current-user-privilege-set/>") {
+            Ok(xml) => xml,
+            Err(error) if is_authentication_error(&error) => return Err(error),
+            Err(_) => return Ok(Capability::Unknown),
+        };
+        Ok(operation_capability(
+            capabilities_from_xml(&xml)?,
+            operation,
+        ))
+    }
+
+    fn calendar_for_operation(
+        &self,
+        calendar_id: &str,
+        operation: CalendarOperation,
+    ) -> Result<Calendar> {
+        let mut calendars: Vec<Calendar> = read(&self.dir.join("calendars.json"))?;
+        let index = calendars
+            .iter()
+            .position(|calendar| calendar.id == calendar_id)
+            .context("日历不存在")?;
+        let mut calendar = calendars[index].clone();
+        let current = operation_capability(calendar.capabilities, operation);
+        let operation_capability = match current {
+            Capability::Allowed | Capability::Denied => current,
+            Capability::Unknown => match self.refresh_calendar_capabilities(&calendar) {
+                Ok(refreshed) => {
+                    calendar.capabilities = refreshed;
+                    calendar.read_only = read_only_for(refreshed);
+                    calendars[index] = calendar.clone();
+                    let _ = write(&self.dir.join("calendars.json"), &calendars);
+                    operation_capability(refreshed, operation)
+                }
+                Err(error) if is_authentication_error(&error) => return Err(error),
+                Err(_) => Capability::Unknown,
+            },
+        };
+        if operation_capability == Capability::Denied {
+            bail!("此日历只读")
+        }
+        Ok(calendar)
+    }
+
     fn event_save(&self, e: Event, overwrite: bool) -> Result<Event> {
         if e.recurring {
             bail!("重复事件请在 Apple 日历中编辑")
         }
-        let calendars: Vec<Calendar> = read(&self.dir.join("calendars.json"))?;
-        let cal = calendars
-            .iter()
-            .find(|c| c.id == e.calendar_id)
-            .context("日历不存在")?;
-        if cal.read_only {
-            bail!("此日历只读")
-        }
         let new = e.href.is_empty();
+        let cal = self.calendar_for_operation(
+            &e.calendar_id,
+            if new {
+                CalendarOperation::Create
+            } else {
+                CalendarOperation::Update
+            },
+        )?;
+        if !new
+            && self.refresh_resource_capability(&e.href, CalendarOperation::Update)?
+                == Capability::Denied
+        {
+            bail!("此事件无修改权限")
+        }
         let href = if new {
             format!(
                 "{}{}.ics",
@@ -402,6 +784,12 @@ impl App {
             r = r.header("If-Match", format!("\"{}\"", e.etag))
         }
         let z = r.body(to_ics(&e)).send()?;
+        if z.status().as_u16() == 401 {
+            bail!("认证失败（401）")
+        }
+        if z.status().as_u16() == 403 {
+            bail!("权限拒绝（403）")
+        }
         if z.status().as_u16() == 412 {
             bail!("事件已在其他设备修改，请刷新后重试或选择覆盖")
         }
@@ -423,6 +811,12 @@ impl App {
         if e.recurring {
             bail!("重复事件请在 Apple 日历中删除")
         }
+        let _calendar = self.calendar_for_operation(&e.calendar_id, CalendarOperation::Delete)?;
+        if self.refresh_resource_capability(&e.href, CalendarOperation::Delete)?
+            == Capability::Denied
+        {
+            bail!("此事件无删除权限")
+        }
         let mut r = self
             .http
             .delete(&e.href)
@@ -431,6 +825,12 @@ impl App {
             r = r.header("If-Match", format!("\"{}\"", e.etag))
         }
         let z = r.send()?;
+        if z.status().as_u16() == 401 {
+            bail!("认证失败（401）")
+        }
+        if z.status().as_u16() == 403 {
+            bail!("权限拒绝（403）")
+        }
         if z.status().as_u16() == 412 {
             bail!("事件已在其他设备修改，请刷新后重试或选择覆盖")
         }
@@ -777,5 +1177,50 @@ mod tests {
         let (detail, retryable) = dav_error_detail("403 Forbidden");
         assert!(retryable);
         assert!(detail.contains("403 Forbidden"));
+    }
+
+    #[test]
+    fn parses_namespaced_all_privilege_only_from_successful_propstat() {
+        let xml = r#"<x:multistatus xmlns:x="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+          <x:response><x:href>/calendar/</x:href>
+            <x:propstat><x:prop><x:current-user-privilege-set><x:privilege><x:write/></x:privilege></x:current-user-privilege-set></x:prop><x:status>HTTP/1.1 404 Not Found</x:status></x:propstat>
+            <x:propstat><x:prop><x:current-user-privilege-set><x:privilege><x:all/></x:privilege></x:current-user-privilege-set></x:prop><x:status>HTTP/1.1 200 OK</x:status></x:propstat>
+          </x:response>
+        </x:multistatus>"#;
+        assert_eq!(
+            capabilities_from_xml(xml).unwrap(),
+            CalendarCapabilities {
+                create: Capability::Allowed,
+                update: Capability::Allowed,
+                delete: Capability::Allowed
+            }
+        );
+    }
+
+    #[test]
+    fn parses_default_namespace_read_as_explicitly_denied() {
+        let xml = r#"<multistatus xmlns="DAV:">
+          <response><href>/calendar/</href><propstat><prop><current-user-privilege-set><privilege><read/></privilege></current-user-privilege-set></prop><status>HTTP/1.1 200 OK</status></propstat></response>
+        </multistatus>"#;
+        assert_eq!(
+            capabilities_from_xml(xml).unwrap(),
+            CalendarCapabilities {
+                create: Capability::Denied,
+                update: Capability::Denied,
+                delete: Capability::Denied
+            }
+        );
+        assert!(read_only_for(capabilities_from_xml(xml).unwrap()));
+    }
+
+    #[test]
+    fn missing_or_failed_privilege_property_is_unknown() {
+        let xml = r#"<d:multistatus xmlns:d="DAV:">
+          <d:response><d:propstat><d:prop><d:current-user-privilege-set><d:privilege><d:write/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 403 Forbidden</d:status></d:propstat></d:response>
+        </d:multistatus>"#;
+        assert_eq!(
+            capabilities_from_xml(xml).unwrap(),
+            CalendarCapabilities::default()
+        );
     }
 }

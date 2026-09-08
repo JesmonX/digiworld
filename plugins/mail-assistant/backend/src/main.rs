@@ -107,7 +107,13 @@ fn handle(engine: &Arc<MailEngine>, method: &str, params: Value) -> Result<Value
         }
         "mail.sync.start" => {
             let account = params.get("accountId").and_then(Value::as_str);
-            Ok(json!({ "startedAccountIds": engine.start_sync(account) }))
+            let manual_retry = params
+                .get("manualRetry")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            Ok(
+                json!({ "startedAccountIds": engine.start_sync_with_options(account, manual_retry) }),
+            )
         }
         "mail.sync.status" => Ok(serde_json::to_value(engine.status()?)?),
         "mail.messages.list" => {

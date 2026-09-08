@@ -10,7 +10,7 @@ impl<T: Read + Write + Send> IoStream for T {}
 pub type BoxedIo = Box<dyn IoStream>;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
-const IO_TIMEOUT: Duration = Duration::from_secs(60);
+const IO_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub fn connect_tls(host: &str, port: u16, use_proxy: bool) -> Result<BoxedIo> {
     let stream = connect_route(host, port, use_proxy)?;

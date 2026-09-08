@@ -5,13 +5,15 @@ use crate::model::{
 use crate::parser;
 use anyhow::{Context, Result};
 use rusqlite::{Connection, OptionalExtension, params};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::Mutex;
 
 pub struct Database {
     connection: Mutex<Connection>,
 }
+
+type BodyRetryState = (u32, Option<String>, Option<String>);
 
 impl Database {
     pub fn open(path: &Path) -> Result<Self> {
@@ -38,6 +40,11 @@ impl Database {
                 sync_phase TEXT NOT NULL DEFAULT 'idle',
                 indexed INTEGER NOT NULL DEFAULT 0,
                 total INTEGER NOT NULL DEFAULT 0,
+                body_total INTEGER NOT NULL DEFAULT 0,
+                body_completed INTEGER NOT NULL DEFAULT 0,
+                body_attempted INTEGER NOT NULL DEFAULT 0,
+                body_failed INTEGER NOT NULL DEFAULT 0,
+                body_pending INTEGER NOT NULL DEFAULT 0,
                 last_success_at TEXT,
                 last_full_reconcile_at TEXT,
                 last_error TEXT,
@@ -65,6 +72,16 @@ impl Database {
             );
             CREATE INDEX IF NOT EXISTS messages_account_received
                 ON messages(account_id, received_at DESC, id DESC);
+            CREATE TABLE IF NOT EXISTS body_retries (
+                account_id TEXT NOT NULL,
+                uid_validity INTEGER NOT NULL,
+                uid INTEGER NOT NULL,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                next_retry_at TEXT,
+                error_category TEXT,
+                PRIMARY KEY(account_id, uid_validity, uid),
+                FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE CASCADE
+            );
             CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
                 subject, sender, recipients, body,
                 content='messages', content_rowid='id', tokenize='trigram'
@@ -85,17 +102,26 @@ impl Database {
             END;
             ",
         )?;
-        let has_use_proxy = connection
-            .prepare("PRAGMA table_info(accounts)")?
-            .query_map([], |row| row.get::<_, String>(1))?
-            .collect::<rusqlite::Result<Vec<_>>>()?
-            .into_iter()
-            .any(|name| name == "use_proxy");
-        if !has_use_proxy {
-            connection.execute(
-                "ALTER TABLE accounts ADD COLUMN use_proxy INTEGER NOT NULL DEFAULT 1",
-                [],
-            )?;
+        for (name, definition) in [
+            ("use_proxy", "INTEGER NOT NULL DEFAULT 1"),
+            ("body_total", "INTEGER NOT NULL DEFAULT 0"),
+            ("body_completed", "INTEGER NOT NULL DEFAULT 0"),
+            ("body_attempted", "INTEGER NOT NULL DEFAULT 0"),
+            ("body_failed", "INTEGER NOT NULL DEFAULT 0"),
+            ("body_pending", "INTEGER NOT NULL DEFAULT 0"),
+        ] {
+            let exists = connection
+                .prepare("PRAGMA table_info(accounts)")?
+                .query_map([], |row| row.get::<_, String>(1))?
+                .collect::<rusqlite::Result<Vec<_>>>()?
+                .into_iter()
+                .any(|column| column == name);
+            if !exists {
+                connection.execute(
+                    &format!("ALTER TABLE accounts ADD COLUMN {name} {definition}"),
+                    [],
+                )?;
+            }
         }
         Ok(Self {
             connection: Mutex::new(connection),
@@ -155,9 +181,11 @@ impl Database {
         )?;
         if reset_cache {
             transaction.execute("DELETE FROM messages WHERE account_id=?1", [id])?;
+            transaction.execute("DELETE FROM body_retries WHERE account_id=?1", [id])?;
             transaction.execute(
                 "UPDATE accounts SET uid_validity=NULL, last_uid=0, baseline_complete=0,
-                    indexed=0, total=0, sync_phase='idle', last_success_at=NULL,
+                    indexed=0, total=0, body_total=0, body_completed=0, body_attempted=0,
+                    body_failed=0, body_pending=0, sync_phase='idle', last_success_at=NULL,
                     last_full_reconcile_at=NULL, last_error=NULL, next_sync_at=NULL WHERE id=?1",
                 [id],
             )?;
@@ -172,7 +200,12 @@ impl Database {
             .expect("database lock poisoned")
             .query_row(
                 "SELECT id, provider, label, email, username, host, port, use_proxy, sync_phase,
-                        indexed, total, baseline_complete, last_success_at, last_error, next_sync_at
+                        indexed, total, baseline_complete, body_total, body_completed,
+                        body_attempted, body_failed, body_pending,
+                        (SELECT COUNT(*) FROM body_retries r WHERE r.account_id=accounts.id),
+                        (SELECT MIN(r.next_retry_at) FROM body_retries r WHERE r.account_id=accounts.id),
+                        (SELECT r.error_category FROM body_retries r WHERE r.account_id=accounts.id ORDER BY r.next_retry_at DESC LIMIT 1),
+                        last_success_at, last_error, next_sync_at
                  FROM accounts WHERE id=?1",
                 [id],
                 account_from_row,
@@ -184,7 +217,12 @@ impl Database {
         let connection = self.connection.lock().expect("database lock poisoned");
         let mut statement = connection.prepare(
             "SELECT id, provider, label, email, username, host, port, use_proxy, sync_phase,
-                    indexed, total, baseline_complete, last_success_at, last_error, next_sync_at
+                    indexed, total, baseline_complete, body_total, body_completed,
+                    body_attempted, body_failed, body_pending,
+                    (SELECT COUNT(*) FROM body_retries r WHERE r.account_id=accounts.id),
+                    (SELECT MIN(r.next_retry_at) FROM body_retries r WHERE r.account_id=accounts.id),
+                    (SELECT r.error_category FROM body_retries r WHERE r.account_id=accounts.id ORDER BY r.next_retry_at DESC LIMIT 1),
+                    last_success_at, last_error, next_sync_at
              FROM accounts ORDER BY label COLLATE NOCASE, email COLLATE NOCASE",
         )?;
         Ok(statement
@@ -196,6 +234,7 @@ impl Database {
         let mut connection = self.connection.lock().expect("database lock poisoned");
         let transaction = connection.transaction()?;
         transaction.execute("DELETE FROM messages WHERE account_id=?1", [id])?;
+        transaction.execute("DELETE FROM body_retries WHERE account_id=?1", [id])?;
         transaction.execute("DELETE FROM accounts WHERE id=?1", [id])?;
         transaction.commit()?;
         Ok(())
@@ -219,7 +258,9 @@ impl Database {
             .lock()
             .expect("database lock poisoned")
             .execute(
-                "UPDATE accounts SET sync_phase=?2, total=?3, last_error=NULL WHERE id=?1",
+                "UPDATE accounts SET sync_phase=?2, total=?3, body_total=0,
+                 body_completed=0, body_attempted=0, body_failed=0, body_pending=0,
+                 last_error=NULL WHERE id=?1",
                 params![id, phase, total],
             )?;
         Ok(())
@@ -232,6 +273,38 @@ impl Database {
             .execute(
                 "UPDATE accounts SET indexed=?2, sync_phase=?3 WHERE id=?1",
                 params![id, indexed, phase],
+            )?;
+        Ok(())
+    }
+
+    pub fn begin_body_sync(&self, id: &str, total: u64, completed: u64) -> Result<()> {
+        self.connection
+            .lock()
+            .expect("database lock poisoned")
+            .execute(
+                "UPDATE accounts SET sync_phase='downloading', body_total=?2,
+                 body_completed=?3, body_attempted=0, body_failed=0,
+                 body_pending=MAX(?2 - ?3, 0) WHERE id=?1",
+                params![id, total, completed],
+            )?;
+        Ok(())
+    }
+
+    pub fn body_progress(
+        &self,
+        id: &str,
+        completed: u64,
+        attempted: u64,
+        failed: u64,
+        pending: u64,
+    ) -> Result<()> {
+        self.connection
+            .lock()
+            .expect("database lock poisoned")
+            .execute(
+                "UPDATE accounts SET sync_phase='downloading', body_completed=?2,
+                 body_attempted=?3, body_failed=?4, body_pending=?5 WHERE id=?1",
+                params![id, completed, attempted, failed, pending],
             )?;
         Ok(())
     }
@@ -270,9 +343,11 @@ impl Database {
         let mut connection = self.connection.lock().expect("database lock poisoned");
         let transaction = connection.transaction()?;
         transaction.execute("DELETE FROM messages WHERE account_id=?1", [id])?;
+        transaction.execute("DELETE FROM body_retries WHERE account_id=?1", [id])?;
         transaction.execute(
             "UPDATE accounts SET uid_validity=?2, last_uid=0, baseline_complete=0,
-                indexed=0, total=0, sync_phase='indexing' WHERE id=?1",
+                indexed=0, total=0, body_total=0, body_completed=0, body_attempted=0,
+                body_failed=0, body_pending=0, sync_phase='indexing' WHERE id=?1",
             params![id, uid_validity],
         )?;
         transaction.commit()?;
@@ -358,31 +433,79 @@ impl Database {
         Ok(changed > 0)
     }
 
-    pub fn has_body(&self, account_id: &str, uid_validity: u32, uid: u32) -> Result<bool> {
-        Ok(self
-            .connection
-            .lock()
-            .expect("database lock poisoned")
+    pub fn cached_body_uids(&self, account_id: &str, uid_validity: u32) -> Result<HashSet<u32>> {
+        let connection = self.connection.lock().expect("database lock poisoned");
+        let mut statement = connection.prepare(
+            "SELECT uid FROM messages WHERE account_id=?1 AND uid_validity=?2 AND has_body=1",
+        )?;
+        Ok(statement
+            .query_map(params![account_id, uid_validity], |row| row.get(0))?
+            .collect::<std::result::Result<HashSet<u32>, _>>()?)
+    }
+
+    pub fn body_retry_states(
+        &self,
+        account_id: &str,
+        uid_validity: u32,
+    ) -> Result<HashMap<u32, BodyRetryState>> {
+        let connection = self.connection.lock().expect("database lock poisoned");
+        let mut statement = connection.prepare(
+            "SELECT uid, attempts, next_retry_at, error_category FROM body_retries
+             WHERE account_id=?1 AND uid_validity=?2",
+        )?;
+        Ok(statement
+            .query_map(params![account_id, uid_validity], |row| {
+                Ok((
+                    row.get::<_, u32>(0)?,
+                    (row.get(1)?, row.get(2)?, row.get(3)?),
+                ))
+            })?
+            .collect::<std::result::Result<HashMap<_, _>, _>>()?)
+    }
+
+    pub fn record_body_failure(
+        &self,
+        account_id: &str,
+        uid_validity: u32,
+        uid: u32,
+        category: &str,
+    ) -> Result<()> {
+        let connection = self.connection.lock().expect("database lock poisoned");
+        let previous: u32 = connection
             .query_row(
-                "SELECT has_body FROM messages WHERE account_id=?1 AND uid_validity=?2 AND uid=?3",
+                "SELECT attempts FROM body_retries WHERE account_id=?1 AND uid_validity=?2 AND uid=?3",
                 params![account_id, uid_validity, uid],
                 |row| row.get(0),
             )
             .optional()?
-            .unwrap_or(false))
+            .unwrap_or(0);
+        let attempts = previous.saturating_add(1);
+        let minutes = match attempts {
+            1 => 1,
+            2 => 5,
+            3 => 30,
+            _ => 120,
+        };
+        let next = chrono::Utc::now() + chrono::Duration::minutes(minutes);
+        connection.execute(
+            "INSERT INTO body_retries(account_id, uid_validity, uid, attempts, next_retry_at, error_category)
+             VALUES(?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(account_id, uid_validity, uid) DO UPDATE SET attempts=excluded.attempts,
+               next_retry_at=excluded.next_retry_at, error_category=excluded.error_category",
+            params![account_id, uid_validity, uid, attempts, next.to_rfc3339(), category],
+        )?;
+        Ok(())
     }
 
-    pub fn incomplete_body_uids(&self, account_id: &str, uid_validity: u32) -> Result<Vec<u32>> {
-        let connection = self.connection.lock().expect("database lock poisoned");
-        let mut statement = connection.prepare(
-            "SELECT uid FROM messages
-             WHERE account_id=?1 AND uid_validity=?2 AND has_body=0
-             ORDER BY uid DESC",
-        )?;
-        statement
-            .query_map(params![account_id, uid_validity], |row| row.get(0))?
-            .collect::<std::result::Result<Vec<u32>, _>>()
-            .map_err(Into::into)
+    pub fn clear_body_retry(&self, account_id: &str, uid_validity: u32, uid: u32) -> Result<()> {
+        self.connection
+            .lock()
+            .expect("database lock poisoned")
+            .execute(
+                "DELETE FROM body_retries WHERE account_id=?1 AND uid_validity=?2 AND uid=?3",
+                params![account_id, uid_validity, uid],
+            )?;
+        Ok(())
     }
 
     pub fn reconcile_uids(
@@ -409,6 +532,17 @@ impl Database {
                 params![account_id, uid_validity, uid],
             )?;
         }
+        transaction.execute(
+            "DELETE FROM body_retries
+             WHERE account_id=?1 AND uid_validity=?2
+               AND NOT EXISTS (
+                 SELECT 1 FROM messages m
+                 WHERE m.account_id=body_retries.account_id
+                   AND m.uid_validity=body_retries.uid_validity
+                   AND m.uid=body_retries.uid
+               )",
+            params![account_id, uid_validity],
+        )?;
         transaction.commit()?;
         Ok(())
     }
@@ -607,9 +741,17 @@ fn account_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Account> {
         indexed: row.get(9)?,
         total: row.get(10)?,
         baseline_complete: row.get(11)?,
-        last_success_at: row.get(12)?,
-        last_error: row.get(13)?,
-        next_sync_at: row.get(14)?,
+        body_total: row.get(12)?,
+        body_completed: row.get(13)?,
+        body_attempted: row.get(14)?,
+        body_failed: row.get(15)?,
+        body_pending: row.get(16)?,
+        body_retry_count: row.get(17)?,
+        body_next_retry_at: row.get(18)?,
+        body_last_error_category: row.get(19)?,
+        last_success_at: row.get(20)?,
+        last_error: row.get(21)?,
+        next_sync_at: row.get(22)?,
     })
 }
 
@@ -798,10 +940,45 @@ mod tests {
         assert_eq!(m101_after.summary.subject, "测试");
         assert_eq!(m101_after.body, "更新后的正文");
         assert!(m101_after.summary.has_body);
-        assert_eq!(database.incomplete_body_uids("acc", 1).unwrap(), vec![100]);
+        let cached = database.cached_body_uids("acc", 1).unwrap();
+        assert!(cached.contains(&101));
+        assert!(!cached.contains(&100));
         assert_eq!(
             database.pending_locally_read_uids("acc", 1).unwrap(),
             vec![100]
         );
+    }
+
+    #[test]
+    fn persists_body_progress_and_bounded_retry_backoff_without_rebuilding_cache() {
+        let database = Database::open(Path::new(":memory:")).unwrap();
+        let account = AccountInput {
+            id: Some("acc".into()),
+            provider: "qq".into(),
+            label: "QQ".into(),
+            email: "user@qq.com".into(),
+            username: "user@qq.com".into(),
+            host: "imap.qq.com".into(),
+            port: 993,
+            use_proxy: false,
+            secret: None,
+        };
+        database
+            .save_account_with_reset("acc", &account, false)
+            .unwrap();
+        database.begin_body_sync("acc", 1799, 1798).unwrap();
+        database.body_progress("acc", 1798, 0, 0, 1).unwrap();
+        database
+            .record_body_failure("acc", 1, 42, "timeout")
+            .unwrap();
+        let account = database.account("acc").unwrap();
+        assert_eq!(account.body_total, 1799);
+        assert_eq!(account.body_completed, 1798);
+        assert_eq!(account.body_pending, 1);
+        assert_eq!(account.body_retry_count, 1);
+        assert_eq!(account.body_last_error_category.as_deref(), Some("timeout"));
+        assert!(account.body_next_retry_at.is_some());
+        database.clear_body_retry("acc", 1, 42).unwrap();
+        assert_eq!(database.account("acc").unwrap().body_retry_count, 0);
     }
 }

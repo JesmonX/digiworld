@@ -20,8 +20,8 @@ for (const theme of THEMES) for (const [width, height] of [[900, 600], [1280, 80
     await expect(page.getByRole('heading', { name: '界面字体', exact: true })).toBeVisible()
     await page.screenshot({ path: info.outputPath('settings.png') })
     const hostFont = await page.locator('.dw-button.primary').first().evaluate(el => getComputedStyle(el).fontSize).catch(() => '')
-    for (const [label, selector] of [['键盘热力图', '.keyboard-card'], ['Agent Overview', '.weekly-card'], ['邮件助手', '.message-list'], ['Git Actions', '.runs'], ['Servers', '.devices'], ['日历与 Todo', '.agenda']]) {
-      await page.getByRole('button', { name: label, exact: true }).click()
+    for (const [label, selector, navLabel] of [['键盘热力图', '.keyboard-card', '键盘热力图'], ['Agent Overview', '.weekly-card', 'Agent 概览'], ['邮件助手', '.message-list', '邮件助手'], ['Git Actions', '.runs', 'Git 工作流'], ['Servers', '.devices', '服务器监控'], ['日历与 Todo', '.agenda', '日历与待办']] as const) {
+      await page.getByRole('button', { name: navLabel, exact: true }).click()
       const frame = page.frameLocator('iframe')
       await expect(frame.locator(selector)).toBeVisible()
       await frame.locator('body').evaluate(() => document.fonts.ready)
@@ -52,7 +52,7 @@ test('live theme and typography update preserves plugin document and UI state', 
 
 for (const state of ['empty', 'error']) test(`plugin ${state} states`, async ({ page }) => {
   await gotoWithRetry(page, `/design.html?state=${state}`)
-  for (const label of ['键盘热力图', 'Agent Overview', '邮件助手', 'Git Actions', 'Servers', '日历与 Todo']) {
+  for (const label of ['键盘热力图', 'Agent 概览', '邮件助手', 'Git 工作流', '服务器监控', '日历与待办']) {
     await page.getByRole('button', { name: label, exact: true }).click()
     await expect(page.frameLocator('iframe').locator('#root')).not.toBeEmpty()
     if (state === 'error') await expect(page.frameLocator('iframe').getByText('演示：暂时无法加载，请重试', { exact: false }).first()).toBeVisible()
@@ -68,9 +68,23 @@ test('shared controls retain keyboard focus and modal focus containment', async 
   await expect(page.getByRole('button', { name: '打开对话框' })).toBeFocused()
 })
 
+test('built-in plugin names switch language and search accepts either translation', async ({ page }) => {
+  await gotoWithRetry(page, '/design.html')
+  await expect(page.getByRole('button', { name: 'Agent 概览', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '切换语言', exact: true }).click()
+  for (const name of ['Keyboard Heatmap', 'Agent Overview', 'Mail Assistant', 'Git Actions', 'Server Monitor', 'Calendar & Todo']) {
+    await expect(page.getByRole('button', { name, exact: true })).toBeVisible()
+  }
+  await page.getByRole('button', { name: 'Plugins Store', exact: true }).click()
+  const search = page.getByRole('textbox', { name: 'Search plugins', exact: true })
+  await search.fill('服务器监控')
+  await expect(page.getByRole('heading', { name: 'Server Monitor', exact: true })).toBeVisible()
+  await expect(page.locator('.catalog-card')).toHaveCount(1)
+})
+
 test('disabled plugin actions menu stays above the plugin content', async ({ page }) => {
   await gotoWithRetry(page, '/design.html?state=disabled')
-  await page.getByRole('button', { name: 'Servers', exact: true }).click()
+  await page.getByRole('button', { name: '服务器监控', exact: true }).click()
   await expect(page.getByRole('heading', { name: '已停用' })).toBeVisible()
   await page.getByRole('button', { name: '更多插件操作' }).click()
   const menu = page.getByRole('menu')
@@ -86,7 +100,7 @@ test('disabled plugin actions menu stays above the plugin content', async ({ pag
 
 test('servers plugin layout switching, GPU metrics and disk device display', async ({ page }) => {
   await gotoWithRetry(page, '/design.html')
-  await page.getByRole('button', { name: 'Servers', exact: true }).click()
+  await page.getByRole('button', { name: '服务器监控', exact: true }).click()
   const frame = page.frameLocator('iframe')
   await expect(frame.locator('.devices')).toBeVisible()
 
@@ -130,7 +144,7 @@ test('servers plugin layout switching, GPU metrics and disk device display', asy
 
 test('calendar plugin filters past events, displays month calendar and supports date selection', async ({ page }) => {
   await gotoWithRetry(page, '/design.html')
-  await page.getByRole('button', { name: '日历与 Todo', exact: true }).click()
+  await page.getByRole('button', { name: '日历与待办', exact: true }).click()
   const frame = page.frameLocator('iframe')
   await expect(frame.locator('.agenda')).toBeVisible()
   await expect(frame.locator('.month-card')).toBeVisible()
@@ -171,12 +185,23 @@ test('calendar plugin filters past events, displays month calendar and supports 
   await expect(frame.locator('.editor')).not.toBeVisible()
 })
 
+test('calendar unknown permissions remain editable and explain server-side confirmation', async ({ page }) => {
+  await gotoWithRetry(page, '/design.html?state=permissions')
+  await page.getByRole('button', { name: '日历与待办', exact: true }).click()
+  const frame = page.frameLocator('iframe')
+  await frame.getByRole('button', { name: /产品评审/ }).click()
+  await expect(frame.getByText(/权限待确认/)).toBeVisible()
+  await expect(frame.getByRole('button', { name: '保存', exact: true })).toBeEnabled()
+  await expect(frame.getByRole('button', { name: '删除', exact: true })).toBeEnabled()
+})
+
 test('mail narrow layout gives the reader the full content pane and a return path', async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 600 })
   await gotoWithRetry(page, '/design.html')
   await page.getByRole('button', { name: '邮件助手', exact: true }).click()
   const frame = page.frameLocator('iframe')
   await frame.locator('.mail-row').first().click()
+  await expect(frame.getByText(/正文 1799\/1799/)).toBeVisible()
   await expect(frame.locator('.detail')).toBeVisible()
   await expect(frame.locator('.message-list')).toBeHidden()
   await expect(frame.getByRole('button', { name: '返回邮件列表' })).toBeVisible()
@@ -186,7 +211,7 @@ test('mail narrow layout gives the reader the full content pane and a return pat
 
 test('actions shows running state as localized status', async ({ page }) => {
   await gotoWithRetry(page, '/design.html')
-  await page.getByRole('button', { name: 'Git Actions', exact: true }).click()
+  await page.getByRole('button', { name: 'Git 工作流', exact: true }).click()
   const frame = page.frameLocator('iframe')
   await expect(frame.locator('.run-status').first()).toHaveText('运行中')
   await expect(frame.getByText('开始于', { exact: false }).first()).toBeVisible()
@@ -212,7 +237,7 @@ test('actions shows running state as localized status', async ({ page }) => {
 
 test('agent overview auto-refresh interval selector', async ({ page }) => {
   await gotoWithRetry(page, '/design.html')
-  await page.getByRole('button', { name: 'Agent Overview', exact: true }).click()
+  await page.getByRole('button', { name: 'Agent 概览', exact: true }).click()
   const frame = page.frameLocator('iframe')
   await expect(frame.locator('.weekly-card')).toBeVisible()
   await expect(frame.getByText('Credits balance', { exact: true })).toBeVisible()

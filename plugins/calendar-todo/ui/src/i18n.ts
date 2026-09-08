@@ -41,6 +41,7 @@ export const DICTIONARY = {
   editEvent: { en: 'Edit Event', zh: '编辑事件' },
   recurringNotice: { en: 'Recurring events are read-only here. Please edit in Apple Calendar.', zh: '重复事件在这里仅供查看，请在 Apple 日历中编辑。' },
   readOnlyNotice: { en: 'This calendar is read-only. Events cannot be modified.', zh: '此日历为只读，事件仅供查看。' },
+  permissionPending: { en: 'Calendar permissions are pending confirmation; the server will decide when you save.', zh: '日历权限待确认，保存时由服务器裁决。' },
   eventTitle: { en: 'Title', zh: '标题' },
   calendar: { en: 'Calendar', zh: '日历' },
   allDayCheck: { en: 'All-day', zh: '全天' },

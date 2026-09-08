@@ -22,6 +22,7 @@ type Cal = {
   name: string
   href: string
   readOnly: boolean
+  capabilities?: { create: 'allowed' | 'denied' | 'unknown'; update: 'allowed' | 'denied' | 'unknown'; delete: 'allowed' | 'denied' | 'unknown' }
 }
 
 type Event = {
@@ -78,6 +79,9 @@ const blank = (cal = '', dk?: DateKey): Event => {
   }
 }
 
+type CalendarCapability = 'create' | 'update' | 'delete'
+const capability = (calendar: Cal | undefined, operation: CalendarCapability) => calendar?.capabilities?.[operation] ?? (calendar?.readOnly ? 'denied' : 'unknown')
+
 export default function App() {
   const [locale, setLocale] = useState<Locale>(() => {
     return (document.documentElement.lang?.startsWith('zh') ? 'zh' : 'en') as Locale
@@ -129,7 +133,7 @@ export default function App() {
   const createEventForDate = (dk: DateKey) => {
     setSelectedDate(dk)
     setTodoDue(dk)
-    setEdit(blank(cals[0]?.id, dk))
+    setEdit(blank(cals.find(calendar => capability(calendar, 'create') !== 'denied')?.id, dk))
   }
 
   const selectDate = (dk: DateKey) => {
@@ -329,6 +333,11 @@ export default function App() {
   }
 
   const weekdays = locale === 'zh' ? ['一', '二', '三', '四', '五', '六', '日'] : ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
+  const createCalendar = cals.find(calendar => capability(calendar, 'create') !== 'denied')
+  const editCalendar = cals.find(calendar => calendar.id === edit?.calendarId)
+  const editOperation: CalendarCapability = edit?.href ? 'update' : 'create'
+  const editCapability = capability(editCalendar, editOperation)
+  const editDeleteCapability = capability(editCalendar, 'delete')
 
   return (
     <PluginPage>
@@ -421,7 +430,7 @@ export default function App() {
                 <Button
                   variant="primary"
                   onClick={() => createEventForDate(selectedDate || today)}
-                  disabled={!cals.length}
+                  disabled={!createCalendar}
                 >
                   <Plus size={15} />{t('newEvent', locale)}
                 </Button>
@@ -495,7 +504,8 @@ export default function App() {
             <Button onClick={() => setEdit(null)}><X size={16} /></Button>
           </header>
           {edit.recurring && <Status>{t('recurringNotice', locale)}</Status>}
-          {cals.find(calendar => calendar.id === edit.calendarId)?.readOnly && <Status>{t('readOnlyNotice', locale)}</Status>}
+          {editCalendar && editCapability === 'denied' && <Status>{t('readOnlyNotice', locale)}</Status>}
+          {editCalendar && editCapability === 'unknown' && <Status>{t('permissionPending', locale)}</Status>}
           <label>
             {t('eventTitle', locale)}
             <Input disabled={edit.recurring} value={edit.title} onChange={e => setEdit({ ...edit, title: e.target.value })} />
@@ -553,11 +563,11 @@ export default function App() {
           </label>
           <footer>
             {edit.href && !edit.recurring ? (
-              <Button variant="danger" disabled={busy || cals.find(calendar => calendar.id === edit.calendarId)?.readOnly} onClick={() => void delEvent()}>{t('delete', locale)}</Button>
+              <Button variant="danger" disabled={busy || editDeleteCapability === 'denied'} onClick={() => void delEvent()}>{t('delete', locale)}</Button>
             ) : <span />}
             <div>
               <Button onClick={() => setEdit(null)}>{t('cancel', locale)}</Button>
-              <Button variant="primary" disabled={busy || edit.recurring || cals.find(calendar => calendar.id === edit.calendarId)?.readOnly || !edit.title || !edit.start || !edit.end} onClick={() => void saveEvent()}>
+              <Button variant="primary" disabled={busy || edit.recurring || editCapability === 'denied' || !edit.title || !edit.start || !edit.end} onClick={() => void saveEvent()}>
                 {busy ? t('saving', locale) : t('save', locale)}
               </Button>
             </div>

@@ -122,9 +122,10 @@ impl App {
                     continue;
                 }
                 let id = run["id"].as_u64().unwrap_or(0);
+                let attempt = run["run_attempt"].as_u64().filter(|attempt| *attempt > 0);
                 let jobs_loaded = run["status"].as_str() != Some("completed");
                 let jobs = if jobs_loaded {
-                    let path = jobs_path(&repo, id)?;
+                    let path = jobs_path(&repo, id, attempt)?;
                     workflow_jobs(&self.get(&path)?["value"])
                 } else {
                     json!([])
@@ -136,12 +137,13 @@ impl App {
         Ok(json!({"login":login,"updatedAt":chrono_like_now(),"runs":runs}))
     }
 
-    fn run_jobs(&self, repository: &str, run_id: u64) -> Result<Value> {
-        let path = jobs_path(repository, run_id)?;
+    fn run_jobs(&self, repository: &str, run_id: u64, attempt: Option<u64>) -> Result<Value> {
+        let path = jobs_path(repository, run_id, attempt)?;
         let data = self.get(&path)?;
         Ok(json!({
             "repository": repository,
             "runId": run_id,
+            "attempt": attempt,
             "jobs": workflow_jobs(&data["value"]),
             "rateLimitRemaining": data["remaining"],
         }))
@@ -166,13 +168,17 @@ fn valid_repo(v: &str) -> Result<()> {
     Ok(())
 }
 
-fn jobs_path(repository: &str, run_id: u64) -> Result<String> {
+fn jobs_path(repository: &str, run_id: u64, attempt: Option<u64>) -> Result<String> {
     valid_repo(repository)?;
     if run_id == 0 {
         bail!("运行 ID 无效")
     }
+    let attempt_path = match attempt {
+        Some(attempt) if attempt > 0 => format!("/attempts/{attempt}"),
+        _ => String::new(),
+    };
     Ok(format!(
-        "/repos/{repository}/actions/runs/{run_id}/jobs?per_page=100"
+        "/repos/{repository}/actions/runs/{run_id}{attempt_path}/jobs?per_page=100"
     ))
 }
 fn chrono_like_now() -> String {
@@ -246,6 +252,7 @@ fn handle(a: &App, m: &str, p: Value) -> Result<Value> {
         "git.run.jobs" => a.run_jobs(
             p["repository"].as_str().context("缺少 repository")?,
             p["runId"].as_u64().context("缺少有效的 runId")?,
+            p["attempt"].as_u64(),
         ),
         _ => bail!("unknown method: {m}"),
     }
@@ -276,11 +283,15 @@ mod tests {
     #[test]
     fn jobs_path_rejects_invalid_repository_parameters() {
         assert_eq!(
-            jobs_path("openai/codex", 42).unwrap(),
+            jobs_path("openai/codex", 42, None).unwrap(),
             "/repos/openai/codex/actions/runs/42/jobs?per_page=100"
         );
-        assert!(jobs_path("owner/../../secret", 42).is_err());
-        assert!(jobs_path("owner/repo", 0).is_err());
+        assert_eq!(
+            jobs_path("openai/codex", 42, Some(3)).unwrap(),
+            "/repos/openai/codex/actions/runs/42/attempts/3/jobs?per_page=100"
+        );
+        assert!(jobs_path("owner/../../secret", 42, None).is_err());
+        assert!(jobs_path("owner/repo", 0, None).is_err());
     }
 
     #[test]

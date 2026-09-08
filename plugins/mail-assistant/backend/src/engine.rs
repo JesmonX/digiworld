@@ -201,6 +201,14 @@ impl MailEngine {
     }
 
     pub fn start_sync(self: &Arc<Self>, account_id: Option<&str>) -> Vec<String> {
+        self.start_sync_with_options(account_id, false)
+    }
+
+    pub fn start_sync_with_options(
+        self: &Arc<Self>,
+        account_id: Option<&str>,
+        manual_retry: bool,
+    ) -> Vec<String> {
         let ids = if let Some(id) = account_id {
             vec![id.to_string()]
         } else {
@@ -225,7 +233,7 @@ impl MailEngine {
             started.push(id.clone());
             let engine = self.clone();
             std::thread::spawn(move || {
-                let result = engine.sync_account(&id);
+                let result = engine.sync_account(&id, manual_retry);
                 if let Err(error) = &result {
                     let message = redact_error(&error.to_string());
                     let _ = engine.database.fail_sync(&id, &message, 5);
@@ -295,7 +303,7 @@ impl MailEngine {
             .contains(account_id)
     }
 
-    fn sync_account(&self, id: &str) -> Result<()> {
+    fn sync_account(&self, id: &str, manual_retry: bool) -> Result<()> {
         let account = self.database.account(id)?;
         let input = AccountInput {
             id: Some(account.id.clone()),
@@ -428,7 +436,11 @@ impl MailEngine {
                     }
                 }
                 Err(err) => {
-                    tracing::warn!("批量读取邮件头失败 ({err})，尝试逐封读取: {sequence}");
+                    tracing::warn!(
+                        "邮件同步阶段=index 错误类型={} UID范围={}，尝试逐封读取",
+                        body_error_category(&err),
+                        sequence
+                    );
                     let mut any_ok = false;
                     for &single_uid in batch {
                         match session.uid_fetch(
@@ -441,31 +453,69 @@ impl MailEngine {
                                     any_ok = true;
                                 }
                             }
-                            Err(e) => tracing::warn!("跳过无法读取头的邮件 UID {single_uid}: {e}"),
+                            Err(e) => tracing::warn!(
+                                "邮件同步阶段=index uid={} 错误类型={}",
+                                single_uid,
+                                body_error_category(&e)
+                            ),
                         }
                     }
                     if !any_ok && !batch.is_empty() {
-                        return Err(anyhow::anyhow!("读取邮件头失败: {err}"));
+                        return Err(anyhow::anyhow!("读取邮件头失败"));
                     }
                 }
             }
             self.database.progress(id, indexed, "indexing")?;
         }
 
-        let mut body_uids = uids.clone();
-        let mut body_uid_set: HashSet<u32> = body_uids.iter().copied().collect();
-        for uid in self.database.incomplete_body_uids(id, uid_validity)? {
-            if body_uid_set.insert(uid) {
-                body_uids.push(uid);
-            }
-        }
-        self.database.progress(id, 0, "downloading")?;
-        let mut downloaded = 0_u64;
+        // Body progress describes the current server mailbox, not only the
+        // incremental header batch above.  This keeps a cached 1,799-message
+        // mailbox at 1,799/1,799 on later syncs and avoids re-fetching bodies.
+        let mut body_server_uids = session
+            .uid_search("ALL")
+            .context("无法读取 INBOX 正文 UID 集合")?
+            .into_iter()
+            .collect::<Vec<_>>();
+        body_server_uids.sort_unstable_by(|left, right| right.cmp(left));
+        let body_server_uid_set: HashSet<u32> = body_server_uids.iter().copied().collect();
+        let cached_body_uids = self.database.cached_body_uids(id, uid_validity)?;
+        let retry_states = self.database.body_retry_states(id, uid_validity)?;
+        let now = chrono::Utc::now();
+        let body_uids: Vec<u32> = body_server_uids
+            .iter()
+            .copied()
+            .filter(|uid| {
+                if cached_body_uids.contains(uid) {
+                    return false;
+                }
+                let Some((_, next_retry_at, _)) = retry_states.get(uid) else {
+                    return true;
+                };
+                manual_retry
+                    || next_retry_at
+                        .as_deref()
+                        .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
+                        .is_none_or(|next| now >= next.with_timezone(&chrono::Utc))
+            })
+            .collect();
+        let body_total = body_server_uids.len() as u64;
+        let body_started = Instant::now();
+        let mut body_completed = cached_body_uids
+            .iter()
+            .filter(|uid| body_server_uid_set.contains(uid))
+            .count() as u64;
+        let mut body_attempted = 0_u64;
+        let mut body_failed = 0_u64;
+        self.database
+            .begin_body_sync(id, body_total, body_completed)?;
+        self.database.body_progress(
+            id,
+            body_completed,
+            body_attempted,
+            body_failed,
+            body_total.saturating_sub(body_completed),
+        )?;
         for uid in &body_uids {
-            if self.database.has_body(id, uid_validity, *uid)? {
-                downloaded += 1;
-                continue;
-            }
             let plan = match session.uid_fetch(uid.to_string(), "(BODYSTRUCTURE)") {
                 Ok(fetches) => fetches
                     .iter()
@@ -485,49 +535,105 @@ impl MailEngine {
                         let raw = fetches
                             .iter()
                             .next()
-                            .and_then(|f| f.text())
-                            .unwrap_or_default();
-                        let text = parser::decode_text_part(raw, "text/plain", None, "8bit");
-                        let truncated = text.chars().count() > MAX_BODY_BYTES;
-                        Ok((text.chars().take(MAX_BODY_BYTES).collect(), truncated))
+                            .and_then(|fetch| fetch.text())
+                            .ok_or_else(|| anyhow!("邮件服务器未返回 FETCH/正文 section"));
+                        match raw {
+                            Ok(raw) => {
+                                let text =
+                                    parser::decode_text_part(raw, "text/plain", None, "8bit");
+                                let truncated = text.chars().count() > MAX_BODY_BYTES;
+                                Ok((text.chars().take(MAX_BODY_BYTES).collect(), truncated))
+                            }
+                            Err(error) => Err(error),
+                        }
                     }
                     Err(fallback_error) => {
-                        tracing::warn!(
-                            "读取邮件 UID {uid} 正文失败: {primary_error}; fallback: {fallback_error}"
+                        tracing::debug!(
+                            "邮件同步阶段=body uid={} 主读取错误类型={} fallback错误类型={}",
+                            uid,
+                            body_error_category(&primary_error),
+                            body_error_category(&fallback_error)
                         );
-                        Err(fallback_error)
+                        Err(anyhow!("读取邮件正文失败: {fallback_error}"))
                     }
                 },
             };
-            if let Ok((body, truncated)) = body_result {
-                let updated = self.database.update_message_body(
-                    id,
-                    uid_validity,
-                    *uid,
-                    &body,
-                    truncated,
-                    &plan.attachments,
-                )?;
-                if !updated {
-                    let mut parsed = empty_message();
-                    parsed.body = body;
-                    parsed.body_truncated = truncated;
-                    parsed.attachments = plan.attachments.clone();
-                    self.database.upsert_message(
+            body_attempted += 1;
+            match body_result {
+                Ok((body, truncated)) => {
+                    let updated = self.database.update_message_body(
                         id,
                         uid_validity,
                         *uid,
-                        0,
-                        false,
-                        &parsed,
-                        true,
+                        &body,
+                        truncated,
+                        &plan.attachments,
                     )?;
+                    if !updated {
+                        let mut parsed = empty_message();
+                        parsed.body = body;
+                        parsed.body_truncated = truncated;
+                        parsed.attachments = plan.attachments.clone();
+                        self.database.upsert_message(
+                            id,
+                            uid_validity,
+                            *uid,
+                            0,
+                            false,
+                            &parsed,
+                            true,
+                        )?;
+                    }
+                    self.database.clear_body_retry(id, uid_validity, *uid)?;
+                    body_completed += 1;
+                }
+                Err(error) => {
+                    body_failed += 1;
+                    let category = body_error_category(&error);
+                    tracing::warn!(
+                        "邮件同步阶段=body uid={} 错误类型={} 耗时_ms={}",
+                        uid,
+                        category,
+                        body_started.elapsed().as_millis()
+                    );
+                    self.database
+                        .record_body_failure(id, uid_validity, *uid, category)?;
+                    if matches!(category, "timeout" | "connection") {
+                        self.database.body_progress(
+                            id,
+                            body_completed,
+                            body_attempted,
+                            body_failed,
+                            body_total
+                                .saturating_sub(body_completed)
+                                .saturating_sub(body_failed),
+                        )?;
+                        return Err(anyhow!("正文连接在 UID {} 处结束", uid));
+                    }
                 }
             }
-            downloaded += 1;
-            self.database.progress(id, downloaded, "downloading")?;
+            self.database.body_progress(
+                id,
+                body_completed,
+                body_attempted,
+                body_failed,
+                body_total
+                    .saturating_sub(body_completed)
+                    .saturating_sub(body_failed),
+            )?;
         }
-        let last_uid = uids.iter().copied().max().unwrap_or(old_last_uid);
+        tracing::info!(
+            "邮件同步阶段=body UID数={} 完成数={} 失败数={} 耗时_ms={}",
+            body_total,
+            body_completed,
+            body_failed,
+            body_started.elapsed().as_millis()
+        );
+        let last_uid = body_server_uids
+            .iter()
+            .copied()
+            .max()
+            .unwrap_or(old_last_uid);
         self.database
             .complete_sync(id, uid_validity, last_uid, reconcile)?;
         let _ = session.logout();
@@ -796,6 +902,21 @@ fn redact_error(value: &str) -> String {
     value.chars().take(500).collect()
 }
 
+fn body_error_category(error: &impl std::fmt::Display) -> &'static str {
+    let text = error.to_string().to_ascii_lowercase();
+    if text.contains("timeout") || text.contains("timed out") || text.contains("would block") {
+        "timeout"
+    } else if text.contains("connection") || text.contains("tls") || text.contains("broken pipe") {
+        "connection"
+    } else if text.contains("fetch") || text.contains("section") {
+        "missing-section"
+    } else if text.contains("parse") || text.contains("decode") {
+        "parse"
+    } else {
+        "server"
+    }
+}
+
 fn compact(value: &str, limit: usize) -> String {
     let value = value.split_whitespace().collect::<Vec<_>>().join(" ");
     value.chars().take(limit).collect()
@@ -873,5 +994,21 @@ mod engine_tests {
         assert_eq!(retry_due_at(Some("2026-09-04T12:05:00Z"), now), Some(false));
         assert_eq!(retry_due_at(Some("invalid"), now), None);
         assert_eq!(retry_due_at(None, now), None);
+    }
+
+    #[test]
+    fn classifies_body_failures_without_hiding_connection_errors() {
+        assert_eq!(
+            body_error_category(&"邮件服务器未返回 FETCH/正文 section"),
+            "missing-section"
+        );
+        assert_eq!(
+            body_error_category(&"读取邮件正文失败: connection reset"),
+            "connection"
+        );
+        assert_eq!(
+            body_error_category(&"读取邮件正文失败: operation timed out"),
+            "timeout"
+        );
     }
 }
