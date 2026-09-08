@@ -244,11 +244,13 @@ test('keyboard data uses one Tab stop and hover-only key feedback', async ({ pag
 
 test('keyboard layouts keep a readable key unit at 100% and 125% zoom', async ({ page }) => {
   const layouts = [
-    ['full', 104],
-    ['tkl', 87],
-    ['75', 84],
-    ['65', 68],
-    ['60', 61],
+    ['108', 108, /108/],
+    ['full', 104, /104/],
+    ['96', 98, /98/],
+    ['tkl', 87, /87/],
+    ['75', 84, /84/],
+    ['65', 68, /68/],
+    ['60', 61, /61/],
   ] as const
   for (const zoom of [1, 1.25]) {
     await page.setViewportSize({ width: 900, height: 800 })
@@ -258,9 +260,9 @@ test('keyboard layouts keep a readable key unit at 100% and 125% zoom', async ({
     await frame.locator('html').evaluate((element, value) => { (element as HTMLElement).style.zoom = String(value) }, zoom)
     for (const width of [900, 1280, 1600]) {
       await page.setViewportSize({ width, height: 800 })
-      for (const [index, [id, count]] of layouts.entries()) {
+      for (const [id, count, name] of layouts) {
         await frame.locator('.layout-picker-trigger').click()
-        await frame.getByRole('menuitemradio').nth(index).click()
+        await frame.getByRole('menuitemradio', { name }).click()
         const board = frame.locator(`.keyboard-board.layout-${id}`)
         await expect(board).toBeVisible()
         const metrics = await board.evaluate((element, expectedCount) => {

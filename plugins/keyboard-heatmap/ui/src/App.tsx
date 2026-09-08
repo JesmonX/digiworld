@@ -98,14 +98,14 @@ export default function App() {
     if (!element) return
     const update = () => {
       const available = Math.max(0, element.clientWidth - 24)
-      const next = Math.max(28, Math.min(46, available / (layout.boardUnits + layout.gapUnits * 0.1)))
+      const next = Math.max(28, Math.min(46, available / (layout.tracks * 0.275)))
       setKeyUnit(next)
     }
     update()
     const observer = new ResizeObserver(update)
     observer.observe(element)
     return () => observer.disconnect()
-  }, [layout.boardUnits, layout.gapUnits])
+  }, [layout.tracks])
 
   const selectLayout = async (next: KeyboardLayoutId) => {
     const previous = layoutId
@@ -134,13 +134,32 @@ export default function App() {
     }
   }
 
-  const getLayoutLabel = (opt: KeyboardLayout) => {
+  const getLayoutLabel = (option: KeyboardLayout) => {
     if (locale === 'en') {
-      const map: Record<string, string> = { full: '104-Key', tkl: '87-Key', '75': '84-Key', '65': '68-Key', '60': '61-Key' }
-      return map[opt.id] || opt.label
+      const map: Record<KeyboardLayoutId, string> = {
+        '108': '108-Key', full: '104-Key', '96': '98-Key', tkl: '87-Key', '75': '84-Key', '65': '68-Key', '60': '61-Key',
+      }
+      return map[option.id]
     }
-    return opt.label
+    return option.label
   }
+
+  const layoutHint = (option: KeyboardLayout) => {
+    const hints: Record<KeyboardLayoutId, string> = {
+      '108': locale === 'en' ? 'Full + Media' : '全尺寸 · 媒体键',
+      full: t('fullSize', locale),
+      '96': '96%',
+      tkl: 'TKL',
+      '75': '75%',
+      '65': '65%',
+      '60': '60%',
+    }
+    return hints[option.id]
+  }
+
+  const keyGap = Math.max(3, Math.min(5, keyUnit * 0.1))
+  const trackWidth = (keyUnit - 3 * keyGap) / 4
+  const boardWidth = layout.tracks * trackWidth + (layout.tracks - 1) * keyGap + 26
 
   return (
     <PluginPage className="heatmap-app">
@@ -181,7 +200,7 @@ export default function App() {
           <Menu id="keyboard-layout-menu" className={`layout-menu ${layoutMenuOpen ? 'open' : ''}`} role="menu" aria-label={t('layoutOptionsAria', locale)} aria-hidden={!layoutMenuOpen}>
             {keyboardLayouts.map(option => <Button key={option.id} type="button" role="menuitemradio" aria-checked={layoutId === option.id} className={layoutId === option.id ? 'active' : ''} onClick={() => void selectLayout(option.id)}>
               <span className="layout-preview" aria-hidden="true">{option.preview.map((row, rowIndex) => <i key={rowIndex}>{row.map((width, index) => <b key={index} style={{ flex: width }} />)}</i>)}</span>
-              <span><strong>{getLayoutLabel(option)}</strong><small>{option.id === 'full' ? t('fullSize', locale) : option.id === 'tkl' ? 'TKL' : `${option.id}%`}</small></span>
+              <span><strong>{getLayoutLabel(option)}</strong><small>{layoutHint(option)}</small></span>
               {layoutId === option.id && <Check aria-hidden="true" />}
             </Button>)}
           </Menu>
@@ -196,17 +215,15 @@ export default function App() {
             className={`keyboard-board layout-${layout.id}`}
             style={{
               '--key-unit': `${keyUnit}px`,
-              '--key-gap': `${Math.max(3, Math.min(5, keyUnit * 0.1))}px`,
-              '--section-gap': `${Math.max(7, Math.min(12, keyUnit * 0.25))}px`,
-              '--board-width': `${layout.boardUnits * keyUnit + layout.gapUnits * Math.max(3, Math.min(5, keyUnit * 0.1)) + 24}px`,
+              '--key-gap': `${keyGap}px`,
+              '--board-columns': layout.tracks,
+              '--board-rows': layout.rows,
+              '--board-width': `${boardWidth}px`,
             } as React.CSSProperties}
           >
-            {layout.functionRow.length > 0 && <><div className="function-row-layout"><KeyboardRow keys={layout.functionRow} counts={snapshot?.counts ?? {}} max={maxCount} locale={locale} /></div><div className="keyboard-gap" /></>}
-            <div className={`keyboard-sections ${layout.numpadKeys.length ? '' : 'without-numpad'} ${layout.navRows.length ? '' : 'without-nav'}`}>
-              <div className="alpha-section">{layout.alphaRows.map((row, index) => <KeyboardRow key={index} keys={row} counts={snapshot?.counts ?? {}} max={maxCount} locale={locale} />)}</div>
-              {layout.navRows.length > 0 && <div className="nav-section">{layout.navRows.map((row, index) => <KeyboardRow key={index} className={index === 3 ? 'arrow-up-row' : ''} keys={row} counts={snapshot?.counts ?? {}} max={maxCount} locale={locale} />)}</div>}
-              {layout.numpadKeys.length > 0 && <div className="numpad-section">{layout.numpadKeys.map(key => <Keycap key={key.id} definition={key} count={snapshot?.counts[key.id] ?? 0} max={maxCount} grid locale={locale} />)}</div>}
-            </div>
+            {layout.keys.map(key => (
+              <Keycap key={key.id} definition={key} count={snapshot?.counts[key.id] ?? 0} max={maxCount} locale={locale} />
+            ))}
           </div>
         </div>
       </section>
@@ -225,15 +242,12 @@ export default function App() {
   )
 }
 
-function KeyboardRow({ keys, counts, max, className = '', locale = 'en' }: { keys: KeyDefinition[]; counts: Record<string, number>; max: number; className?: string; locale?: Locale }) {
-  return <div className={`key-row ${className}`}>{keys.map(key => <Keycap key={key.id} definition={key} count={counts[key.id] ?? 0} max={max} locale={locale} />)}</div>
-}
-
-function Keycap({ definition, count, max, grid = false, locale = 'en' }: { definition: KeyDefinition; count: number; max: number; grid?: boolean; locale?: Locale }) {
+function Keycap({ definition, count, max, locale = 'en' }: { definition: KeyDefinition; count: number; max: number; locale?: Locale }) {
   const level = heatLevel(count, max)
-  const style = grid
-    ? { gridRow: `${definition.row} / span ${definition.rowSpan ?? 1}`, gridColumn: `${definition.column} / span ${definition.columnSpan ?? 1}` }
-    : { '--width': definition.width ?? 1, '--spacer': definition.spacer ?? 0 }
+  const style = {
+    gridRow: `${definition.row} / span ${definition.rowSpan ?? 1}`,
+    gridColumn: `${definition.column} / span ${definition.columnSpan ?? 1}`,
+  }
   const label = formatKeyLabel(definition.id, locale)
   const countText = t('presses', locale).replace('{count}', count.toLocaleString())
   return (
@@ -241,7 +255,7 @@ function Keycap({ definition, count, max, grid = false, locale = 'en' }: { defin
       tabIndex={definition.id === 'Escape' ? 0 : -1}
       className={`key level-${level} ${count > 0 ? 'has-count' : ''} ${level >= 3 ? 'strong-heat' : ''}`}
       aria-label={`${definition.label || label}, ${countText}`}
-      style={style as React.CSSProperties}
+      style={style}
     >
       <span>{definition.id === 'Backspace' ? 'Bksp' : definition.label || label}</span>
       {count > 0 && <small>{count > 999 ? `${(count / 1000).toFixed(1)}k` : count}</small>}

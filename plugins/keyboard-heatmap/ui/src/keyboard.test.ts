@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { formatKeyLabel, getKeyboardLayout, heatLevel, keyboardLayouts, layoutKeys, numpadKeys } from './keyboard'
 
 describe('keyboard layouts', () => {
-  it('covers the mainstream 104, 87, 84, 68 and 61-key distributions', () => {
-    expect(keyboardLayouts.map(layout => layout.keyCount)).toEqual([104, 87, 84, 68, 61])
+  it('covers the mainstream 108, 104, 98, 87, 84, 68 and 61-key distributions', () => {
+    expect(keyboardLayouts.map(layout => layout.keyCount)).toEqual([108, 104, 98, 87, 84, 68, 61])
     for (const layout of keyboardLayouts) {
       const ids = layoutKeys(layout).map(key => key.id)
       expect(ids).toHaveLength(layout.keyCount)
@@ -13,6 +13,36 @@ describe('keyboard layouts', () => {
     }
     expect(layoutKeys(getKeyboardLayout('full')).map(key => key.id)).toContain('NumpadEnter')
     expect(layoutKeys(getKeyboardLayout('60')).map(key => key.id)).not.toContain('F1')
+    expect(layoutKeys(getKeyboardLayout('108')).map(key => key.id)).toContain('VolumeUp')
+  })
+
+  it('places every key on a non-overlapping grid cell inside the board', () => {
+    for (const layout of keyboardLayouts) {
+      const occupied = new Set<string>()
+      for (const key of layout.keys) {
+        const rowSpan = key.rowSpan ?? 1
+        const columnSpan = key.columnSpan ?? 1
+        expect(key.row).toBeGreaterThanOrEqual(1)
+        expect(key.column).toBeGreaterThanOrEqual(1)
+        expect(key.row + rowSpan - 1).toBeLessThanOrEqual(layout.rows)
+        expect(key.column + columnSpan - 1).toBeLessThanOrEqual(layout.tracks)
+        for (let row = key.row; row < key.row + rowSpan; row += 1) {
+          for (let column = key.column; column < key.column + columnSpan; column += 1) {
+            const cell = `${row}:${column}`
+            expect(occupied.has(cell), `${layout.id} ${key.id} overlaps ${cell}`).toBe(false)
+            occupied.add(cell)
+          }
+        }
+      }
+    }
+  })
+
+  it('keeps every ANSI bottom row exactly 15 units wide', () => {
+    for (const layout of keyboardLayouts) {
+      const bottomRow = layout.keys.filter(key => key.row === layout.rows && key.column + (key.columnSpan ?? 1) - 1 <= 60)
+      const rightEdge = Math.max(...bottomRow.map(key => key.column + (key.columnSpan ?? 1) - 1))
+      expect(rightEdge, `${layout.id} bottom row`).toBe(60)
+    }
   })
 
   it('renders tall numpad keys as single physical keys', () => {

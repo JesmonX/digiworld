@@ -142,7 +142,7 @@ impl StatsEngine {
 }
 
 fn valid_layout(layout: &str) -> bool {
-    matches!(layout, "full" | "tkl" | "75" | "65" | "60")
+    matches!(layout, "108" | "full" | "96" | "tkl" | "75" | "65" | "60")
 }
 
 #[cfg(test)]
@@ -155,6 +155,10 @@ mod tests {
         assert_eq!(engine.layout().unwrap(), "full");
         engine.set_layout("65").unwrap();
         assert_eq!(engine.layout().unwrap(), "65");
+        engine.set_layout("96").unwrap();
+        assert_eq!(engine.layout().unwrap(), "96");
+        engine.set_layout("108").unwrap();
+        assert_eq!(engine.layout().unwrap(), "108");
         assert!(engine.set_layout("ergonomic").is_err());
     }
 }

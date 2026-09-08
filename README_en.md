@@ -64,7 +64,7 @@ A local-first, distraction-free IMAP email reader.
 ### 3. Keyboard Heatmap (`keyboard-heatmap`)
 Hardware physical key heatmap for developers and mechanical keyboard enthusiasts.
 
-- **Physical Layouts**: 104-key, 87-key (TKL), 84-key (75%), 68-key (65%), and 61-key (60%) layouts.
+- **Physical Layouts**: 108-key, 104-key, 98-key (96%), 87-key (TKL), 84-key (75%), 68-key (65%), and 61-key (60%) layouts.
 - **Strict Privacy**: Aggregates daily press counts by physical key code only. Never records keystroke sequence, text content, active application titles, or device IDs.
 - **Dynamic Heat Tiers**: Visual gradient reflecting press density with Today vs. All-time statistics and Top-10 keys.
 

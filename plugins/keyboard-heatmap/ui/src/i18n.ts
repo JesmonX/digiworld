@@ -20,6 +20,8 @@ export const DICTIONARY = {
   noData: { en: 'No data', zh: '暂无数据' },
   presses: { en: '{count} presses', zh: '{count} 次' },
   layoutFull: { en: '104-Key', zh: '104 键' },
+  layout108: { en: '108-Key', zh: '108 键' },
+  layout96: { en: '98-Key', zh: '98 键' },
   layoutTkl: { en: '87-Key', zh: '87 键' },
   layout75: { en: '84-Key', zh: '84 键' },
   layout65: { en: '68-Key', zh: '68 键' },

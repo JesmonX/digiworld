@@ -7,6 +7,10 @@ pub fn physical_key(scan_code: u32, extended: bool, vk_code: u32) -> Option<&'st
         0x5B => return Some("MetaLeft"),
         0x5C => return Some("MetaRight"),
         0x5D => return Some("ContextMenu"),
+        0xAD => return Some("VolumeMute"),
+        0xAE => return Some("VolumeDown"),
+        0xAF => return Some("VolumeUp"),
+        0xB3 => return Some("MediaPlayPause"),
         _ => {}
     }
     if extended {
@@ -130,5 +134,13 @@ mod tests {
         assert_eq!(physical_key(0x1C, true, 0x0D), Some("NumpadEnter"));
         assert_eq!(physical_key(0x47, false, 0x67), Some("Numpad7"));
         assert_eq!(physical_key(0x47, true, 0x24), Some("Home"));
+    }
+
+    #[test]
+    fn maps_media_keys_used_by_full_size_boards() {
+        assert_eq!(physical_key(0x20, true, 0xAD), Some("VolumeMute"));
+        assert_eq!(physical_key(0x2E, true, 0xAE), Some("VolumeDown"));
+        assert_eq!(physical_key(0x30, true, 0xAF), Some("VolumeUp"));
+        assert_eq!(physical_key(0x22, true, 0xB3), Some("MediaPlayPause"));
     }
 }
