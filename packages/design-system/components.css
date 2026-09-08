@@ -78,3 +78,8 @@
   border: 1px solid var(--dw-material-border-strong); border-radius: var(--dw-radius-sm); box-shadow: var(--dw-shadow-md);
 }
 .dw-tooltip[hidden] { display: none; }
+.dw-tooltip[data-variant="accent"] {
+  color: var(--dw-accent-strong);
+  background: var(--dw-accent-soft);
+  border-color: var(--dw-accent-border);
+}

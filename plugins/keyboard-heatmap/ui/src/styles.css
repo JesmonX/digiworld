@@ -205,13 +205,8 @@ button { font: inherit; }
   transition: transform var(--dw-motion-fast), box-shadow var(--dw-motion-fast);
 }
 .key:focus-visible { outline: 2px solid var(--dw-focus); outline-offset: 2px; }
-.key.is-pressing { transform: translateY(2px) scale(.985); box-shadow: 0 0 0 color-mix(in srgb, var(--dw-material-border) 20%, transparent); }
-.key:hover {
+.key:hover:not(:focus-visible) {
   box-shadow: 0 2px 4px color-mix(in srgb, var(--dw-material-border) 40%, transparent);
-  transform: none;
-}
-.key.is-pressing:hover {
-  box-shadow: 0 0 0 color-mix(in srgb, var(--dw-material-border) 20%, transparent);
   transform: translateY(2px) scale(.985);
 }
 .key.level-0 { background: var(--dw-material-card); color: var(--dw-text-muted); }
@@ -246,13 +241,13 @@ button { font: inherit; }
   font-weight: var(--dw-weight-bold);
   line-height: 1.1;
   text-align: center;
-  background: color-mix(in srgb, var(--dw-material-card) 75%, transparent);
+  background: var(--dw-material-raised);
   color: var(--dw-text);
   font-variant-numeric: tabular-nums;
 }
 .key.strong-heat small {
-  background: var(--dw-overlay);
-  color: var(--dw-accent-contrast);
+  background: var(--dw-material-raised);
+  color: var(--dw-text);
 }
 
 .nav-section .key-row:nth-child(3) { height: var(--key-unit, 42px); }
@@ -288,5 +283,5 @@ button { font: inherit; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
-  .key.is-pressing { transform: none; box-shadow: inherit; }
+  .key:hover:not(:focus-visible) { transform: none; }
 }

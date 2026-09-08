@@ -434,7 +434,7 @@ export default function App() {
   const sourceOptions = settings ? [{ id: 'local', label: t('localDevice', locale) }, ...settings.sshSources] : []
 
   return (
-    <PluginPage className="usage-app">
+    <PluginPage className="usage-app" data-tooltip-variant="accent">
       <PageToolbar className=" usage-header">
         <div className="header-buttons">
           <Button className="secondary" onClick={() => setSettingsOpen(true)}><Settings2 />{t('settings', locale)}</Button>
@@ -572,13 +572,13 @@ function WeeklyChart({ points, locale = 'en' }: { points: WeeklyUsagePoint[]; lo
           })
           .filter(Boolean)
           .join('、')
-        return <g key={point.day} tabIndex={index === 0 ? 0 : -1} data-tooltip={`${point.day} · ${formatTokens(point.totalTokens)} Token${modelSummary ? ` · ${modelSummary}` : ''} · ${t('cacheRate', locale)} ${cache}`} aria-label={`${point.day} · ${formatTokens(point.totalTokens)} Token`}><rect x={x - barWidth / 2} y={top} width={barWidth} height={plotHeight} rx="5" className="chart-bar-track" /><g className="token-bar">{modelCategories.map((category, categoryIndex) => {
+        return <g key={point.day} tabIndex={index === 0 ? 0 : -1} data-tooltip={`${formatTokens(point.totalTokens)} Token${modelSummary ? ` · ${modelSummary}` : ''} · ${t('cacheRate', locale)} ${cache}`} aria-label={`${point.day} · ${formatTokens(point.totalTokens)} Token`}><rect x={x - barWidth / 2} y={top} width={barWidth} height={plotHeight} rx="5" className="chart-bar-track" /><g className="token-bar">{modelCategories.map((category, categoryIndex) => {
           const value = category.values[index] ?? 0
           if (value <= 0) return null
           const segmentHeight = value * scale
           const y = top + plotHeight - offset - segmentHeight
           offset += segmentHeight
-          return <rect key={`${point.day}-${category.key}`} x={x - barWidth / 2} y={y} width={barWidth} height={segmentHeight} rx="5" className={`token-segment model-${categoryIndex % 8}`} data-tooltip={`${point.day} · ${category.label} · ${formatTokens(value)} Token (${point.totalTokens > 0 ? (value / point.totalTokens * 100).toFixed(1) : '0.0'}%)`} />
+          return <rect key={`${point.day}-${category.key}`} x={x - barWidth / 2} y={y} width={barWidth} height={segmentHeight} rx="5" className={`token-segment model-${categoryIndex % 8}`} data-tooltip={`${category.label} · ${formatTokens(value)} Token (${point.totalTokens > 0 ? (value / point.totalTokens * 100).toFixed(1) : '0.0'}%)`} />
         })}</g><text x={x} y={height - 18} textAnchor="middle" className="chart-day-label">{point.day.slice(5).replace('-', '/')}</text></g>
       })}
       {segments.map((segment, index) => segment.length > 1 && <polyline key={index} points={segment.map(point => `${xFor(point)},${yForRate(point.cacheRate!)}`).join(' ')} className="cache-line" />)}
@@ -587,7 +587,7 @@ function WeeklyChart({ points, locale = 'en' }: { points: WeeklyUsagePoint[]; lo
         const y = yForRate(point.cacheRate!)
         const label = `${(point.cacheRate! * 100).toFixed(1)}%`
         const labelBelow = y < top + 27 || (index % 2 === 1 && y < top + 52)
-        return <g key={point.day} className="cache-marker"><circle cx={x} cy={y} r="5" className="cache-point" data-tooltip={`${point.day} ${t('cacheRate', locale)} ${label}`} /><text visibility={width < 480 ? 'hidden' : undefined} x={x} y={labelBelow ? y + 20 : y - 11} textAnchor="middle" className="cache-point-label">{label}</text></g>
+        return <g key={point.day} className="cache-marker"><circle cx={x} cy={y} r="5" className="cache-point" data-tooltip={`${t('cacheRate', locale)} ${label}`} /><text visibility={width < 480 ? 'hidden' : undefined} x={x} y={labelBelow ? y + 20 : y - 11} textAnchor="middle" className="cache-point-label">{label}</text></g>
       })}
     </svg> : <Empty locale={locale} />}
   </Card>
@@ -787,8 +787,9 @@ function QuotaCard(props: QuotaCardProps) {
         </div>
       </div>
 
-      {isCodex ? (
-        !effectiveCodexConfigured || effectiveCodexQuota?.status === 'unconfigured' ? (
+      <div className="quota-content-slot">
+      <div className={`quota-pane ${isCodex ? 'active' : ''}`} aria-hidden={!isCodex} inert={!isCodex ? true : undefined}>
+        {!effectiveCodexConfigured || effectiveCodexQuota?.status === 'unconfigured' ? (
           <div className="quota-empty">
             <Gauge />
             <span>{locale === 'zh' ? '尚未选择限额查询设备' : 'No device configured for quota queries'}</span>
@@ -880,9 +881,10 @@ function QuotaCard(props: QuotaCardProps) {
             <span>{effectiveCodexQuota?.error ?? (locale === 'zh' ? '当前设备无法获取 Codex 限额' : 'Unable to query Codex quota from device')}</span>
             <Button onClick={onConfigure}>{t('settings', locale)}</Button>
           </div>
-        )
-      ) : (
-        !currentConfigured || agyQuota?.status === 'unconfigured' ? (
+        )}
+      </div>
+      <div className={`quota-pane ${!isCodex ? 'active' : ''}`} aria-hidden={isCodex} inert={isCodex ? true : undefined}>
+        {!currentConfigured || agyQuota?.status === 'unconfigured' ? (
           <div className="quota-empty">
             <Gauge />
             <span>{locale === 'zh' ? '尚未选择限额查询设备' : 'No device configured for quota queries'}</span>
@@ -935,9 +937,10 @@ function QuotaCard(props: QuotaCardProps) {
             <span>{agyQuota?.error ?? (locale === 'zh' ? '当前设备无法获取 Antigravity 限额' : 'Unable to query Antigravity quota from device')}</span>
             <Button onClick={onConfigure}>{t('settings', locale)}</Button>
           </div>
-        )
-      )}
+        )}
+      </div>
 
+      </div>
       <div className="quota-footer">
         <div className={`quota-meta ${currentStatus === 'stale' ? 'warning' : ''}`}>
           {currentStatus === 'stale'

@@ -157,6 +157,7 @@ interface SchemePalette {
     secondary: string
     soft: string
     border: string
+    strong: string
     chart1: string
     chart2: string
   }
@@ -164,6 +165,7 @@ interface SchemePalette {
     secondary: string
     soft: string
     border: string
+    strong: string
     chart1: string
     chart2: string
   }
@@ -176,6 +178,7 @@ const SCHEME_PALETTES: Record<ColorSchemeId, SchemePalette> = {
       secondary: '#059669',
       soft: '#dcfce7',
       border: '#059669',
+      strong: '#047857',
       chart1: '#059669',
       chart2: '#2563eb',
     },
@@ -183,6 +186,7 @@ const SCHEME_PALETTES: Record<ColorSchemeId, SchemePalette> = {
       secondary: '#34d399',
       soft: '#132e27',
       border: '#34d399',
+      strong: '#34d399',
       chart1: '#34d399',
       chart2: '#60a5fa',
     },
@@ -193,6 +197,7 @@ const SCHEME_PALETTES: Record<ColorSchemeId, SchemePalette> = {
       secondary: '#2563eb',
       soft: '#dbeafe',
       border: '#2563eb',
+      strong: '#1d4ed8',
       chart1: '#2563eb',
       chart2: '#059669',
     },
@@ -200,6 +205,7 @@ const SCHEME_PALETTES: Record<ColorSchemeId, SchemePalette> = {
       secondary: '#60a5fa',
       soft: '#172554',
       border: '#60a5fa',
+      strong: '#60a5fa',
       chart1: '#60a5fa',
       chart2: '#34d399',
     },
@@ -210,6 +216,7 @@ const SCHEME_PALETTES: Record<ColorSchemeId, SchemePalette> = {
       secondary: '#7c3aed',
       soft: '#ede9fe',
       border: '#7c3aed',
+      strong: '#6d28d9',
       chart1: '#7c3aed',
       chart2: '#2563eb',
     },
@@ -217,6 +224,7 @@ const SCHEME_PALETTES: Record<ColorSchemeId, SchemePalette> = {
       secondary: '#a78bfa',
       soft: '#2e1065',
       border: '#a78bfa',
+      strong: '#a78bfa',
       chart1: '#a78bfa',
       chart2: '#60a5fa',
     },
@@ -227,6 +235,7 @@ const SCHEME_PALETTES: Record<ColorSchemeId, SchemePalette> = {
       secondary: '#d97706',
       soft: '#fef3c7',
       border: '#d97706',
+      strong: '#92400e',
       chart1: '#d97706',
       chart2: '#059669',
     },
@@ -234,6 +243,7 @@ const SCHEME_PALETTES: Record<ColorSchemeId, SchemePalette> = {
       secondary: '#fbbf24',
       soft: '#261e0b',
       border: '#fbbf24',
+      strong: '#fbbf24',
       chart1: '#fbbf24',
       chart2: '#34d399',
     },
@@ -244,6 +254,7 @@ const SCHEME_PALETTES: Record<ColorSchemeId, SchemePalette> = {
       secondary: '#e11d48',
       soft: '#ffe4e6',
       border: '#e11d48',
+      strong: '#be123c',
       chart1: '#e11d48',
       chart2: '#2563eb',
     },
@@ -251,6 +262,7 @@ const SCHEME_PALETTES: Record<ColorSchemeId, SchemePalette> = {
       secondary: '#fb7185',
       soft: '#2b1418',
       border: '#fb7185',
+      strong: '#fb7185',
       chart1: '#fb7185',
       chart2: '#60a5fa',
     },
@@ -276,6 +288,7 @@ export function getTheme(id: string, schemeId: ColorSchemeId = DEFAULT_COLOR_SCH
       focus: config.secondary,
       'accent-border': config.border,
       'accent-soft': config.soft,
+      'accent-strong': config.strong,
       'chart-1': config.chart1,
       'chart-2': config.chart2,
     },

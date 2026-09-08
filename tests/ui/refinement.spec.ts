@@ -9,7 +9,7 @@ test('calendar columns remain separate across widths, fonts and heavier text', a
       localStorage.setItem('digiworld.font-weight.v1', '600')
     }, font)
     await gotoWithRetry(page, '/design.html')
-    await page.getByRole('button', { name: '日历与 Todo', exact: true }).click()
+    await page.getByRole('button', { name: '日历与待办', exact: true }).click()
     const frame = page.frameLocator('iframe')
     await expect(frame.locator('.month-card')).toBeVisible()
     for (const width of [900, 1040, 1100, 1280, 1600]) {
@@ -29,7 +29,7 @@ test('calendar columns remain separate across widths, fonts and heavier text', a
 test('heatmap tooltip avoids clipping and supports arrows, Escape and scrolling', async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 600 })
   await gotoWithRetry(page, '/design.html')
-  await page.getByRole('button', { name: 'Agent Overview', exact: true }).click()
+  await page.getByRole('button', { name: 'Agent 概览', exact: true }).click()
   const frame = page.frameLocator('iframe')
   const cells = frame.locator('.calendar-grid i[data-tooltip]')
   await cells.first().focus()
@@ -52,9 +52,41 @@ test('heatmap tooltip avoids clipping and supports arrows, Escape and scrolling'
   await expect(tip).toBeHidden()
 })
 
+test('heatmap focus ring scales at the scroll edges and respects reduced motion', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 600 })
+  await gotoWithRetry(page, '/design.html')
+  await page.getByRole('button', { name: 'Agent 概览', exact: true }).click()
+  const frame = page.frameLocator('iframe')
+  const cells = frame.locator('.calendar-grid i:not(.blank)')
+  const blankCells = frame.locator('.calendar-grid i.blank[data-tooltip]')
+  await expect(cells).not.toHaveCount(0)
+  await expect(blankCells).toHaveCount(0)
+
+  for (const cell of [cells.first(), cells.last()]) {
+    await cell.focus()
+    await page.waitForTimeout(220)
+    const state = await cell.evaluate(element => {
+      const wrap = element.closest('.calendar-wrap')!.getBoundingClientRect()
+      const box = element.getBoundingClientRect()
+      const ring = getComputedStyle(element, '::after')
+      return { inside: box.left >= wrap.left && box.right <= wrap.right, transform: getComputedStyle(element).transform, ringOpacity: ring.opacity, ringColor: ring.borderColor }
+    })
+    expect(state.inside).toBe(true)
+    expect(state.transform).not.toBe('none')
+    expect(state.ringOpacity).toBe('1')
+    expect(state.ringColor).not.toBe('rgba(0, 0, 0, 0)')
+  }
+
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await cells.first().focus()
+  expect(await cells.first().evaluate(element => getComputedStyle(element).transform)).toBe('none')
+  expect(await cells.first().evaluate(element => getComputedStyle(element, '::after').animationName)).toBe('none')
+  expect(await cells.first().evaluate(element => getComputedStyle(element, '::after').opacity)).toBe('1')
+})
+
 test('weekly chart labels retain their rendered size at all supported widths', async ({ page }) => {
   await gotoWithRetry(page, '/design.html')
-  await page.getByRole('button', { name: 'Agent Overview', exact: true }).click()
+  await page.getByRole('button', { name: 'Agent 概览', exact: true }).click()
   const frame = page.frameLocator('iframe')
   for (const width of [900, 1280, 1600]) {
     await page.setViewportSize({ width, height: 800 })
@@ -66,9 +98,80 @@ test('weekly chart labels retain their rendered size at all supported widths', a
   }
 })
 
+test('weekly chart tooltips omit dates while axes and accessible labels retain them', async ({ page }) => {
+  await gotoWithRetry(page, '/design.html')
+  await page.getByRole('button', { name: 'Agent 概览', exact: true }).click()
+  const frame = page.frameLocator('iframe')
+  const tooltip = frame.getByRole('tooltip')
+  const group = frame.locator('.weekly-chart g[data-tooltip]').first()
+  await group.focus()
+  await expect(tooltip).toBeVisible()
+  await expect(tooltip).not.toContainText(/2026-\d\d-\d\d/)
+  await expect(group).toHaveAttribute('aria-label', /2026-\d\d-\d\d/)
+
+  const segment = frame.locator('.weekly-chart rect.token-segment[data-tooltip]').first()
+  await segment.hover()
+  await expect(tooltip).toBeVisible()
+  await expect(tooltip).not.toContainText(/2026-\d\d-\d\d/)
+  const cachePoint = frame.locator('.weekly-chart circle.cache-point[data-tooltip]').first()
+  await cachePoint.hover()
+  await expect(tooltip).toBeVisible()
+  await expect(tooltip).not.toContainText(/2026-\d\d-\d\d/)
+})
+
+test('quota card keeps one outer size while Codex and AGY content changes', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 600 })
+  await gotoWithRetry(page, '/design.html')
+  await page.getByRole('button', { name: 'Agent 概览', exact: true }).click()
+  const frame = page.frameLocator('iframe')
+  const card = frame.locator('.quota-card')
+  const codex = await card.boundingBox()
+  await frame.getByRole('button', { name: '下一个限额卡片', exact: true }).click()
+  const agy = await card.boundingBox()
+  expect(codex).not.toBeNull()
+  expect(agy).not.toBeNull()
+  expect(Math.abs(codex!.width - agy!.width)).toBeLessThanOrEqual(1)
+  expect(Math.abs(codex!.height - agy!.height)).toBeLessThanOrEqual(1)
+  await expect(frame.locator('.quota-pane[aria-hidden="true"]')).toHaveAttribute('inert', '')
+})
+
+test('agent accent tooltips remain themed and readable across schemes and modes', async ({ page }) => {
+  for (const theme of THEMES) for (const scheme of COLOR_SCHEMES) {
+    await page.addInitScript(({ theme, scheme }) => {
+      localStorage.setItem('digiworld.theme.v2', theme)
+      localStorage.setItem('digiworld.color-scheme.v1', scheme)
+    }, { theme: theme.id, scheme: scheme.id })
+    await gotoWithRetry(page, '/design.html')
+    await page.getByRole('button', { name: 'Agent 概览', exact: true }).click()
+    const frame = page.frameLocator('iframe')
+    const target = frame.locator('.weekly-chart g[data-tooltip]').first()
+    await target.focus()
+    const colors = await frame.getByRole('tooltip').evaluate(element => {
+      const parse = (value: string) => {
+        const match = value.match(/rgba?\(([^)]+)\)/)
+        if (!match) return null
+        const channels = match[1]!.split(',').map(channel => Number.parseFloat(channel.trim()))
+        return channels.slice(0, 3).map(channel => channel / 255)
+      }
+      const luminance = (value: string) => {
+        const rgb = parse(value)
+        if (!rgb) return 0
+        return rgb.map((channel, index) => (channel <= .03928 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4) * [0.2126, 0.7152, 0.0722][index]!).reduce((sum, value) => sum + value, 0)
+      }
+      const foreground = getComputedStyle(element).color
+      const background = getComputedStyle(element).backgroundColor
+      const light = luminance(foreground)
+      const dark = luminance(background)
+      return { variant: element.getAttribute('data-variant'), contrast: (Math.max(light, dark) + .05) / (Math.min(light, dark) + .05) }
+    })
+    expect(colors.variant).toBe('accent')
+    expect(colors.contrast).toBeGreaterThanOrEqual(4.5)
+  }
+})
+
 test('server dialog contains focus and returns it; GPU information is not truncated', async ({ page }) => {
   await gotoWithRetry(page, '/design.html')
-  await page.getByRole('button', { name: 'Servers', exact: true }).click()
+  await page.getByRole('button', { name: '服务器监控', exact: true }).click()
   const frame = page.frameLocator('iframe')
   const trigger = frame.getByRole('button', { name: '设备设置', exact: true })
   await trigger.click()
@@ -85,35 +188,33 @@ test('server dialog contains focus and returns it; GPU information is not trunca
   expect(await frame.locator('.metric-value').evaluateAll(nodes => nodes.every(el => el.scrollWidth <= el.clientWidth + 1))).toBe(true)
 })
 
-test('keyboard data uses one Tab stop and shared full-name tooltips', async ({ page }) => {
+test('keyboard data uses one Tab stop and hover-only key feedback', async ({ page }) => {
   await gotoWithRetry(page, '/design.html')
   await page.getByRole('button', { name: '键盘热力图', exact: true }).click()
   const frame = page.frameLocator('iframe')
   await expect(frame.locator('.key[tabindex="0"]')).toHaveCount(1)
-  const key = frame.locator('.key[data-tooltip*="Backspace"]')
-  await expect(key).toHaveAttribute('data-tooltip-pointer-only', 'true')
+  const key = frame.locator('.key[aria-label*="Backspace"]')
+  await expect(key).not.toHaveAttribute('data-tooltip')
+  await expect(key).not.toHaveAttribute('data-tooltip-pointer-only')
+  await expect(key).not.toHaveAttribute('title')
   await expect(key).toHaveAttribute('aria-label', /Backspace/)
   await key.focus()
   await expect(frame.getByRole('tooltip')).toBeHidden()
   await expect(key).not.toHaveAttribute('aria-describedby', /dw-tooltip/)
   await key.hover()
-  await expect(frame.getByRole('tooltip')).toContainText('Backspace')
+  await expect(frame.getByRole('tooltip')).toBeHidden()
   await page.emulateMedia({ reducedMotion: 'no-preference' })
-  const box = await key.boundingBox()
-  if (!box) throw new Error('keyboard key has no layout box')
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-  await page.mouse.down()
-  await expect(key).toHaveClass(/is-pressing/)
-  await page.mouse.up()
+  await key.evaluate(element => (element as HTMLElement).blur())
+  await key.hover()
+  expect(await key.evaluate(el => getComputedStyle(el).transform)).not.toBe('none')
+  await key.click()
   await expect(key).not.toHaveClass(/is-pressing/)
-  await page.keyboard.down('Enter')
-  await expect(key).toHaveClass(/is-pressing/)
-  await page.keyboard.up('Enter')
+  await key.focus()
   await expect(key).not.toHaveClass(/is-pressing/)
   await page.emulateMedia({ reducedMotion: 'reduce' })
-  await page.keyboard.down('Enter')
-  await expect(key).not.toHaveClass(/is-pressing/)
-  await page.keyboard.up('Enter')
+  await key.evaluate(element => (element as HTMLElement).blur())
+  await key.hover()
+  expect(await key.evaluate(el => getComputedStyle(el).transform)).toBe('none')
   await page.keyboard.press('ArrowRight')
   await expect(key).not.toBeFocused()
 })
@@ -156,6 +257,29 @@ test('keyboard layouts keep a readable key unit at 100% and 125% zoom', async ({
   }
 })
 
+test('keyboard counts stay readable on every dark color scheme', async ({ page }) => {
+  for (const scheme of COLOR_SCHEMES) {
+    await page.addInitScript(schemeId => {
+      localStorage.setItem('digiworld.theme.v2', 'dark')
+      localStorage.setItem('digiworld.color-scheme.v1', schemeId)
+    }, scheme.id)
+    await gotoWithRetry(page, '/design.html')
+    await page.getByRole('button', { name: '键盘热力图', exact: true }).click()
+    const frame = page.frameLocator('iframe')
+    const readable = await frame.locator('.key.has-count small').evaluateAll(nodes => {
+      const parse = (value: string) => value.match(/rgba?\(([^)]+)\)/)?.[1]?.split(',').map(channel => Number.parseFloat(channel.trim()) / 255).slice(0, 3) ?? []
+      const luminance = (value: string) => parse(value).map((channel, index) => (channel <= .03928 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4) * [0.2126, 0.7152, 0.0722][index]!).reduce((sum, item) => sum + item, 0)
+      return nodes.map(node => {
+        const style = getComputedStyle(node)
+        const contrast = (Math.max(luminance(style.color), luminance(style.backgroundColor)) + .05) / (Math.min(luminance(style.color), luminance(style.backgroundColor)) + .05)
+        return { color: style.color, contrast }
+      })
+    })
+    expect(readable.length).toBeGreaterThan(0)
+    expect(readable.every(item => item.color !== 'rgb(0, 0, 0)' && item.contrast >= 4.5)).toBe(true)
+  }
+})
+
 for (const theme of THEMES) for (const scheme of COLOR_SCHEMES) test(`actual controls use ${theme.id} ${scheme.id} colors`, async ({ page }) => {
   await page.addInitScript(({ theme, scheme }) => {
     localStorage.setItem('digiworld.theme.v2', theme)
@@ -163,7 +287,7 @@ for (const theme of THEMES) for (const scheme of COLOR_SCHEMES) test(`actual con
   }, { theme: theme.id, scheme: scheme.id })
   await gotoWithRetry(page, '/design.html')
   const expected = await page.locator('.app-window').evaluate(el => getComputedStyle(el).getPropertyValue('--dw-accent-secondary').trim())
-  await page.getByRole('button', { name: 'Servers', exact: true }).click()
+  await page.getByRole('button', { name: '服务器监控', exact: true }).click()
   const frame = page.frameLocator('iframe')
   await expect(frame.locator('.dw-progress-track > span').first()).toBeVisible()
   expect(await frame.locator('.dw-progress-track > span').first().evaluate((el, expected) => {
@@ -177,7 +301,7 @@ for (const theme of THEMES) for (const scheme of COLOR_SCHEMES) test(`actual con
 test('long action metadata remains readable through keyboard tooltips', async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 600 })
   await gotoWithRetry(page, '/design.html?long')
-  await page.getByRole('button', { name: 'Git Actions', exact: true }).click()
+  await page.getByRole('button', { name: 'Git 工作流', exact: true }).click()
   const frame = page.frameLocator('iframe')
   const title = frame.locator('.run-head strong').first()
   await title.focus()

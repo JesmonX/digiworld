@@ -239,18 +239,18 @@ describe('token usage layout', () => {
     expect(container.querySelector('.model-key-0')).not.toBeNull()
     expect(container.querySelector('.token-segment.model-0')).not.toBeNull()
 
-    const quotaWindowText = container.querySelector<HTMLElement>('.quota-window span')!.textContent
+    const quotaWindowText = container.querySelector<HTMLElement>('.quota-pane.active .quota-window span')!.textContent
     expect(quotaWindowText).toBe('剩余 68%')
     expect(quotaWindowText).not.toContain('已用')
-    expect(container.querySelector('.quota-credits')?.textContent).toContain('不可用')
-    expect(container.querySelector('.quota-credits')?.getAttribute('data-has-credits')).toBe('false')
+    expect(container.querySelector('.quota-pane.active .quota-credits')?.textContent).toContain('不可用')
+    expect(container.querySelector('.quota-pane.active .quota-credits')?.getAttribute('data-has-credits')).toBe('false')
 
-    const quotaFill = container.querySelector<HTMLElement>('.quota-track i')!
+    const quotaFill = container.querySelector<HTMLElement>('.quota-pane.active .quota-track i')!
     expect(quotaFill.style.width).toBe('68%')
     const quotaRule = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8').match(/\.quota-track i \{[^}]+\}/)?.[0]
     expect(quotaRule).not.toContain('margin-left: auto')
 
-    const quotaResets = container.querySelector<HTMLElement>('.quota-resets')!
+    const quotaResets = container.querySelector<HTMLElement>('.quota-pane.active .quota-resets')!
     expect(quotaResets.textContent).toContain('重置卡')
     expect(quotaResets.textContent).toContain('1 张可用')
     expect(quotaResets.textContent).toContain('赠送重置卡')
@@ -424,7 +424,7 @@ describe('token usage layout', () => {
     expect(groups[1]?.querySelector('.quota-agy-group-header')?.textContent).toBe('Claude 与 GPT 模型')
 
     // Verify concise 5h and 7d limit bars in AGY card
-    const windows = container.querySelectorAll('.quota-window')
+    const windows = container.querySelectorAll('.quota-pane.active .quota-window')
     expect(windows).toHaveLength(3)
     // Gemini 5h limit
     expect(windows[0]?.textContent).toContain('5h')
@@ -440,7 +440,7 @@ describe('token usage layout', () => {
     expect(windows[2]?.querySelector<HTMLElement>('.quota-track i')?.style.width).toBe('50%')
 
     // Plan tier card should be removed from AGY card
-    expect(container.querySelector('.quota-card .quota-credits')).toBeNull()
+    expect(container.querySelector('.quota-pane.active .quota-credits')).toBeNull()
 
     // Test refreshing AGY quota
     mocks.request.mockClear()

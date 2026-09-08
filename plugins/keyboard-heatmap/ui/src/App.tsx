@@ -192,7 +192,7 @@ export default function App() {
             <div className="legend"><span>{t('low', locale)}</span>{[1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>{t('high', locale)}</span></div>
           </div>
           <div
-            onKeyDown={event => rovingDataKeyDown(event)}
+            onKeyDown={event => rovingDataKeyDown(event, '.key[tabindex]')}
             className={`keyboard-board layout-${layout.id}`}
             style={{
               '--key-unit': `${keyUnit}px`,
@@ -230,40 +230,17 @@ function KeyboardRow({ keys, counts, max, className = '', locale = 'en' }: { key
 }
 
 function Keycap({ definition, count, max, grid = false, locale = 'en' }: { definition: KeyDefinition; count: number; max: number; grid?: boolean; locale?: Locale }) {
-  const [pressed, setPressed] = useState(false)
-  const releaseTimer = useRef<number | null>(null)
   const level = heatLevel(count, max)
   const style = grid
     ? { gridRow: `${definition.row} / span ${definition.rowSpan ?? 1}`, gridColumn: `${definition.column} / span ${definition.columnSpan ?? 1}` }
     : { '--width': definition.width ?? 1, '--spacer': definition.spacer ?? 0 }
   const label = formatKeyLabel(definition.id, locale)
   const countText = t('presses', locale).replace('{count}', count.toLocaleString())
-  const press = () => {
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
-    if (releaseTimer.current !== null) window.clearTimeout(releaseTimer.current)
-    setPressed(true)
-    releaseTimer.current = window.setTimeout(() => { setPressed(false); releaseTimer.current = null }, 130)
-  }
-  const release = () => {
-    if (releaseTimer.current !== null) window.clearTimeout(releaseTimer.current)
-    releaseTimer.current = null
-    setPressed(false)
-  }
-  useEffect(() => () => { if (releaseTimer.current !== null) window.clearTimeout(releaseTimer.current) }, [])
   return (
     <div
       tabIndex={definition.id === 'Escape' ? 0 : -1}
-      className={`key level-${level} ${count > 0 ? 'has-count' : ''} ${level >= 3 ? 'strong-heat' : ''} ${pressed ? 'is-pressing' : ''}`}
-      data-tooltip={`${definition.label || label} (${definition.id}): ${countText}`}
-      data-tooltip-pointer-only="true"
+      className={`key level-${level} ${count > 0 ? 'has-count' : ''} ${level >= 3 ? 'strong-heat' : ''}`}
       aria-label={`${definition.label || label}, ${countText}`}
-      onPointerDown={event => { if (event.button === 0) press() }}
-      onPointerUp={release}
-      onPointerCancel={release}
-      onPointerLeave={release}
-      onBlur={release}
-      onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); press() } }}
-      onKeyUp={event => { if (event.key === 'Enter' || event.key === ' ') release() }}
       style={style as React.CSSProperties}
     >
       <span>{definition.id === 'Backspace' ? 'Bksp' : definition.label || label}</span>

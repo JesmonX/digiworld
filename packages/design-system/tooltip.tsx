@@ -27,6 +27,7 @@ export function TooltipLayer() {
         else target.setAttribute('aria-describedby', originalDescription)
       }
       target = null
+      tip.removeAttribute('data-variant')
       if (tip.matches(':popover-open')) tip.hidePopover()
       tip.hidden = true
     }
@@ -51,6 +52,9 @@ export function TooltipLayer() {
       originalDescription = element.getAttribute('aria-describedby')
       element.setAttribute('aria-describedby', [originalDescription, tip.id].filter(Boolean).join(' '))
       tip.textContent = content
+      const variant = element.getAttribute('data-tooltip-variant') ?? element.closest('[data-tooltip-variant]')?.getAttribute('data-tooltip-variant')
+      if (variant) tip.dataset.variant = variant
+      else tip.removeAttribute('data-variant')
       tip.hidden = false
       tip.showPopover?.()
       position()
