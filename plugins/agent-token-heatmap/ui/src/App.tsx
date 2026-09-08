@@ -713,10 +713,19 @@ function QuotaCard(props: QuotaCardProps) {
   const currentFetchedAt = isCodex ? effectiveCodexQuota?.fetchedAt : agyQuota?.fetchedAt
   const currentError = isCodex ? effectiveCodexQuota?.error : agyQuota?.error
 
+  const [activeCreditIndex, setActiveCreditIndex] = useState(0)
   const codexAvailable = effectiveCodexQuota && (effectiveCodexQuota.status === 'ready' || effectiveCodexQuota.status === 'stale') && effectiveCodexQuota.windows.length > 0
   const resetSummary = effectiveCodexQuota?.resetCredits
   const availableResets = resetSummary?.availableCount ?? 0
   const credits = (resetSummary?.credits ?? []).filter(credit => credit.status !== 'redeemed')
+  const safeCreditIndex = credits.length > 0 ? Math.min(activeCreditIndex, credits.length - 1) : 0
+  const currentCredit = credits[safeCreditIndex]
+  const handlePrevCredit = () => {
+    setActiveCreditIndex(current => (credits.length > 0 ? (current - 1 + credits.length) % credits.length : 0))
+  }
+  const handleNextCredit = () => {
+    setActiveCreditIndex(current => (credits.length > 0 ? (current + 1) % credits.length : 0))
+  }
   const codexBalance = effectiveCodexQuota?.credits?.unlimited
     ? t('unlimited', locale)
     : formatCreditBalance(effectiveCodexQuota?.credits?.balance, locale)
@@ -822,23 +831,45 @@ function QuotaCard(props: QuotaCardProps) {
             <div className="quota-resets">
               <div className="quota-resets-header">
                 <span className="quota-resets-title"><Ticket />{t('resetCards', locale)}</span>
-                <span className={`quota-resets-badge ${availableResets > 0 ? 'active' : 'zero'}`}>
-                  {t('availableResets', locale).replace('{count}', String(availableResets))}
-                </span>
-              </div>
-              {credits.length > 0 && (
-                <div className="quota-reset-items">
-                  {credits.map((credit, index) => (
-                    <div key={credit.id || index} className="quota-reset-item">
-                      <div className="quota-reset-item-name">
-                        <span>{credit.title || t('defaultResetCard', locale)}</span>
-                      </div>
-                      <div className="quota-reset-item-dates">
-                        <span>{t('granted', locale)} {formatCardDate(credit.grantedAt, locale)}</span>
-                        <span>{t('expires', locale)} {formatCardDate(credit.expiresAt, locale)}</span>
-                      </div>
+                <div className="quota-resets-actions">
+                  {credits.length > 1 && (
+                    <div className="quota-carousel-nav" role="navigation" aria-label={t('resetCardPagination', locale)}>
+                      <button
+                        type="button"
+                        className="quota-nav-btn"
+                        title={t('prevResetCard', locale)}
+                        aria-label={t('prevResetCard', locale)}
+                        onClick={handlePrevCredit}
+                      >
+                        <ChevronLeft />
+                      </button>
+                      <span className="quota-page-badge">{safeCreditIndex + 1}/{credits.length}</span>
+                      <button
+                        type="button"
+                        className="quota-nav-btn"
+                        title={t('nextResetCard', locale)}
+                        aria-label={t('nextResetCard', locale)}
+                        onClick={handleNextCredit}
+                      >
+                        <ChevronRight />
+                      </button>
                     </div>
-                  ))}
+                  )}
+                  <span className={`quota-resets-badge ${availableResets > 0 ? 'active' : 'zero'}`}>
+                    {t('availableResets', locale).replace('{count}', String(availableResets))}
+                  </span>
+                </div>
+              </div>
+              {credits.length > 0 && currentCredit && (
+                <div className="quota-reset-items">
+                  <div key={currentCredit.id || safeCreditIndex} className="quota-reset-item">
+                    <div className="quota-reset-item-name">
+                      <span>{currentCredit.title || t('defaultResetCard', locale)}</span>
+                    </div>
+                    <div className="quota-reset-item-dates">
+                      <span>{formatCardPeriod(currentCredit.grantedAt, currentCredit.expiresAt, locale)}</span>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -994,7 +1025,48 @@ function formatAgyReset(seconds: number | null | undefined, resetTimeStr: string
   return locale === 'zh' ? '未提供重置时间' : 'No reset time'
 }
 
-function formatCardDate(seconds: number | null | undefined, locale: Locale = 'en'): string {
+export function formatCardPeriod(
+  grantedAt: number | null | undefined,
+  expiresAt: number | null | undefined,
+  locale: Locale = 'en',
+): string {
+  if (!grantedAt && !expiresAt) {
+    return locale === 'zh' ? '永久有效' : 'Permanent'
+  }
+  const toDate = (sec: number) => new Date(sec > 100_000_000_000 ? sec : sec * 1000)
+  const formatMmDd = (d: Date) => {
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    return `${mm}/${dd}`
+  }
+  const formatTime = (d: Date) => {
+    let hours = d.getHours()
+    const minutes = String(d.getMinutes()).padStart(2, '0')
+    const ampm = hours >= 12 ? 'PM' : 'AM'
+    hours = hours % 12
+    if (hours === 0) hours = 12
+    const hourStr = String(hours).padStart(2, '0')
+    return `${hourStr}:${minutes} ${ampm}`
+  }
+
+  if (grantedAt && expiresAt) {
+    const startDate = toDate(grantedAt)
+    const endDate = toDate(expiresAt)
+    return `${formatMmDd(startDate)}-${formatMmDd(endDate)}, ${formatTime(endDate)}`
+  }
+  if (grantedAt && !expiresAt) {
+    const startDate = toDate(grantedAt)
+    const perm = locale === 'zh' ? '永久有效' : 'Permanent'
+    return `${formatMmDd(startDate)}-${perm}, ${formatTime(startDate)}`
+  }
+  if (!grantedAt && expiresAt) {
+    const endDate = toDate(expiresAt)
+    return `${formatMmDd(endDate)}, ${formatTime(endDate)}`
+  }
+  return locale === 'zh' ? '永久有效' : 'Permanent'
+}
+
+export function formatCardDate(seconds: number | null | undefined, locale: Locale = 'en'): string {
   if (!seconds) return locale === 'zh' ? '永久有效' : 'Permanent'
   const ms = seconds > 100_000_000_000 ? seconds : seconds * 1000
   return new Date(ms).toLocaleString(locale === 'zh' ? 'zh-CN' : 'en-US', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })

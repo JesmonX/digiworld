@@ -95,15 +95,16 @@ button svg { width: 14px; height: 14px; }
 .quota-credits strong { overflow-wrap: anywhere; color: var(--dw-text); font-size: var(--type-body); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
 .quota-resets { margin-top: 13px; padding-top: 9px; border-top: 1px solid var(--dw-border); display: flex; flex-direction: column; gap: 7px; }
 .quota-resets-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.quota-resets-actions { display: flex; align-items: center; gap: 6px; }
 .quota-resets-title { display: inline-flex; align-items: center; gap: 5px; font-size: var(--type-caption); font-weight: var(--weight-medium); color: var(--dw-text); }
 .quota-resets-title svg { width: 12px; height: 12px; color: var(--dw-accent); }
 .quota-resets-badge { font-size: var(--type-caption); padding: 1px 7px; border-radius: 999px; }
 .quota-resets-badge.active { background: var(--dw-accent-soft); color: var(--dw-accent-strong); font-weight: var(--weight-semibold); }
 .quota-resets-badge.zero { background: var(--dw-surface-subtle); color: var(--dw-text-muted); }
-.quota-reset-items { display: flex; flex-direction: column; gap: 6px; max-height: 120px; overflow-y: auto; }
+.quota-reset-items { display: flex; flex-direction: column; gap: 6px; }
 .quota-reset-item { padding: 6px 8px; border-radius: var(--dw-radius-sm); background: var(--dw-surface-subtle); border: 1px solid color-mix(in srgb, var(--dw-border) 60%, transparent); font-size: var(--type-caption); display: flex; flex-direction: column; gap: 3px; }
 .quota-reset-item-name { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-weight: var(--weight-medium); color: var(--dw-text); }
-.quota-reset-item-dates { display: flex; flex-wrap: wrap; gap: 8px 12px; color: var(--dw-text-muted); font-size: var(--type-caption); }
+.quota-reset-item-dates { display: flex; align-items: center; color: var(--dw-text-muted); font-size: var(--type-caption); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }
 .quota-meta { margin-top: 13px; padding-top: 8px; border-top: 1px solid var(--dw-border); color: var(--dw-text-muted); font-size: var(--type-caption); }
 .quota-meta.warning { color: var(--dw-warning); }
 .quota-empty { min-height: 190px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--dw-text-muted); text-align: center; font-size: var(--type-body-sm); }

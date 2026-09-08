@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import App, { formatCreditBalance } from './App'
+import App, { formatCardPeriod, formatCreditBalance } from './App'
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -255,8 +255,9 @@ describe('token usage layout', () => {
     expect(quotaResets.textContent).toContain('1 张可用')
     expect(quotaResets.textContent).toContain('赠送重置卡')
     expect(quotaResets.textContent).not.toContain('系统补偿额度')
-    expect(quotaResets.textContent).toContain('获得：')
-    expect(quotaResets.textContent).toContain('到期：')
+    expect(quotaResets.textContent).not.toContain('获得：')
+    expect(quotaResets.textContent).not.toContain('到期：')
+    expect(quotaResets.textContent).toMatch(/\d{2}\/\d{2}-\d{2}\/\d{2},\s*\d{2}:\d{2}\s*(AM|PM)/)
 
     mocks.request.mockClear()
     const thirtyDays = Array.from(heatmap.querySelectorAll('button')).find(button => button.textContent === '30 天')!
@@ -488,6 +489,96 @@ describe('token usage layout', () => {
       await flush()
     })
     expect(mocks.request).toHaveBeenCalledWith('usage.testAgyQuota', expect.anything())
+
+    await act(async () => root.unmount())
+  })
+
+  it('formats reset card period to mm/dd-mm/dd, hour:min AM/PM on one line', () => {
+    const formatted = formatCardPeriod(1788500000, 1789500000, 'zh')
+    expect(formatted).toMatch(/^\d{2}\/\d{2}-\d{2}\/\d{2},\s*\d{2}:\d{2}\s*(AM|PM)$/)
+    expect(formatCardPeriod(null, null, 'zh')).toBe('永久有效')
+    expect(formatCardPeriod(null, null, 'en')).toBe('Permanent')
+  })
+
+  it('switches between multiple reset cards using carousel navigation and occupies only one card space', async () => {
+    const quotaWithMultipleCredits = {
+      ...quota,
+      resetCredits: {
+        availableCount: 2,
+        credits: [
+          {
+            id: 'credit-1',
+            title: '重置卡 A',
+            grantedAt: 1788500000,
+            expiresAt: 1789500000,
+            status: 'available',
+          },
+          {
+            id: 'credit-2',
+            title: '重置卡 B',
+            grantedAt: 1788600000,
+            expiresAt: 1789600000,
+            status: 'available',
+          },
+        ],
+      },
+    }
+    mocks.request.mockImplementation(async (method: string, _params?: any) => {
+      if (method === 'usage.getSettings') return settings
+      if (method === 'usage.snapshot') return snapshot
+      if (method === 'usage.getCodexQuota') return quotaWithMultipleCredits
+      if (method === 'usage.getAgyQuota') return agyQuota
+      throw new Error(`unexpected method: ${method}`)
+    })
+
+    const root = createRoot(container)
+    await act(async () => {
+      root.render(<App />)
+      await flush()
+      await flush()
+    })
+
+    const quotaResets = container.querySelector<HTMLElement>('.quota-resets')!
+    expect(quotaResets).not.toBeNull()
+    expect(quotaResets.textContent).toContain('2 张可用')
+
+    // Only ONE card is rendered in the DOM
+    const resetItems = container.querySelectorAll('.quota-reset-item')
+    expect(resetItems).toHaveLength(1)
+    expect(resetItems[0]?.textContent).toContain('重置卡 A')
+    expect(resetItems[0]?.textContent).not.toContain('重置卡 B')
+
+    // Carousel nav exists with page badge 1/2
+    const nav = quotaResets.querySelector('.quota-carousel-nav')!
+    expect(nav).not.toBeNull()
+    const pageBadge = nav.querySelector('.quota-page-badge')!
+    expect(pageBadge.textContent).toBe('1/2')
+
+    // Click next button
+    const nextBtn = nav.querySelector<HTMLButtonElement>('.quota-nav-btn[aria-label="下一张重置卡"]')!
+    expect(nextBtn).not.toBeNull()
+    await act(async () => {
+      nextBtn.click()
+      await flush()
+    })
+
+    // Still only ONE card rendered, now showing Card B
+    expect(container.querySelectorAll('.quota-reset-item')).toHaveLength(1)
+    expect(container.querySelector('.quota-reset-item')?.textContent).toContain('重置卡 B')
+    expect(container.querySelector('.quota-reset-item')?.textContent).not.toContain('重置卡 A')
+    expect(pageBadge.textContent).toBe('2/2')
+
+    // Click prev button
+    const prevBtn = nav.querySelector<HTMLButtonElement>('.quota-nav-btn[aria-label="上一张重置卡"]')!
+    expect(prevBtn).not.toBeNull()
+    await act(async () => {
+      prevBtn.click()
+      await flush()
+    })
+
+    expect(container.querySelectorAll('.quota-reset-item')).toHaveLength(1)
+    expect(container.querySelector('.quota-reset-item')?.textContent).toContain('重置卡 A')
+    expect(pageBadge.textContent).toBe('1/2')
 
     await act(async () => root.unmount())
   })
