@@ -20,11 +20,22 @@ const calendarDay = (offset: number) => {
   date.setDate(date.getDate() + offset)
   return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-')
 }
+let markpadNotes = [
+  { id: 'markpad-demo', day: calendarDay(0), content: '留住一个想法\n\n**把重要的小事记下来。**\n今晚散步时，试着换一条路线。', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+  { id: 'markpad-yesterday', day: calendarDay(-1), content: '读书摘记\n慢下来，给思考留一点时间。', createdAt: new Date(Date.now()-86400000).toISOString(), updatedAt: new Date(Date.now()-86400000).toISOString() },
+]
 export function fixture(method: string, payload: unknown = {}): unknown {
   if (new URLSearchParams(location.search).get('state') === 'error') throw new Error('演示：暂时无法加载，请重试')
   const longText = new URLSearchParams(location.search).has('long')
   const empty = new URLSearchParams(location.search).get('state') === 'empty'
   const permissions = new URLSearchParams(location.search).get('state') === 'permissions'
+  if (method === 'markpad.list') return empty ? [] : markpadNotes
+  if (method === 'markpad.save') {
+    const note = payload as typeof markpadNotes[number]
+    markpadNotes = [...markpadNotes.filter(n => n.id !== note.id), { ...note, updatedAt: new Date().toISOString() }]
+    return { updatedAt: new Date().toISOString() }
+  }
+  if (method === 'markpad.delete') { markpadNotes = markpadNotes.filter(n => n.id !== (payload as { id: string }).id); return { deleted: true } }
   if (method === 'heatmap.getLayout') return { layout: 'full' }
   if (method === 'heatmap.setLayout') return {}
   if (method === 'heatmap.snapshot') return { scope: 'today', paused: false, total: empty ? 0 : 12840, uniqueKeys: empty ? 0 : 42, topKey: empty ? null : 'Space', counts: empty ? {} : { Space: 4000, KeyA: 1900, KeyE: 2000, Enter: 180, ShiftLeft: 420, ControlLeft: 128, Numpad1: 40, Digit1: 4, Numpad2: 1 }, topTen: empty ? [] : [{ key: 'Space', count: 4000 }, { key: 'KeyE', count: 2000 }, { key: 'KeyA', count: 1900 }] }

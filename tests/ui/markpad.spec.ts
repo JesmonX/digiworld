@@ -1,0 +1,27 @@
+import { test, expect } from '@playwright/test'
+import { gotoWithRetry } from './nav'
+
+test('MarkPad edits, autosaves, searches across dates and confirms deletion', async ({ page }) => {
+  await gotoWithRetry(page, '/design.html')
+  await page.getByRole('button', { name: 'MarkPad', exact: true }).click()
+  const frame = page.frameLocator('iframe')
+  await frame.getByRole('button', { name: '写一条', exact: true }).click()
+  const editor = frame.getByRole('textbox', { name: '随笔内容', exact: true })
+  await editor.fill('一个新的想法')
+  await editor.selectText()
+  await frame.getByRole('button', { name: '加粗 (Ctrl+B)', exact: true }).click()
+  await expect(editor).toHaveValue('**一个新的想法**')
+  await expect(frame.getByText('已保存到本地', { exact: true })).toBeVisible()
+  await frame.getByRole('button', { name: '阅读', exact: true }).click()
+  await expect(frame.locator('.markpad-reading strong')).toHaveText('一个新的想法')
+  await frame.getByRole('textbox', { name: '搜索随笔', exact: true }).fill('读书摘记')
+  await expect(frame.locator('.markpad-note')).toHaveCount(1)
+  await frame.locator('.markpad-note').click()
+  await expect(editor).toHaveValue(/读书摘记/)
+  await frame.getByRole('button', { name: '删除随笔', exact: true }).click()
+  await frame.getByRole('button', { name: '取消', exact: true }).click()
+  await expect(editor).toHaveValue(/读书摘记/)
+  await frame.getByRole('button', { name: '删除随笔', exact: true }).click()
+  await frame.getByRole('button', { name: '删除', exact: true }).click()
+  await expect(frame.locator('.markpad-note')).toHaveCount(0)
+})

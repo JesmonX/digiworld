@@ -1058,6 +1058,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "digiworld-markpad"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "rusqlite",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "digiworld-server-monitor"
 version = "0.1.6"
 dependencies = [

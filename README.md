@@ -26,7 +26,7 @@
 
 ## 📦 官方插件矩阵与实机展示
 
-Digiworld 目前提供六个开箱即用的官方插件：
+Digiworld 目前提供七个开箱即用的官方插件：
 
 ### 1. Agent Overview (AI Token 用量与限额全景看板)
 > 插件标识: `io.github.jesmonx.digiworld.agent-token-heatmap`
@@ -93,6 +93,10 @@ Digiworld 目前提供六个开箱即用的官方插件：
 通过 CalDAV 与 iCloud 日历双向同步普通事件，支持多日历选择、条件写入冲突保护和重复事件只读展示；Todo 独立保存在本地。
 
 ---
+
+### 7. MarkPad
+
+轻量本地随笔：支持同一天多条记录、按日期回顾、全文搜索、基础加粗和编辑／阅读切换。输入后自动保存到本地 SQLite，支持手动保存与删除确认。
 
 ## 🏗️ 系统架构与技术实现
 

@@ -8,6 +8,7 @@ members = [
   "plugins/github-actions/backend",
   "plugins/server-monitor/backend",
   "plugins/calendar-todo/backend",
+  "plugins/markpad/backend",
 ]
 
 [workspace.package]

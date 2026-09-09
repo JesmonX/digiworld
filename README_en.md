@@ -79,6 +79,10 @@ Synchronize ordinary iCloud Calendar events over CalDAV with ETag conflict prote
 
 ---
 
+### 7. MarkPad
+
+Lightweight local notes with multiple entries per day, date browsing, full-text search, basic bold formatting, and editing/reading modes. Notes autosave to SQLite, with manual save and deletion confirmation.
+
 ## Getting Started
 
 ### Installation

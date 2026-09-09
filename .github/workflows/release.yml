@@ -68,7 +68,7 @@ jobs:
       - name: Validate built plugin interfaces
         run: pnpm test:ui
       - name: Build plugin backends
-        run: cargo build --release -p digiworld-keyboard-heatmap -p digiworld-agent-token-heatmap -p digiworld-mail-assistant -p digiworld-github-actions -p digiworld-server-monitor -p digiworld-calendar-todo
+        run: cargo build --release -p digiworld-keyboard-heatmap -p digiworld-agent-token-heatmap -p digiworld-mail-assistant -p digiworld-github-actions -p digiworld-server-monitor -p digiworld-calendar-todo -p digiworld-markpad
       - name: Package signed keyboard plugin
         shell: pwsh
         env:
@@ -105,6 +105,12 @@ jobs:
           DIGIWORLD_TARGET: windows-x86_64
           DIGIWORLD_RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: pnpm package:calendar-todo
+      - name: Package signed MarkPad plugin
+        shell: pwsh
+        env:
+          DIGIWORLD_TARGET: windows-x86_64
+          DIGIWORLD_RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: pnpm package:markpad
       - name: Build signed plugin catalog
         env:
           DIGIWORLD_CATALOG_SEQUENCE: ${{ github.run_number }}

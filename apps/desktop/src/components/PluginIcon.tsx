@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { BarChart3, Boxes, CalendarDays, GitBranch, Keyboard, Mail, Server, type LucideIcon } from 'lucide-react'
+import { BarChart3, Boxes, CalendarDays, GitBranch, Keyboard, Mail, Server, NotebookPen, type LucideIcon } from 'lucide-react'
 
 function ChatGptIcon({ className, 'aria-hidden': ariaHidden, 'data-plugin-icon': dataPluginIcon }: { className?: string; 'aria-hidden'?: boolean | 'true' | 'false'; 'data-plugin-icon'?: string }) {
   return (
@@ -19,11 +19,13 @@ const pluginIconMap: Record<string, PluginIconType> = {
   'git-branch': GitBranch,
   server: Server,
   'calendar-days': CalendarDays,
+  'notebook-pen': NotebookPen,
   default: Boxes,
 }
 
 function pluginIconKey(plugin: { id: string; icon?: string }): string {
   if (plugin.icon && pluginIconMap[plugin.icon]) return plugin.icon
+  if (plugin.id.includes('markpad')) return 'notebook-pen'
   if (plugin.id.includes('keyboard')) return 'keyboard'
   if (plugin.id.includes('agent-token')) return 'chatgpt'
   if (plugin.id.includes('mail')) return 'mail'

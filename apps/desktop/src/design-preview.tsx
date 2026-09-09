@@ -14,8 +14,8 @@ if (typeof window !== 'undefined' && !localStorage.getItem('digiworld.locale.v1'
   localStorage.setItem('digiworld.locale.v1', 'zh')
 }
 
-const names = ['keyboard-heatmap', 'agent-token-heatmap', 'mail-assistant', 'github-actions', 'server-monitor', 'calendar-todo']
-const labels = ['键盘热力图', 'Agent Overview', '邮件助手', 'Git Actions', 'Servers', '日历与 Todo']
+const names = ['keyboard-heatmap', 'agent-token-heatmap', 'mail-assistant', 'github-actions', 'server-monitor', 'calendar-todo', 'markpad']
+const labels = ['键盘热力图', 'Agent Overview', '邮件助手', 'Git Actions', 'Servers', '日历与 Todo', 'MarkPad']
 const localizedNames = [
   { zh: '键盘热力图', en: 'Keyboard Heatmap' },
   { zh: 'Agent 概览', en: 'Agent Overview' },
@@ -23,6 +23,7 @@ const localizedNames = [
   { zh: 'Git 工作流', en: 'Git Actions' },
   { zh: '服务器监控', en: 'Server Monitor' },
   { zh: '日历与待办', en: 'Calendar & Todo' },
+  { zh: 'MarkPad', en: 'MarkPad' },
 ]
 const previewState = new URLSearchParams(location.search).get('state')
 const plugins = names.map((name, index) => ({ id: `io.github.jesmonx.digiworld.${name}`, version: '1.0.0', name: labels[index]!, localizedNames: localizedNames[index]!, description: '界面验证数据', enabled: previewState !== 'disabled', state: previewState === 'disabled' ? 'disabled' as const : 'running' as const, permissions: [], uiDesignVersion: 1 }))

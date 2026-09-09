@@ -20,7 +20,8 @@
     "package:github-actions": "node scripts/package-plugin.mjs github-actions",
     "package:server-monitor": "node scripts/package-plugin.mjs server-monitor",
     "package:calendar-todo": "node scripts/package-plugin.mjs calendar-todo",
-    "catalog:build": "node scripts/build-catalog.mjs"
+    "catalog:build": "node scripts/build-catalog.mjs",
+    "package:markpad": "node scripts/package-plugin.mjs markpad"
   },
   "devDependencies": {
     "@playwright/test": "1.61.1",

@@ -1,0 +1,23 @@
+{
+  "id": "io.github.jesmonx.digiworld.markpad",
+  "version": "0.1.0",
+  "uiDesignVersion": 1,
+  "name": "MarkPad",
+  "localizedNames": {
+    "zh": "MarkPad",
+    "en": "MarkPad"
+  },
+  "description": "随手记录灵感，按日期回顾与搜索，支持基础加粗和阅读模式。",
+  "icon": "notebook-pen",
+  "author": "JesmonX",
+  "license": "MIT",
+  "minCoreVersion": "0.2.61",
+  "ui": "ui/index.html",
+  "background": "none",
+  "permissions": [
+    {
+      "id": "plugin-storage",
+      "reason": "将随笔内容和记录日期保存在本地。"
+    }
+  ]
+}

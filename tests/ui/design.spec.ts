@@ -20,7 +20,7 @@ for (const theme of THEMES) for (const [width, height] of [[900, 600], [1280, 80
     await expect(page.getByRole('heading', { name: '界面字体', exact: true })).toBeVisible()
     await page.screenshot({ path: info.outputPath('settings.png') })
     const hostFont = await page.locator('.dw-button.primary').first().evaluate(el => getComputedStyle(el).fontSize).catch(() => '')
-    for (const [label, selector, navLabel] of [['键盘热力图', '.keyboard-card', '键盘热力图'], ['Agent Overview', '.weekly-card', 'Agent 概览'], ['邮件助手', '.message-list', '邮件助手'], ['Git Actions', '.runs', 'Git 工作流'], ['Servers', '.devices', '服务器监控'], ['日历与 Todo', '.agenda', '日历与待办']] as const) {
+    for (const [label, selector, navLabel] of [['键盘热力图', '.keyboard-card', '键盘热力图'], ['Agent Overview', '.weekly-card', 'Agent 概览'], ['邮件助手', '.message-list', '邮件助手'], ['Git Actions', '.runs', 'Git 工作流'], ['Servers', '.devices', '服务器监控'], ['日历与 Todo', '.agenda', '日历与待办'], ['MarkPad', '.markpad-editor', 'MarkPad']] as const) {
       await page.getByRole('button', { name: navLabel, exact: true }).click()
       const frame = page.frameLocator('iframe')
       await expect(frame.locator(selector)).toBeVisible()
@@ -52,7 +52,7 @@ test('live theme and typography update preserves plugin document and UI state', 
 
 for (const state of ['empty', 'error']) test(`plugin ${state} states`, async ({ page }) => {
   await gotoWithRetry(page, `/design.html?state=${state}`)
-  for (const label of ['键盘热力图', 'Agent 概览', '邮件助手', 'Git 工作流', '服务器监控', '日历与待办']) {
+  for (const label of ['键盘热力图', 'Agent 概览', '邮件助手', 'Git 工作流', '服务器监控', '日历与待办', 'MarkPad']) {
     await page.getByRole('button', { name: label, exact: true }).click()
     await expect(page.frameLocator('iframe').locator('#root')).not.toBeEmpty()
     if (state === 'error') await expect(page.frameLocator('iframe').getByText('演示：暂时无法加载，请重试', { exact: false }).first()).toBeVisible()
