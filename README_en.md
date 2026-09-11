@@ -86,10 +86,10 @@ Lightweight local notes with multiple entries per day, date browsing, full-text 
 ## Getting Started
 
 ### Installation
-Download the latest Windows installer (`.msi` or `.exe`) from [GitHub Releases](https://github.com/JesmonX/digiworld/releases).
+Download the installer for your platform from [GitHub Releases](https://github.com/JesmonX/digiworld/releases): the Windows x86-64 `.exe`, Apple Silicon `.dmg`, or Intel Mac `.dmg`.
 
 > [!NOTE]
-> Preview releases are signed using Ed25519 for updater and plugin packages, but intentionally omit Windows Authenticode. Windows SmartScreen may show an unknown-publisher warning. Verify the published `SHA256SUMS.txt` before running the installer.
+> Preview releases use Ed25519 signatures for updater and plugin packages, but intentionally omit Windows Authenticode and Apple notarization. Windows SmartScreen may show an unknown-publisher warning. macOS may require approval in Privacy & Security after the first launch attempt. Verify the published `SHA256SUMS.txt` before opening an installer.
 
 ---
 

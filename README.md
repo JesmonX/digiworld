@@ -140,9 +140,11 @@ Digiworld 采用了严密的宿主-插件解耦架构，确保应用在拥有极
 ## 🚀 快速上手与使用
 
 ### 下载安装
-前往 [GitHub Releases](https://github.com/JesmonX/digiworld/releases) 页面下载最新发布的 Windows 安装包：
-- `Digiworld_<version>_x64_en-US.msi` 或对应安装包
-- **安全校验提示**：当前处于 Preview 预览阶段，工作流进行了完整的 Ed25519 插件与更新签名，但尚未引入 Windows Authenticode 商业证书。若 Windows SmartScreen 弹出“未知发布者”提示，请先校验 Release 页面提供的 `SHA256SUMS.txt` 校验和，确认无误后点击“仍要运行”。
+前往 [GitHub Releases](https://github.com/JesmonX/digiworld/releases) 页面下载对应平台的最新安装包：
+- Windows x86-64：`Digiworld_<version>_x64-setup.exe`
+- Apple Silicon：`Digiworld_<version>_darwin-aarch64.dmg`
+- Intel Mac：`Digiworld_<version>_darwin-x86_64.dmg`
+- **安全校验提示**：当前处于 Preview 预览阶段，工作流进行了完整的 Ed25519 插件与更新签名，但尚未引入 Windows Authenticode 商业证书或 Apple Developer ID 公证。Windows SmartScreen 可能提示“未知发布者”；macOS 可能要求首次尝试打开后在“隐私与安全性”中批准。请先校验 Release 页面提供的 `SHA256SUMS.txt`。
 
 ### 插件启用与管理
 1. 启动 Digiworld，在左侧导航栏点击 **「功能库」**；

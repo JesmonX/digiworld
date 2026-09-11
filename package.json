@@ -11,7 +11,7 @@
     "dev": "pnpm --filter @digiworld/desktop tauri dev",
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
-    "test": "node scripts/check-version-consistency.mjs && pnpm -r --if-present test",
+    "test": "node scripts/check-version-consistency.mjs && node --test scripts/resolve-preview-version.test.mjs scripts/build-update-manifest.test.mjs && pnpm -r --if-present test",
     "check:versions": "node scripts/check-version-consistency.mjs",
     "lint": "pnpm -r --if-present lint",
     "package:keyboard": "node scripts/package-plugin.mjs keyboard-heatmap",
