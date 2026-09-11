@@ -195,7 +195,7 @@ jobs:
           pnpm package:calendar-todo
           pnpm package:markpad
       - name: Build Digiworld DMG and updater artifact
-        run: pnpm --filter @digiworld/desktop tauri build --bundles dmg
+        run: pnpm --filter @digiworld/desktop tauri build --bundles app,dmg
       - name: Stage macOS release
         env:
           DIGIWORLD_TARGET: ${{ matrix.target }}

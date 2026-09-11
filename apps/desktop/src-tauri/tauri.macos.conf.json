@@ -5,6 +5,7 @@
   },
   "bundle": {
     "targets": [
+      "app",
       "dmg"
     ],
     "macOS": {
