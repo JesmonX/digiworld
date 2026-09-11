@@ -131,11 +131,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/setup@v2
+        if: matrix.target != 'darwin-x86_64'
         with:
           version: 11.21.0
           runtime: node@24
           cache: true
           install: false
+      - uses: actions/setup-node@v6
+        if: matrix.target == 'darwin-x86_64'
+        with:
+          node-version: 24
+      - name: Install pnpm on Intel macOS
+        if: matrix.target == 'darwin-x86_64'
+        run: npm install --global pnpm@11.21.0
       - name: Refuse an unsigned release
         run: |
           test -n "$DIGIWORLD_PLUGIN_SIGNING_KEY_B64"
