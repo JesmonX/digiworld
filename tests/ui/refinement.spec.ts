@@ -251,6 +251,7 @@ test('keyboard layouts keep a readable key unit at 100% and 125% zoom', async ({
     ['75', 84, /84/],
     ['65', 68, /68/],
     ['60', 61, /61/],
+    ['mac', 78, /Mac/],
   ] as const
   for (const zoom of [1, 1.25]) {
     await page.setViewportSize({ width: 900, height: 800 })
@@ -276,7 +277,23 @@ test('keyboard layouts keep a readable key unit at 100% and 125% zoom', async ({
         }, count)
         expect(metrics.count).toBe(metrics.expectedCount)
         expect(metrics.keyUnit).toBeGreaterThanOrEqual(28)
-        expect(metrics.minHeight).toBeGreaterThanOrEqual(27)
+        expect(metrics.minHeight).toBeGreaterThanOrEqual(id === 'mac' ? 18 : 39)
+        await expect(board.locator('.key[tabindex="0"]')).toHaveCount(1)
+        if (width >= 1280 && zoom === 1) {
+          expect(await frame.locator('.keyboard-scroll').evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true)
+        }
+        if (id === 'mac') {
+          const arrows = await board.locator('.key').evaluateAll(keys => keys.filter(key => /^[←↑↓→],/.test(key.getAttribute('aria-label') ?? '')).map(key => ({ width: key.getBoundingClientRect().width, height: key.getBoundingClientRect().height })))
+          expect(arrows).toHaveLength(4)
+          expect(new Set(arrows.map(key => `${key.width.toFixed(1)}:${key.height.toFixed(1)}`)).size).toBe(1)
+        }
+        if (!['mac', '60', '65'].includes(id)) {
+          const gap = await board.evaluate(element => {
+            const find = (label: string) => [...element.querySelectorAll('.key')].find(key => key.getAttribute('aria-label')?.startsWith(label + ','))!.getBoundingClientRect()
+            return find('1').top - find('F1').bottom
+          })
+          expect(gap).toBeLessThanOrEqual(5)
+        }
       }
     }
   }
@@ -304,6 +321,38 @@ test('keyboard counts stay readable on every dark color scheme', async ({ page }
     })
     expect(readable.length).toBeGreaterThan(0)
     expect(readable.every(item => item.color !== 'rgb(0, 0, 0)' && item.contrast >= 4.5)).toBe(true)
+  }
+})
+
+test('keyboard key legends have readable contrast at every heat level', async ({ page }) => {
+  for (const theme of ['light', 'dark']) for (const scheme of COLOR_SCHEMES) {
+    await page.addInitScript(({ theme, scheme }) => {
+      localStorage.setItem('digiworld.theme.v2', theme)
+      localStorage.setItem('digiworld.color-scheme.v1', scheme)
+    }, { theme, scheme: scheme.id })
+    await gotoWithRetry(page, '/design.html')
+    await page.getByRole('button', { name: '键盘热力图', exact: true }).click()
+    const contrasts = await page.frameLocator('iframe').locator('.key').first().evaluate(key => {
+      const ctx = document.createElement('canvas').getContext('2d')!
+      const luminance = (color: string) => {
+        ctx.fillStyle = color
+        ctx.fillRect(0, 0, 1, 1)
+        return [...ctx.getImageData(0, 0, 1, 1).data].slice(0, 3).map((channel, i) => {
+          const value = channel / 255
+          return (value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4) * [0.2126, .7152, .0722][i]!
+        }).reduce((sum, value) => sum + value, 0)
+      }
+      const original = key.className
+      const values = Array.from({ length: 6 }, (_, level) => {
+        key.className = `key level-${level} ${level >= 3 ? 'strong-heat' : ''}`
+        const style = getComputedStyle(key)
+        const foreground = luminance(style.color), background = luminance(style.backgroundColor)
+        return (Math.max(foreground, background) + .05) / (Math.min(foreground, background) + .05)
+      })
+      key.className = original
+      return values
+    })
+    contrasts.forEach((contrast, level) => expect(contrast, `${theme} ${scheme.id} level ${level}`).toBeGreaterThanOrEqual(4.5))
   }
 })
 

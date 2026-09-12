@@ -1,6 +1,6 @@
 {
   "id": "io.github.jesmonx.digiworld.mail-assistant",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "uiDesignVersion": 1,
   "name": "邮件助手",
   "localizedNames": { "zh": "邮件助手", "en": "Mail Assistant" },

@@ -5,7 +5,7 @@ import type { CatalogIndex, CatalogPlugin, PluginSummary } from '@digiworld/plug
 import { Loading } from '../components/Loading'
 import { PluginIcon } from '../components/PluginIcon'
 import { t, type Locale } from '../lib/i18n'
-import { pluginDisplayName, pluginSearchNames } from '../lib/pluginNames'
+import { pluginDescription, pluginDisplayName, pluginSearchNames } from '../lib/pluginNames'
 
 export function CatalogPage({
   catalog,
@@ -66,7 +66,7 @@ export function CatalogPage({
                 </div>
               </div>
               <h3>{pluginDisplayName(plugin, locale)}</h3>
-              <p>{plugin.description}</p>
+              <p>{pluginDescription(plugin, locale)}</p>
               {current
                 ? <Button className="secondary full" onClick={() => onOpen(plugin.id)}>{t('openBtn', locale)} <ChevronRight /></Button>
                 : !supported

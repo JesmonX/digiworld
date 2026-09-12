@@ -26,6 +26,10 @@ export const DICTIONARY = {
   layout75: { en: '84-Key', zh: '84 键' },
   layout65: { en: '68-Key', zh: '68 键' },
   layout60: { en: '61-Key', zh: '61 键' },
+  loading: { en: 'Loading statistics…', zh: '正在载入统计…' },
+  liveStatus: { en: 'Updates every 2 seconds', zh: '每 2 秒更新统计' },
+  pausedStatus: { en: 'Recording paused', zh: '已暂停记录' },
+  macNote: { en: 'Fn / Eject are shown for layout reference only', zh: 'Fn / ⏏ 仅用于展示配列，不计数' },
 } as const
 
 export function t(key: keyof typeof DICTIONARY, locale: Locale): string {

@@ -1,6 +1,6 @@
 {
   "id": "io.github.jesmonx.digiworld.server-monitor",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "uiDesignVersion": 1,
   "name": "Servers",
   "localizedNames": { "zh": "服务器监控", "en": "Server Monitor" },

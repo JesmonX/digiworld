@@ -32,7 +32,7 @@ export default function App() {
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pauseBusy, setPauseBusy] = useState(false)
-  const [keyUnit, setKeyUnit] = useState(42)
+  const [keyUnit, setKeyUnit] = useState(44)
   const layoutPickerRef = useRef<HTMLDivElement>(null)
   const layoutTriggerRef = useRef<HTMLButtonElement>(null)
   const keyboardScrollRef = useRef<HTMLDivElement>(null)
@@ -97,8 +97,8 @@ export default function App() {
     const element = keyboardScrollRef.current
     if (!element) return
     const update = () => {
-      const available = Math.max(0, element.clientWidth - 24)
-      const next = Math.max(28, Math.min(46, available / (layout.tracks * 0.275)))
+      const available = Math.max(0, element.clientWidth - 26)
+      const next = Math.max(32, Math.min(46, (available + 4) / (layout.tracks / 4) - 4))
       setKeyUnit(next)
     }
     update()
@@ -137,7 +137,7 @@ export default function App() {
   const getLayoutLabel = (option: KeyboardLayout) => {
     if (locale === 'en') {
       const map: Record<KeyboardLayoutId, string> = {
-        '108': '108-Key', full: '104-Key', '96': '98-Key', tkl: '87-Key', '75': '84-Key', '65': '68-Key', '60': '61-Key',
+        '108': '108-Key', full: '104-Key', '96': '98-Key', tkl: '87-Key', '75': '84-Key', '65': '68-Key', '60': '61-Key', mac: 'Mac',
       }
       return map[option.id]
     }
@@ -153,27 +153,29 @@ export default function App() {
       '75': '75%',
       '65': '65%',
       '60': '60%',
+      mac: locale === 'en' ? 'ANSI · Compact' : 'ANSI · 紧凑配列',
     }
     return hints[option.id]
   }
 
-  const keyGap = Math.max(3, Math.min(5, keyUnit * 0.1))
+  const keyGap = 4
   const trackWidth = (keyUnit - 3 * keyGap) / 4
   const boardWidth = layout.tracks * trackWidth + (layout.tracks - 1) * keyGap + 26
+  const keyHeight = Math.max(40, keyUnit)
 
   return (
     <PluginPage className="heatmap-app">
       <PageToolbar className=" plugin-header">
         <div className="summary-line" aria-label={t('summaryAria', locale)}>
-          <div><span>{t('totalCount', locale)}</span><strong>{(snapshot?.total ?? 0).toLocaleString()}</strong></div>
-          <div><Flame /><span>{t('topKey', locale)}</span><strong>{snapshot?.topKey ? formatKeyLabel(snapshot.topKey, locale) : '—'}</strong></div>
+          <div><span>{t('totalCount', locale)}</span><strong>{snapshot ? snapshot.total.toLocaleString(locale) : '—'}</strong></div>
+          <div><Flame /><span>{t('topKey', locale)}</span><strong>{snapshot?.topKey ? formatKeyLabel(snapshot.topKey, locale, layout.id) : '—'}</strong></div>
         </div>
         <div className="header-actions">
           <div className="dw-segmented scope-toggle" role="group" aria-label={t('scopeAria', locale)}>
             <Button aria-pressed={scope === 'today'} className={scope === 'today' ? 'active' : ''} onClick={() => setScope('today')}>{t('today', locale)}</Button>
             <Button aria-pressed={scope === 'all'} className={scope === 'all' ? 'active' : ''} onClick={() => setScope('all')}>{t('all', locale)}</Button>
           </div>
-          <Button className={`pause-button ${snapshot?.paused ? 'paused' : ''}`} disabled={pauseBusy || !snapshot} onClick={() => void togglePause()}>
+          <Button className={`pause-button ${snapshot?.paused ? 'paused' : ''}`} aria-busy={pauseBusy} disabled={pauseBusy || !snapshot} onClick={() => void togglePause()}>
             {snapshot?.paused ? <Play /> : <Pause />}
             {pauseBusy ? t('processing', locale) : snapshot?.paused ? t('resume', locale) : t('pause', locale)}
           </Button>
@@ -192,12 +194,19 @@ export default function App() {
             aria-expanded={layoutMenuOpen}
             aria-controls="keyboard-layout-menu"
             onClick={() => setLayoutMenuOpen(open => !open)}
+            onKeyDown={event => {
+              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault()
+                setLayoutMenuOpen(true)
+                requestAnimationFrame(() => layoutPickerRef.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus())
+              }
+            }}
           >
             <span className="layout-preview" aria-hidden="true">{layout.preview.map((row, rowIndex) => <i key={rowIndex}>{row.map((width, index) => <b key={index} style={{ flex: width }} />)}</i>)}</span>
             <span className="layout-picker-copy"><strong>{getLayoutLabel(layout)}</strong></span>
             <ChevronDown aria-hidden="true" />
           </Button>
-          <Menu id="keyboard-layout-menu" className={`layout-menu ${layoutMenuOpen ? 'open' : ''}`} role="menu" aria-label={t('layoutOptionsAria', locale)} aria-hidden={!layoutMenuOpen}>
+          <Menu id="keyboard-layout-menu" className={`layout-menu ${layoutMenuOpen ? 'open' : ''}`} role="menu" aria-label={t('layoutOptionsAria', locale)} aria-hidden={!layoutMenuOpen} inert={!layoutMenuOpen}>
             {keyboardLayouts.map(option => <Button key={option.id} type="button" role="menuitemradio" aria-checked={layoutId === option.id} className={layoutId === option.id ? 'active' : ''} onClick={() => void selectLayout(option.id)}>
               <span className="layout-preview" aria-hidden="true">{option.preview.map((row, rowIndex) => <i key={rowIndex}>{row.map((width, index) => <b key={index} style={{ flex: width }} />)}</i>)}</span>
               <span><strong>{getLayoutLabel(option)}</strong><small>{layoutHint(option)}</small></span>
@@ -219,13 +228,15 @@ export default function App() {
               '--board-columns': layout.tracks,
               '--board-rows': layout.rows,
               '--board-width': `${boardWidth}px`,
+              '--row-height': layout.id === 'mac' ? `${(keyHeight - keyGap) / 2}px` : `${keyHeight}px`,
             } as React.CSSProperties}
           >
             {layout.keys.map(key => (
-              <Keycap key={key.id} definition={key} count={snapshot?.counts[key.id] ?? 0} max={maxCount} locale={locale} />
+              <Keycap key={`${layout.id}-${key.id}`} definition={key} count={snapshot?.counts[key.id] ?? 0} max={maxCount} locale={locale} layoutId={layout.id} first={key.id === layout.keys[0]?.id} />
             ))}
           </div>
         </div>
+        <p className="board-status" role="status">{snapshot ? t(snapshot.paused ? 'pausedStatus' : 'liveStatus', locale) : t('loading', locale)}{layout.id === 'mac' && ` · ${t('macNote', locale)}`}</p>
       </section>
 
       <section className="lower-grid">
@@ -233,7 +244,7 @@ export default function App() {
           <h2>{t('topKeys', locale)}</h2>
           <div className="ranking-list">
             {snapshot?.topTen.length
-              ? snapshot.topTen.map((entry, index) => <div key={entry.key}><b>{index + 1}</b><span>{formatKeyLabel(entry.key, locale)}</span><i><em style={{ width: `${(entry.count / (snapshot.topTen[0]?.count || 1)) * 100}%` }} /></i><strong>{entry.count.toLocaleString()}</strong></div>)
+              ? snapshot.topTen.map((entry, index) => <div key={entry.key}><b>{index + 1}</b><span>{formatKeyLabel(entry.key, locale, layout.id)}</span><i><em style={{ width: `${(entry.count / (snapshot.topTen[0]?.count || 1)) * 100}%` }} /></i><strong>{entry.count.toLocaleString(locale)}</strong></div>)
               : <p className="no-data">{t('noData', locale)}</p>}
           </div>
         </Card>
@@ -242,23 +253,30 @@ export default function App() {
   )
 }
 
-function Keycap({ definition, count, max, locale = 'en' }: { definition: KeyDefinition; count: number; max: number; locale?: Locale }) {
+function Keycap({ definition, count, max, locale = 'en', layoutId, first }: { definition: KeyDefinition; count: number; max: number; locale?: Locale; layoutId: KeyboardLayoutId; first: boolean }) {
   const level = heatLevel(count, max)
   const style = {
     gridRow: `${definition.row} / span ${definition.rowSpan ?? 1}`,
     gridColumn: `${definition.column} / span ${definition.columnSpan ?? 1}`,
   }
-  const label = formatKeyLabel(definition.id, locale)
+  const label = formatKeyLabel(definition.id, locale, layoutId)
   const countText = t('presses', locale).replace('{count}', count.toLocaleString())
+  const half = layoutId === 'mac' && (definition.rowSpan ?? 1) === 1
+  const showCount = count > 0 && !half
+  const shortLabels: Record<string, string> = { Backspace: '⌫', CapsLock: 'Caps', PrintScreen: 'Prt', ScrollLock: 'Scr', Pause: 'Pau', Home: 'Hm', PageUp: 'Pg↑', PageDown: 'Pg↓', NumpadEnter: '↵', ContextMenu: '☰' }
+  const displayLabel = layoutId === 'mac' ? label : shortLabels[definition.id] ?? (definition.label || label)
+  const compactCount = count >= 1000 && count < 10000 && locale === 'zh'
+    ? `${Math.round(count / 1000)}千`
+    : new Intl.NumberFormat(locale === 'zh' ? 'zh-CN' : 'en', { notation: 'compact', maximumFractionDigits: 1 }).format(count)
   return (
     <div
-      tabIndex={definition.id === 'Escape' ? 0 : -1}
-      className={`key level-${level} ${count > 0 ? 'has-count' : ''} ${level >= 3 ? 'strong-heat' : ''}`}
-      aria-label={`${definition.label || label}, ${countText}`}
+      tabIndex={first ? 0 : -1}
+      className={`key level-${level} ${showCount ? 'has-count' : ''} ${level >= 3 ? 'strong-heat' : ''}`}
+      aria-label={`${layoutId === 'mac' ? label : definition.label || label}, ${countText}`}
       style={style}
     >
-      <span>{definition.id === 'Backspace' ? 'Bksp' : definition.label || label}</span>
-      {count > 0 && <small>{count > 999 ? `${(count / 1000).toFixed(1)}k` : count}</small>}
+      <span>{displayLabel}</span>
+      {showCount && <small>{compactCount}</small>}
     </div>
   )
 }

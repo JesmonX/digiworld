@@ -272,7 +272,7 @@ describe('token usage layout', () => {
     expect(quotaResets.textContent).not.toContain('系统补偿额度')
     expect(quotaResets.textContent).not.toContain('获得：')
     expect(quotaResets.textContent).not.toContain('到期：')
-    expect(quotaResets.textContent).toMatch(/\d{2}\/\d{2}-\d{2}\/\d{2},\s*\d{2}:\d{2}\s*(AM|PM)/)
+    expect(quotaResets.textContent).toMatch(/\d{2}\/\d{2}-\d{2}\/\d{2},\s*\d{2}:\d{2}/)
 
     mocks.request.mockClear()
     const thirtyDays = Array.from(heatmap.querySelectorAll('button')).find(button => button.textContent === '30 天')!
@@ -442,15 +442,15 @@ describe('token usage layout', () => {
     const windows = container.querySelectorAll('.quota-pane.active .quota-window')
     expect(windows).toHaveLength(3)
     // Gemini 5h limit
-    expect(windows[0]?.textContent).toContain('5h')
+    expect(windows[0]?.textContent).toContain('5 小时')
     expect(windows[0]?.textContent).toContain('剩余 85%')
     expect(windows[0]?.querySelector<HTMLElement>('.quota-track i')?.style.width).toBe('85%')
     // Gemini weekly limit (7d)
-    expect(windows[1]?.textContent).toContain('7d')
+    expect(windows[1]?.textContent).toContain('7 天')
     expect(windows[1]?.textContent).toContain('剩余 37%')
     expect(windows[1]?.querySelector<HTMLElement>('.quota-track i')?.style.width).toBe('37%')
     // Claude weekly limit (7d)
-    expect(windows[2]?.textContent).toContain('7d')
+    expect(windows[2]?.textContent).toContain('7 天')
     expect(windows[2]?.textContent).toContain('剩余 50%')
     expect(windows[2]?.querySelector<HTMLElement>('.quota-track i')?.style.width).toBe('50%')
 
@@ -508,9 +508,9 @@ describe('token usage layout', () => {
     await act(async () => root.unmount())
   })
 
-  it('formats reset card period to mm/dd-mm/dd, hour:min AM/PM on one line', () => {
+  it('formats Chinese reset periods with a 24-hour clock', () => {
     const formatted = formatCardPeriod(1788500000, 1789500000, 'zh')
-    expect(formatted).toMatch(/^\d{2}\/\d{2}-\d{2}\/\d{2},\s*\d{2}:\d{2}\s*(AM|PM)$/)
+    expect(formatted).toMatch(/^\d{2}\/\d{2}-\d{2}\/\d{2},\s*\d{2}:\d{2}$/)
     expect(formatCardPeriod(null, null, 'zh')).toBe('永久有效')
     expect(formatCardPeriod(null, null, 'en')).toBe('Permanent')
   })

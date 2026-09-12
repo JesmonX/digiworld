@@ -4,7 +4,7 @@ import type { PluginSummary } from '@digiworld/plugin-sdk'
 import { PluginIcon } from '../components/PluginIcon'
 import { stateLabel } from '../components/PluginStatus'
 import { t, type Locale } from '../lib/i18n'
-import { pluginDisplayName } from '../lib/pluginNames'
+import { pluginDescription, pluginDisplayName } from '../lib/pluginNames'
 
 export function HomePage({
   plugins,
@@ -91,7 +91,7 @@ export function HomePage({
                     <strong>{pluginDisplayName(plugin, locale)}</strong>
                     <ChevronRight className="row-chevron" size={15} />
                   </span>
-                  <small>{plugin.description || t('openTool', locale)}</small>
+                  <small>{pluginDescription(plugin, locale) || t('openTool', locale)}</small>
                 </span>
                 <span className={`compact-status ${plugin.state}`}>
                   {stateLabel(plugin, locale)}

@@ -1,10 +1,10 @@
 {
   "id": "io.github.jesmonx.digiworld.github-actions",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "uiDesignVersion": 1,
   "name": "Git Actions",
   "localizedNames": { "zh": "Git 工作流", "en": "Git Actions" },
-  "description": "查看所选 GitHub 仓库中由当前账号触发的 Actions 运行与 Job 进度。",
+  "description": "查看所选 GitHub 仓库中由当前账号触发的工作流运行与作业进度。",
   "icon": "git-branch",
   "author": "JesmonX",
   "license": "MIT",

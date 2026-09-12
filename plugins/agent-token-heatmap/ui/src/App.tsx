@@ -482,7 +482,7 @@ export default function App() {
           <Summary label={t('cacheReadTokens', locale)} value={snapshot?.totals.cacheReadTokens} />
           <Summary label={t('cacheRate', locale)} text={snapshot?.totals.cacheRate == null ? '—' : `${(snapshot.totals.cacheRate * 100).toFixed(1)}%`} />
         </MetricGrid>
-        {snapshot && cells.length ? <div className="calendar-wrap"><div className="weekday-labels">{locale === 'zh' ? <><span>一</span><span>三</span><span>五</span><span>日</span></> : <><span>M</span><span>W</span><span>F</span><span>S</span></>}</div><div className="calendar-grid" onKeyDown={event => rovingDataKeyDown(event)}>{cells.map((cell, index) => <i key={cell.day ?? `blank-${index}`} tabIndex={cell.day ? (index === cells.findIndex(item => item.day) ? 0 : -1) : undefined} aria-label={cell.day ? `${cell.day}，${formatTokens(cell.value)}` : undefined} className={`level-${heatLevel(cell.value, max)} ${cell.day ? '' : 'blank'}`} data-tooltip={cell.day ? `${cell.day} · ${formatTokens(cell.value)} Tokens` : undefined} />)}</div><div className="legend"><span>{t('low', locale)}</span>{[0, 1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>{t('high', locale)}</span></div></div> : <Empty locale={locale} />}
+        {snapshot && cells.length ? <div className="calendar-wrap"><div className="weekday-labels">{locale === 'zh' ? <><span>一</span><span>三</span><span>五</span><span>日</span></> : <><span>M</span><span>W</span><span>F</span><span>S</span></>}</div><div className="calendar-grid" onKeyDown={event => rovingDataKeyDown(event)}>{cells.map((cell, index) => <i key={cell.day ?? `blank-${index}`} tabIndex={cell.day ? (index === cells.findIndex(item => item.day) ? 0 : -1) : undefined} aria-label={cell.day ? `${cell.day}，${formatTokens(cell.value)}` : undefined} className={`level-${heatLevel(cell.value, max)} ${cell.day ? '' : 'blank'}`} data-tooltip={cell.day ? `${cell.day} · ${formatTokens(cell.value)} ${locale === 'zh' ? '词元' : 'tokens'}` : undefined} />)}</div><div className="legend"><span>{t('low', locale)}</span>{[0, 1, 2, 3, 4, 5].map(level => <i key={level} className={`level-${level}`} />)}<span>{t('high', locale)}</span></div></div> : <Empty locale={locale} />}
       </section>
 
       <section className="lower-grid">
@@ -952,7 +952,7 @@ export function QuotaCard(props: QuotaCardProps) {
           <button
             type="button"
             className={`quota-dot ${isCodex ? 'active' : ''}`}
-            aria-label="Codex Quota"
+            aria-label={t('codexQuota', locale)}
             title="Codex"
             aria-selected={isCodex}
             onClick={() => handleSwitch('codex')}
@@ -960,7 +960,7 @@ export function QuotaCard(props: QuotaCardProps) {
           <button
             type="button"
             className={`quota-dot ${!isCodex ? 'active' : ''}`}
-            aria-label="Antigravity Quota"
+            aria-label={t('agyQuota', locale)}
             title="Antigravity (agy)"
             aria-selected={!isCodex}
             onClick={() => handleSwitch('agy')}
@@ -999,10 +999,9 @@ function formatAgyGroupName(name: string, locale: Locale = 'en'): string {
 
 function formatDuration(minutes: number | null, locale: Locale = 'en'): string {
   if (minutes == null) return t('quotaWindow', locale)
-  if (minutes % 10_080 === 0) return `${minutes / 10_080 * 7}d`
-  if (minutes % 1_440 === 0) return `${minutes / 1_440}d`
-  if (minutes % 60 === 0) return `${minutes / 60}h`
-  return `${minutes}m`
+  if (minutes % 1_440 === 0) return `${minutes / 1_440}${locale === 'zh' ? ' 天' : 'd'}`
+  if (minutes % 60 === 0) return `${minutes / 60}${locale === 'zh' ? ' 小时' : 'h'}`
+  return `${minutes}${locale === 'zh' ? ' 分钟' : 'm'}`
 }
 
 function formatReset(seconds: number | null, locale: Locale = 'en'): string {
@@ -1042,6 +1041,7 @@ export function formatCardPeriod(
     return `${mm}/${dd}`
   }
   const formatTime = (d: Date) => {
+    if (locale === 'zh') return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
     let hours = d.getHours()
     const minutes = String(d.getMinutes()).padStart(2, '0')
     const ampm = hours >= 12 ? 'PM' : 'AM'
@@ -1148,7 +1148,7 @@ function SourceDialog({ settings, refreshRunning, locale = 'en', onClose, onSave
     <section className="source-block quota-settings"><div className="source-heading"><div><Gauge /><span><strong>{t('codexQuotaSettings', locale)}</strong><small>{t('codexQuotaSubtitle', locale)}</small></span></div></div>
       <div className="quota-setting-grid">
         <label>{t('queryDevice', locale)}<Select value={draft.codexQuota.sourceId ?? ''} onChange={event => setDraft(current => ({ ...current, codexQuota: { ...current.codexQuota, sourceId: event.target.value || null } }))}><option value="">{t('noQuery', locale)}</option>{sourceOptions.map(source => <option key={source.id} value={source.id}>{source.label}</option>)}</Select></label>
-        <label>Shell<Select value={draft.codexQuota.shellPreset} onChange={event => setDraft(current => ({ ...current, codexQuota: { ...current.codexQuota, shellPreset: event.target.value as ShellPreset } }))}><option value="auto">{t('autoShell', locale)}</option><option value="powershell">PowerShell</option><option value="zsh">zsh</option><option value="bash">bash</option></Select></label>
+        <label>{locale === 'zh' ? '命令解释器' : 'Shell'}<Select value={draft.codexQuota.shellPreset} onChange={event => setDraft(current => ({ ...current, codexQuota: { ...current.codexQuota, shellPreset: event.target.value as ShellPreset } }))}><option value="auto">{t('autoShell', locale)}</option><option value="powershell">PowerShell</option><option value="zsh">zsh</option><option value="bash">bash</option></Select></label>
         <label>{t('autoRefreshMode', locale)}<Select value={intervalMode} onChange={event => { const value = event.target.value; setDraft(current => ({ ...current, codexQuota: { ...current.codexQuota, refreshIntervalSeconds: value === 'off' ? null : value === 'custom' ? 120 : Number(value) } })) }}><option value="off">{t('off', locale)}</option><option value="30">{t('thirtySec', locale)}</option><option value="60">{t('sixtySec', locale)}</option><option value="300">{t('fiveMin', locale)}</option><option value="900">{t('fifteenMin', locale)}</option><option value="custom">{t('customMode', locale)}</option></Select></label>
         {intervalMode === 'custom' && <label>{t('customSeconds', locale)}<Input type="number" min="30" max="3600" value={interval ?? 120} onChange={event => setDraft(current => ({ ...current, codexQuota: { ...current.codexQuota, refreshIntervalSeconds: Number(event.target.value) } }))} /></label>}
       </div>
@@ -1158,7 +1158,7 @@ function SourceDialog({ settings, refreshRunning, locale = 'en', onClose, onSave
     <section className="source-block quota-settings agy-quota-settings"><div className="source-heading"><div><AgentIcon agent="agy" /><span><strong>{t('agyQuotaSettings', locale)}</strong><small>{t('agyQuotaSubtitle', locale)}</small></span></div></div>
       <div className="quota-setting-grid">
         <label>{t('queryDevice', locale)}<Select value={draft.agyQuota.sourceId ?? ''} onChange={event => setDraft(current => ({ ...current, agyQuota: { ...current.agyQuota, sourceId: event.target.value || null } }))}><option value="">{t('noQuery', locale)}</option>{sourceOptions.map(source => <option key={source.id} value={source.id}>{source.label}</option>)}</Select></label>
-        <label>Shell<Select value={draft.agyQuota.shellPreset} onChange={event => setDraft(current => ({ ...current, agyQuota: { ...current.agyQuota, shellPreset: event.target.value as ShellPreset } }))}><option value="auto">{t('autoShell', locale)}</option><option value="powershell">PowerShell</option><option value="zsh">zsh</option><option value="bash">bash</option></Select></label>
+        <label>{locale === 'zh' ? '命令解释器' : 'Shell'}<Select value={draft.agyQuota.shellPreset} onChange={event => setDraft(current => ({ ...current, agyQuota: { ...current.agyQuota, shellPreset: event.target.value as ShellPreset } }))}><option value="auto">{t('autoShell', locale)}</option><option value="powershell">PowerShell</option><option value="zsh">zsh</option><option value="bash">bash</option></Select></label>
         <label>{t('autoRefreshMode', locale)}<Select value={agyIntervalMode} onChange={event => { const value = event.target.value; setDraft(current => ({ ...current, agyQuota: { ...current.agyQuota, refreshIntervalSeconds: value === 'off' ? null : value === 'custom' ? 120 : Number(value) } })) }}><option value="off">{t('off', locale)}</option><option value="30">{t('thirtySec', locale)}</option><option value="60">{t('sixtySec', locale)}</option><option value="300">{t('fiveMin', locale)}</option><option value="900">{t('fifteenMin', locale)}</option><option value="custom">{t('customMode', locale)}</option></Select></label>
         {agyIntervalMode === 'custom' && <label>{t('customSeconds', locale)}<Input type="number" min="30" max="3600" value={agyInterval ?? 120} onChange={event => setDraft(current => ({ ...current, agyQuota: { ...current.agyQuota, refreshIntervalSeconds: Number(event.target.value) } }))} /></label>}
       </div>

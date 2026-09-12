@@ -56,6 +56,10 @@
 .dw-status { display: flex; align-items: center; gap: var(--dw-space-2); padding: var(--dw-space-3) var(--dw-space-4); border: 1px solid var(--dw-material-border); border-radius: var(--dw-radius-sm); color: var(--dw-text-muted); background: var(--dw-material-inset); font-size: var(--dw-type-body-sm); }
 .dw-status[data-tone=error] { color: var(--dw-danger); border-color: var(--dw-danger-border); background: var(--dw-danger-soft); }
 .dw-status[data-tone=success] { color: var(--dw-success); border-color: var(--dw-success-border); background: var(--dw-success-soft); }
+.dw-status { overflow-wrap: anywhere; flex-wrap: wrap; }
+.dw-dialog[open], .dw-status { animation: dw-state-enter var(--dw-motion-normal) var(--dw-ease-out); }
+@keyframes dw-state-enter { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+.dw-button[aria-busy=true] { cursor: progress; }
 .dw-segmented { display: inline-flex; flex-wrap: wrap; gap: 3px; padding: 4px; border-radius: 999px; background: var(--dw-surface-subtle); border: 1px solid var(--dw-material-border); }
 .dw-segmented > .dw-button { border-color: transparent; background: transparent; border-radius: 999px; padding: 4px 12px; min-height: 28px; font-size: var(--dw-type-body-sm); }
 .dw-segmented > .dw-button:is(.active, [aria-pressed=true], [aria-checked=true]) { background: var(--dw-material-raised); color: var(--dw-text); font-weight: var(--dw-weight-semibold); box-shadow: var(--dw-shadow-xs); }

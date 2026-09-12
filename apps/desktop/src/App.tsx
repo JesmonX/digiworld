@@ -14,6 +14,7 @@ import { HomePage } from './pages/HomePage'
 import { CatalogPage } from './pages/CatalogPage'
 import { loadLocale, saveLocale, t, type Locale } from './lib/i18n'
 import { pluginDisplayName, progressDisplayName } from './lib/pluginNames'
+import { permissionText } from './lib/permissionText'
 import {
   api, type AppState, type CoreUpdateInfo, type PluginUpdateInfo, type ProxyMode,
   type ProxySettings, type UpdateProgress,
@@ -67,17 +68,17 @@ function permissionLabel(id: string, locale: Locale = 'en'): string {
     'background': '后台运行',
     'global-input': '读取全局键位事件',
     'plugin-storage': '本地插件存储',
-    'filesystem:agent-session-data': '读取 Coding Agent 会话数据',
+    'filesystem:agent-session-data': '读取编程智能体会话数据',
     'process:ssh': '使用系统 SSH',
-    'process:shell': '运行已配置的系统 Shell',
+    'process:shell': '运行已配置的系统命令解释器',
     'network:openai': '访问 OpenAI Codex 服务',
     'network:imap': '访问 IMAP 邮箱服务',
     'network:github': '访问 GitHub 服务',
     'network:icloud': '访问 iCloud 日历服务',
     'notifications': '显示系统通知',
     'secret:mail-credentials': '保存邮箱授权码',
-    'secret:github-token': '保存 GitHub Token',
-    'secret:icloud-app-password': '保存 iCloud App 专用密码',
+    'secret:github-token': '保存 GitHub 访问令牌',
+    'secret:icloud-app-password': '保存 iCloud 应用专用密码',
   }
   return (locale === 'zh' ? zhLabels[id] : enLabels[id]) ?? id
 }
@@ -618,7 +619,7 @@ function SettingsPage({
                 type="button"
                 role="radio"
                 aria-checked={locale === 'en'}
-                aria-label="English (Default)"
+                aria-label={t('langEn', locale)}
                 className={locale === 'en' ? 'active' : ''}
                 onClick={() => onLocaleChange('en')}
               >
@@ -632,7 +633,7 @@ function SettingsPage({
                 type="button"
                 role="radio"
                 aria-checked={locale === 'zh'}
-                aria-label="Chinese (简体中文)"
+                aria-label={t('langZh', locale)}
                 className={locale === 'zh' ? 'active' : ''}
                 onClick={() => onLocaleChange('zh')}
               >
@@ -659,10 +660,10 @@ function SettingsPage({
                   role="radio"
                   aria-checked={fontThemeId === theme.id}
                   tabIndex={fontThemeId === theme.id ? 0 : -1}
-                  aria-label={theme.label}
+                  aria-label={locale === 'en' && theme.id === 'plex' ? 'Plex' : theme.label}
                   onClick={() => onFontThemeChange(theme.id)}
                 >
-                  <span>{theme.label}</span>
+                  <span>{locale === 'en' && theme.id === 'plex' ? 'Plex' : theme.label}</span>
                   {fontThemeId === theme.id && <Check size={14} />}
                 </Button>
               ))}
@@ -765,7 +766,7 @@ function InstallDialog({ plugin, busy, progress, locale = 'en', onCancel, onConf
               <Check />
               <span>
                 <strong>{permissionLabel(permission.id, locale)}</strong>
-                <small>{permission.reason}</small>
+                <small>{permissionText(permission.reason, locale)}</small>
               </span>
             </div>
           ))}
@@ -797,9 +798,9 @@ function UpdateDialogView({ dialog, busy, progress, error, locale = 'en', onCanc
                 <span><strong>{pluginDisplayName(update, locale)}</strong><small>{update.currentVersion} → {update.version}</small>
                   {update.permissionsChanged && (
                     <span className="permission-changes">
-                      {update.addedPermissions.map(permission => <small key={`added:${permission.id}`}><b>{locale === 'zh' ? '新增' : 'Added'} {permissionLabel(permission.id, locale)}</b>: {permission.reason}</small>)}
-                      {update.removedPermissions.map(permission => <small key={`removed:${permission.id}`}><b>{locale === 'zh' ? '移除' : 'Removed'} {permissionLabel(permission.id, locale)}</b>: {permission.reason}</small>)}
-                      {update.changedPermissions.map(permission => <small key={`changed:${permission.id}`}><b>{locale === 'zh' ? '变更' : 'Changed'} {permissionLabel(permission.id, locale)}</b>: {permission.oldReason} → {permission.newReason}</small>)}
+                      {update.addedPermissions.map(permission => <small key={`added:${permission.id}`}><b>{locale === 'zh' ? '新增' : 'Added'} {permissionLabel(permission.id, locale)}</b>: {permissionText(permission.reason, locale)}</small>)}
+                      {update.removedPermissions.map(permission => <small key={`removed:${permission.id}`}><b>{locale === 'zh' ? '移除' : 'Removed'} {permissionLabel(permission.id, locale)}</b>: {permissionText(permission.reason, locale)}</small>)}
+                      {update.changedPermissions.map(permission => <small key={`changed:${permission.id}`}><b>{locale === 'zh' ? '变更' : 'Changed'} {permissionLabel(permission.id, locale)}</b>: {permissionText(permission.oldReason, locale)} → {permissionText(permission.newReason, locale)}</small>)}
                     </span>
                   )}
                 </span>

@@ -301,8 +301,8 @@ export default function App() {
             </Select>
           </div>
           <Button onClick={() => edit()}><Plus size={15} />{t('addServer', locale)}</Button>
-          <Button onClick={() => void loadSettings()} disabled={busy}>
-            <RefreshCw className={busy ? 'spin' : ''} size={15} />{t('refresh', locale)}
+          <Button onClick={() => void loadSettings()} disabled={busy} aria-busy={busy}>
+            <RefreshCw className={busy ? 'spin' : ''} size={15} />{t(busy ? 'refreshing' : 'refresh', locale)}
           </Button>
         </div>
       </PageToolbar>

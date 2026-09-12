@@ -1,17 +1,17 @@
 .markpad h1 { margin: 0; font-size: var(--dw-type-page); }
-.markpad-muted { color: var(--dw-muted); font-size: var(--dw-type-caption); }
+.markpad-muted { color: var(--dw-text-muted); font-size: var(--dw-type-caption); }
 .markpad-sidebar, .markpad-list, .markpad-editor { display: flex; flex-direction: column; gap: var(--dw-space-3); min-width: 0; }
 .markpad-search, .markpad-filters, .markpad-actions, .markpad-footer, .markpad-editor-head { display: flex; align-items: center; gap: var(--dw-space-2); flex-wrap: wrap; }
 .markpad-search { flex-wrap: nowrap; }
 .markpad-search input { min-width: 0; width: 100%; }
 .markpad-filters input { flex: 1; min-width: 140px; }
 .markpad-days { display: flex; flex-wrap: wrap; gap: var(--dw-space-2); margin-top: var(--dw-space-2); max-height: 180px; overflow: auto; }
-.markpad summary { cursor: pointer; color: var(--dw-muted); }
+.markpad summary { cursor: pointer; color: var(--dw-text-muted); }
 .markpad-list { max-height: 520px; overflow: auto; }
 .markpad-note.dw-button { display: flex; flex-direction: column; align-items: stretch; text-align: left; width: 100%; gap: var(--dw-space-2); padding: var(--dw-space-3); white-space: normal; }
 .markpad-note[aria-pressed=true] { background: var(--dw-accent-soft); border-color: var(--dw-accent); }
 .markpad-note-title { font-weight: var(--dw-weight-semibold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.markpad-excerpt { color: var(--dw-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.markpad-excerpt { color: var(--dw-text-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .markpad-editor { min-height: 440px; }
 .markpad-editor-head, .markpad-footer { justify-content: space-between; }
 .markpad-editor-head > div:first-child { display: flex; flex-direction: column; gap: var(--dw-space-1); }

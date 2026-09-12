@@ -75,11 +75,26 @@ test('built-in plugin names switch language and search accepts either translatio
   for (const name of ['Keyboard Heatmap', 'Agent Overview', 'Mail Assistant', 'Git Actions', 'Server Monitor', 'Calendar & Todo']) {
     await expect(page.getByRole('button', { name, exact: true })).toBeVisible()
   }
+  await expect(page.locator('.plugin-row-copy small').first()).toContainText('physical keyboard activity')
   await page.getByRole('button', { name: 'Plugins Store', exact: true }).click()
   const search = page.getByRole('textbox', { name: 'Search plugins', exact: true })
   await search.fill('服务器监控')
   await expect(page.getByRole('heading', { name: 'Server Monitor', exact: true })).toBeVisible()
   await expect(page.locator('.catalog-card')).toHaveCount(1)
+  await expect(page.locator('.catalog-card p')).toContainText('Monitor remote Linux')
+})
+
+test('calendar and workflow controls follow live language changes', async ({ page }) => {
+  await gotoWithRetry(page, '/design.html')
+  await page.getByRole('button', { name: '日历与待办', exact: true }).click()
+  const calendar = page.frameLocator('iframe')
+  await expect(calendar.getByPlaceholder('添加待办', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '切换语言', exact: true }).click()
+  await expect(calendar.getByPlaceholder('Add a new task...', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Git Actions', exact: true }).click()
+  await expect(page.frameLocator('iframe').getByRole('button', { name: 'Show jobs and steps' }).first()).toBeVisible()
+  await page.getByRole('button', { name: 'Toggle language', exact: true }).click()
+  await expect(page.frameLocator('iframe').getByRole('button', { name: '展开作业与步骤' }).first()).toBeVisible()
 })
 
 test('disabled plugin actions menu stays above the plugin content', async ({ page }) => {
@@ -220,14 +235,14 @@ test('actions shows running state as localized status', async ({ page }) => {
   await expect(frame.locator('.run').first().locator('.run-progress-head strong')).toHaveText('1/2')
   await expect(frame.locator('.run').first().locator('.run-progress-track')).toHaveAttribute('aria-valuenow', '50')
   await expect(frame.locator('.run').first().getByText('当前步骤：Build', { exact: true })).toBeVisible()
-  await frame.getByRole('button', { name: '展开 Job 与步骤' }).first().click()
+  await frame.getByRole('button', { name: '展开作业与步骤' }).first().click()
   const activeJob = frame.locator('.run').first().locator('details.job-detail')
   await expect(activeJob).not.toHaveAttribute('open', '')
   await expect(activeJob.getByText('Windows build', { exact: true })).toBeVisible()
   await activeJob.locator('summary').click()
   await expect(activeJob.getByText('Checkout', { exact: true })).toBeVisible()
   const historicalRun = frame.locator('.run').nth(1)
-  await historicalRun.getByRole('button', { name: '展开 Job 与步骤' }).click()
+  await historicalRun.getByRole('button', { name: '展开作业与步骤' }).click()
   await expect(historicalRun.getByText('Linux test', { exact: true })).toBeVisible()
   const job = historicalRun.locator('details.job-detail')
   await expect(job).not.toHaveAttribute('open', '')
@@ -240,7 +255,7 @@ test('agent overview auto-refresh interval selector', async ({ page }) => {
   await page.getByRole('button', { name: 'Agent 概览', exact: true }).click()
   const frame = page.frameLocator('iframe')
   await expect(frame.locator('.weekly-card')).toBeVisible()
-  await expect(frame.getByText('Credits balance', { exact: true })).toBeVisible()
+  await expect(frame.getByText('点数余额', { exact: true })).toBeVisible()
   await expect(frame.getByText('$12.5', { exact: true })).toBeVisible()
 
   const settingsButton = frame.getByRole('button', { name: '设置', exact: true })

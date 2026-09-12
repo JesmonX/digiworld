@@ -317,9 +317,10 @@ export default function App() {
             void loadRuns().catch(reason => setError(String(reason))).finally(() => setBusy(false))
           }}
           disabled={busy}
+          aria-busy={busy}
         >
           {busy ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}
-          {t('refresh', locale)}
+          {t(busy ? 'refreshing' : 'refresh', locale)}
         </Button>
       </PageToolbar>
 
