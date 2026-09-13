@@ -20,6 +20,50 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 use tauri_plugin_autostart::ManagerExt as AutostartManagerExt;
+use tauri_plugin_dialog::DialogExt;
+
+#[tauri::command]
+async fn transfer_config(
+    app: AppHandle,
+    manager: State<'_, Arc<PluginManager>>,
+    import: bool,
+    password: String,
+    preferences: std::collections::BTreeMap<String, String>,
+) -> Result<Option<Value>> {
+    if password.chars().count() < 8 {
+        return Err(DigiworldError::Plugin(
+            "备份密码至少需要 8 个字符 / Use at least 8 characters".into(),
+        ));
+    }
+    let path = tauri::async_runtime::spawn_blocking(move || {
+        let dialog = app
+            .dialog()
+            .file()
+            .add_filter("Digiworld encrypted configuration", &["dwconfig"]);
+        if import {
+            dialog.blocking_pick_file()
+        } else {
+            dialog
+                .set_file_name(format!(
+                    "digiworld-{}.dwconfig",
+                    chrono::Local::now().format("%Y%m%d-%H%M%S")
+                ))
+                .blocking_save_file()
+        }
+    })
+    .await
+    .map_err(|_| DigiworldError::Plugin("File dialog failed".into()))?;
+    let Some(path) = path else {
+        return Ok(None);
+    };
+    let path = path
+        .into_path()
+        .map_err(|_| DigiworldError::Plugin("Select a local file".into()))?;
+    manager
+        .transfer_config(import, path, password, preferences)
+        .await
+        .map(Some)
+}
 
 struct LogGuard {
     _guard: tracing_appender::non_blocking::WorkerGuard,
@@ -512,6 +556,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            transfer_config,
             get_app_state,
             get_catalog,
             install_plugin,

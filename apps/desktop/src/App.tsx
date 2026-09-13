@@ -10,6 +10,7 @@ import { AppShell } from './layout/AppShell'
 import { PluginIcon } from './components/PluginIcon'
 import { stateLabel } from './components/PluginStatus'
 import { Loading } from './components/Loading'
+import { ConfigTransfer } from './components/ConfigTransfer'
 import { HomePage } from './pages/HomePage'
 import { CatalogPage } from './pages/CatalogPage'
 import { loadLocale, saveLocale, t, type Locale } from './lib/i18n'
@@ -561,6 +562,7 @@ function SettingsPage({
 
   return (
     <div className="settings-stack">
+      <ConfigTransfer locale={locale} />
       <Panel className="settings-section appearance-section" padding="none">
         <div className="settings-section-header">
           <div><strong>{t('appearanceTitle', locale)}</strong></div>

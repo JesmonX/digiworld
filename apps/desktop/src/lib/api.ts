@@ -61,6 +61,8 @@ export interface UpdateProgress {
 }
 
 export const api = {
+  transferConfig: (importConfig: boolean, password: string, preferences: Record<string, string>) =>
+    invoke<{ preferences: Record<string, string>; warnings: string[] } | null>('transfer_config', { import: importConfig, password, preferences }),
   appState: () => invoke<AppState>('get_app_state'),
   catalog: (refresh = false) => invoke<CatalogIndex>('get_catalog', { refresh }),
   install: (pluginId: string, version: string) =>

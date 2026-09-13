@@ -142,7 +142,10 @@ impl StatsEngine {
 }
 
 fn valid_layout(layout: &str) -> bool {
-    matches!(layout, "108" | "full" | "96" | "tkl" | "75" | "65" | "60" | "mac")
+    matches!(
+        layout,
+        "108" | "full" | "96" | "tkl" | "75" | "65" | "60" | "mac"
+    )
 }
 
 #[cfg(test)]

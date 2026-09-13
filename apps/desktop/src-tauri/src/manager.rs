@@ -22,6 +22,7 @@ const MAX_EXTRACTED_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_UI_BYTES: u64 = 8 * 1024 * 1024;
 
 pub struct PluginManager {
+    config_gate: RwLock<()>,
     plugins_dir: PathBuf,
     data_dir: PathBuf,
     store: Store,
@@ -46,6 +47,7 @@ impl PluginManager {
             .and_then(|value| network::normalized(value).ok())
             .unwrap_or_default();
         Ok(Arc::new(Self {
+            config_gate: RwLock::new(()),
             plugins_dir,
             data_dir,
             store,
@@ -81,6 +83,7 @@ impl PluginManager {
     }
 
     pub async fn set_proxy_settings(&self, settings: ProxySettings) -> Result<ProxySettings> {
+        let _guard = self.config_gate.read().await;
         let settings = network::normalized(settings)?;
         self.store
             .set_metadata("proxy_settings", &serde_json::to_string(&settings)?)?;
@@ -116,6 +119,7 @@ impl PluginManager {
     }
 
     pub async fn start_enabled(&self) {
+        let _guard = self.config_gate.read().await;
         let manifests = match self.store.manifests(true) {
             Ok(value) => value,
             Err(error) => {
@@ -185,6 +189,7 @@ impl PluginManager {
     where
         F: FnMut(&str, &str, u64, Option<u64>),
     {
+        let _guard = self.config_gate.read().await;
         validate_plugin_id(plugin_id)?;
         let catalog = self.load_catalog(false).await?;
         self.install_from_catalog(
@@ -204,6 +209,7 @@ impl PluginManager {
     where
         F: FnMut(&str, &str, &str, u64, Option<u64>),
     {
+        let _guard = self.config_gate.read().await;
         if requests.is_empty() {
             return Ok(Vec::new());
         }
@@ -418,6 +424,7 @@ impl PluginManager {
     }
 
     pub async fn set_enabled(&self, plugin_id: &str, enabled: bool) -> Result<PluginSummary> {
+        let _guard = self.config_gate.read().await;
         validate_plugin_id(plugin_id)?;
         let manifest = self.store.manifest(plugin_id)?.ok_or_else(|| {
             DigiworldError::Plugin(format!("plugin is not installed: {plugin_id}"))
@@ -437,6 +444,7 @@ impl PluginManager {
     }
 
     pub async fn uninstall(&self, plugin_id: &str, delete_data: bool) -> Result<()> {
+        let _guard = self.config_gate.read().await;
         validate_plugin_id(plugin_id)?;
         self.stop(plugin_id).await;
         let package = self.plugins_dir.join(plugin_id);
@@ -467,6 +475,7 @@ impl PluginManager {
     }
 
     pub async fn request(&self, plugin_id: &str, method: &str, payload: Value) -> Result<Value> {
+        let _guard = self.config_gate.read().await;
         validate_plugin_id(plugin_id)?;
         validate_method(method)?;
         let process = self
@@ -509,6 +518,64 @@ impl PluginManager {
         for id in ids {
             self.stop(&id).await;
         }
+    }
+
+    pub async fn transfer_config(
+        &self,
+        import: bool,
+        path: PathBuf,
+        password: String,
+        preferences: std::collections::BTreeMap<String, String>,
+    ) -> Result<Value> {
+        let guard = self.config_gate.write().await;
+        self.stop_all().await;
+        let root = self
+            .data_dir
+            .parent()
+            .expect("data directory has parent")
+            .to_path_buf();
+        let result = tokio::task::spawn_blocking(move || -> anyhow::Result<Value> {
+            use digiworld_config_transfer as transfer;
+            use std::io::{Read, Write};
+            let config = if import {
+                let file = std::fs::File::open(&path)?;
+                let mut bytes = Vec::new();
+                file.take(transfer::MAX_BYTES + 1).read_to_end(&mut bytes)?;
+                let config = transfer::decrypt(&bytes, &password)?;
+                if let Some(json) = config.proxy_json() {
+                    network::normalized(serde_json::from_str(json)?)?;
+                }
+                transfer::restore(&root, &config)?;
+                config
+            } else {
+                let config = transfer::collect(&root, preferences)?;
+                let bytes = transfer::encrypt(&config, &password)?;
+                let mut file = tempfile::NamedTempFile::new_in(
+                    path.parent()
+                        .ok_or_else(|| anyhow::anyhow!("Invalid destination"))?,
+                )?;
+                file.write_all(&bytes)?;
+                file.as_file().sync_all()?;
+                file.persist(&path)?;
+                config
+            };
+            Ok(serde_json::json!({"preferences": config.preferences, "warnings": config.warnings}))
+        })
+        .await;
+        // Restore runtime proxy state without restarting plugins until the exclusive lock is released.
+        if import
+            && matches!(&result, Ok(Ok(_)))
+            && let Ok(Some(json)) = self.store.metadata_string("proxy_settings")
+            && let Ok(settings) = serde_json::from_str(&json)
+        {
+            *self.proxy.write().await = settings;
+            *self.catalog_cache.lock().await = None;
+        }
+        drop(guard);
+        self.start_enabled().await;
+        result
+            .map_err(|_| DigiworldError::Plugin("Configuration task failed".into()))?
+            .map_err(|error| DigiworldError::Plugin(format!("{error:#}")))
     }
 
     pub fn summaries(&self) -> Result<Vec<PluginSummary>> {
