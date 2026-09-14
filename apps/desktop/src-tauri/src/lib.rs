@@ -4,6 +4,7 @@ mod manager;
 mod model;
 mod network;
 mod process;
+mod status_bar;
 mod store;
 
 use crate::error::{DigiworldError, Result};
@@ -436,15 +437,20 @@ fn open_main(app: &AppHandle) {
     }
 }
 
+#[tauri::command]
+async fn refresh_tray_menu(app: AppHandle) -> Result<()> {
+    let _ = status_bar::update_tray(&app).await;
+    Ok(())
+}
+
 fn create_tray(app: &tauri::App) -> anyhow::Result<()> {
-    let open = MenuItem::with_id(app, "open", "打开 Digiworld", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&open, &quit])?;
-    let mut builder = TrayIconBuilder::new()
+    let menu = status_bar::build_tray_menu(app.handle(), None)?;
+    let mut builder = TrayIconBuilder::with_id("main")
         .tooltip("Digiworld")
+        .show_menu_on_left_click(true)
         .menu(&menu)
         .on_menu_event(|app, event| match event.id.as_ref() {
-            "open" => open_main(app),
+            "open" | "status_today" | "status_codex" | "status_agy" => open_main(app),
             "quit" => {
                 let manager = app.state::<Arc<PluginManager>>().inner().clone();
                 let handle = app.clone();
@@ -462,7 +468,16 @@ fn create_tray(app: &tauri::App) -> anyhow::Result<()> {
                 ..
             } = event
             {
+                #[cfg(not(target_os = "macos"))]
                 open_main(tray.app_handle());
+
+                #[cfg(target_os = "macos")]
+                {
+                    let handle = tray.app_handle().clone();
+                    tauri::async_runtime::spawn(async move {
+                        let _ = status_bar::update_tray(&handle).await;
+                    });
+                }
             }
         });
     if let Some(icon) = app.default_window_icon() {
@@ -523,8 +538,20 @@ pub fn run() {
                 let _ = window.hide();
             }
             let startup_manager = manager.clone();
+            let startup_app = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 startup_manager.start_enabled().await;
+                let _ = status_bar::update_tray(&startup_app).await;
+            });
+
+            let tray_app = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
+                interval.tick().await;
+                loop {
+                    interval.tick().await;
+                    let _ = status_bar::update_tray(&tray_app).await;
+                }
             });
 
             if let Some(window) = app.get_webview_window("main") {
@@ -572,6 +599,7 @@ pub fn run() {
             test_proxy_settings,
             check_core_update,
             install_core_update,
+            refresh_tray_menu,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Digiworld");

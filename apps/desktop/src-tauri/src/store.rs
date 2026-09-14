@@ -155,6 +155,18 @@ impl Store {
             .transpose()
     }
 
+    pub fn is_enabled(&self, id: &str) -> Result<bool> {
+        let connection = self.connection.lock().expect("store lock poisoned");
+        let enabled: Option<bool> = connection
+            .query_row(
+                "SELECT enabled FROM installed_plugins WHERE id = ?1",
+                [id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        Ok(enabled.unwrap_or(false))
+    }
+
     pub fn summaries(&self) -> Result<Vec<PluginSummary>> {
         let connection = self.connection.lock().expect("store lock poisoned");
         let mut statement = connection.prepare(

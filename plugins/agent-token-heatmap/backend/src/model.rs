@@ -469,3 +469,44 @@ pub struct RefreshStatus {
     pub current_source: Option<String>,
     pub errors: Vec<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusBarSummary {
+    pub today: StatusBarToday,
+    pub codex: Option<StatusBarQuota>,
+    pub agy: Option<StatusBarQuota>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusBarToday {
+    pub day: String,
+    pub total_tokens: u64,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub cache_read_tokens: u64,
+    pub cache_write_tokens: u64,
+    pub cache_rate: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusBarWindow {
+    pub window: String,
+    pub window_duration_mins: Option<i64>,
+    pub used_percent: u32,
+    pub remaining_percent: u32,
+    pub resets_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusBarQuota {
+    pub name: String,
+    pub plan_type: Option<String>,
+    pub windows: Vec<StatusBarWindow>,
+    pub balance: Option<String>,
+    pub reset_cards: Option<i64>,
+}
+

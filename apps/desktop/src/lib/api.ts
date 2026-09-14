@@ -85,6 +85,7 @@ export const api = {
     invoke<InstallResult[]>('install_plugin_updates', { updates }),
   checkCoreUpdate: () => invoke<CoreUpdateInfo | null>('check_core_update'),
   installCoreUpdate: (version: string) => invoke<void>('install_core_update', { version }),
+  refreshTrayMenu: () => invoke<void>('refresh_tray_menu'),
   onUpdateProgress: (handler: (progress: UpdateProgress) => void): Promise<UnlistenFn> =>
     listen<UpdateProgress>('update-progress', event => handler(event.payload)),
 }

@@ -590,6 +590,19 @@ impl PluginManager {
             .ok_or_else(|| DigiworldError::Plugin(format!("plugin not found: {id}")))
     }
 
+    pub async fn ensure_running(&self, plugin_id: &str) -> Result<()> {
+        let _guard = self.config_gate.read().await;
+        if self.processes.lock().await.contains_key(plugin_id) {
+            return Ok(());
+        }
+        if let Some(manifest) = self.store.manifest(plugin_id)?
+            && self.store.is_enabled(plugin_id)?
+        {
+            self.start(&manifest).await?;
+        }
+        Ok(())
+    }
+
     async fn start(&self, manifest: &PluginManifest) -> Result<()> {
         if self.processes.lock().await.contains_key(&manifest.id) {
             return Ok(());

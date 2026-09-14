@@ -122,6 +122,9 @@ fn handle(engine: &UsageEngine, method: &str, params: Value) -> Result<Value> {
                 serde_json::from_value(params).context("invalid snapshot request")?;
             Ok(serde_json::to_value(engine.snapshot(request)?)?)
         }
+        "usage.statusBarSummary" => {
+            Ok(serde_json::to_value(engine.status_bar_summary()?)?)
+        }
         _ => bail!("unknown method: {method}"),
     }
 }

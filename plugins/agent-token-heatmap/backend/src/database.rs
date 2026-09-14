@@ -1,6 +1,7 @@
 use crate::model::{
     AgentKind, Breakdown, DailyModelSnapshot, DaySnapshot, FileUsage, ModelBreakdown, ScanBatch,
-    SnapshotRequest, SourceStatus, TokenUsage, UsageSettings, UsageSnapshot, UsageTotals,
+    SnapshotRequest, SourceStatus, StatusBarToday, TokenUsage, UsageSettings, UsageSnapshot,
+    UsageTotals,
 };
 use anyhow::{Context, Result};
 use chrono::{Duration, Local};
@@ -363,6 +364,77 @@ impl Database {
         })
     }
 
+    pub fn today_usage(&self, settings: &UsageSettings) -> Result<StatusBarToday> {
+        let day = Local::now().format("%Y-%m-%d").to_string();
+        let source_ids: BTreeSet<_> = if let Some(sources) = &settings.selected_sources {
+            sources.iter().cloned().collect()
+        } else {
+            std::iter::once("local".to_string())
+                .chain(settings.ssh_sources.iter().map(|source| source.id.clone()))
+                .collect()
+        };
+        let agents: BTreeSet<_> = settings
+            .selected_agents
+            .as_ref()
+            .map(|agents| agents.iter().copied().collect())
+            .unwrap_or_else(|| AgentKind::ALL.into_iter().collect());
+
+        let mut statement = self.connection.prepare(
+            "SELECT source_id, agent,
+                    SUM(input_tokens), SUM(output_tokens),
+                    SUM(cache_read_tokens), SUM(cache_write_tokens), MAX(cache_available)
+             FROM daily_file_usage
+             WHERE day = ?1
+             GROUP BY source_id, agent",
+        )?;
+        let rows = statement.query_map(params![day], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, u64>(2)?,
+                row.get::<_, u64>(3)?,
+                row.get::<_, u64>(4)?,
+                row.get::<_, u64>(5)?,
+                row.get::<_, bool>(6)?,
+            ))
+        })?;
+
+        let mut input_tokens = 0_u64;
+        let mut output_tokens = 0_u64;
+        let mut cache_read_tokens = 0_u64;
+        let mut cache_write_tokens = 0_u64;
+        let mut cache_available = false;
+
+        for row in rows {
+            let (source_id, agent_str, inp, out, cr, cw, ca) = row?;
+            let Some(agent) = parse_agent(&agent_str) else {
+                continue;
+            };
+            if !source_ids.contains(&source_id) || !agents.contains(&agent) {
+                continue;
+            }
+            input_tokens = input_tokens.saturating_add(inp);
+            output_tokens = output_tokens.saturating_add(out);
+            cache_read_tokens = cache_read_tokens.saturating_add(cr);
+            cache_write_tokens = cache_write_tokens.saturating_add(cw);
+            cache_available |= ca;
+        }
+
+        let total_tokens = input_tokens.saturating_add(output_tokens);
+        let cache_rate = (cache_available && input_tokens > 0)
+            .then_some(cache_read_tokens as f64 / input_tokens as f64);
+
+        Ok(StatusBarToday {
+            day,
+            total_tokens,
+            input_tokens,
+            output_tokens,
+            cache_read_tokens,
+            cache_write_tokens,
+            cache_rate,
+        })
+    }
+
     fn statuses(&self, sources: &BTreeSet<String>) -> Result<Vec<SourceStatus>> {
         let mut statement = self.connection.prepare(
             "SELECT source_id, status, last_scanned_at, error, warnings_json FROM source_status",
@@ -619,4 +691,40 @@ mod tests {
         drop(database);
         std::fs::remove_file(path).unwrap();
     }
+
+    #[test]
+    fn calculates_today_usage_and_cache_rate() {
+        let mut database = Database::open(Path::new(":memory:")).unwrap();
+        let day = Local::now().format("%Y-%m-%d").to_string();
+        let batch = ScanBatch {
+            files: vec![FileUsage {
+                agent: AgentKind::Codex,
+                file_hash: "codex-1".into(),
+                size: 100,
+                modified: 1,
+                daily: vec![DailyUsage {
+                    day: day.clone(),
+                    model: "gpt-4o".into(),
+                    usage: TokenUsage {
+                        input_tokens: 1000,
+                        output_tokens: 200,
+                        cache_read_tokens: 800,
+                        cache_write_tokens: 100,
+                        cache_available: true,
+                    },
+                }],
+            }],
+            seen: BTreeMap::from([(AgentKind::Codex, vec!["codex-1".into()])]),
+            warnings: vec![],
+        };
+        database.apply_scan("local", &batch).unwrap();
+
+        let today = database.today_usage(&UsageSettings::default()).unwrap();
+        assert_eq!(today.day, day);
+        assert_eq!(today.total_tokens, 1200);
+        assert_eq!(today.cache_read_tokens, 800);
+        assert_eq!(today.input_tokens, 1000);
+        assert_eq!(today.cache_rate, Some(0.8));
+    }
 }
+

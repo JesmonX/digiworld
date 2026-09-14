@@ -2,7 +2,8 @@ use crate::database::Database;
 #[cfg(test)]
 use crate::model::AgentKind;
 use crate::model::{
-    AgyQuotaSnapshot, CodexQuotaSnapshot, RefreshStatus, SnapshotRequest, SshSource, UsageSettings,
+    AgyQuotaBucket, AgyQuotaSnapshot, CodexQuotaSnapshot, RefreshStatus, SnapshotRequest,
+    SshSource, StatusBarQuota, StatusBarSummary, StatusBarWindow, UsageSettings,
     UsageSnapshot,
 };
 use crate::{agy_quota, quota, remote, scanner};
@@ -238,6 +239,138 @@ impl UsageEngine {
                 error.to_string().chars().take(500).collect(),
             )
         }))
+    }
+
+    pub fn status_bar_summary(&self) -> Result<StatusBarSummary> {
+        let settings = self.settings()?;
+        let today = self
+            .database
+            .lock()
+            .expect("database lock poisoned")
+            .today_usage(&settings)?;
+
+        let codex = match self.codex_quota(false) {
+            Ok(snapshot) if snapshot.status == "ready" || snapshot.status == "stale" => {
+                let windows: Vec<StatusBarWindow> = snapshot
+                    .windows
+                    .into_iter()
+                    .map(|w| {
+                        let window_label = match w.window_duration_mins {
+                            Some(300) => "5h".to_string(),
+                            Some(10080) => "7d".to_string(),
+                            Some(m) if m % 1440 == 0 => format!("{}d", m / 1440),
+                            Some(m) if m % 60 == 0 => format!("{}h", m / 60),
+                            Some(m) => format!("{}m", m),
+                            None => "limit".to_string(),
+                        };
+                        let remaining_percent = 100_u32.saturating_sub(w.used_percent.min(100));
+                        StatusBarWindow {
+                            window: window_label,
+                            window_duration_mins: w.window_duration_mins,
+                            used_percent: w.used_percent,
+                            remaining_percent,
+                            resets_at: w.resets_at,
+                        }
+                    })
+                    .collect();
+                let balance = snapshot.credits.as_ref().and_then(|c| {
+                    if c.unlimited {
+                        Some("无限".to_string())
+                    } else {
+                        c.balance.clone()
+                    }
+                });
+                let reset_cards = snapshot.reset_credits.as_ref().map(|r| r.available_count);
+                if windows.is_empty() && balance.is_none() && reset_cards.is_none() {
+                    None
+                } else {
+                    Some(StatusBarQuota {
+                        name: "Codex".to_string(),
+                        plan_type: snapshot.plan_type,
+                        windows,
+                        balance,
+                        reset_cards,
+                    })
+                }
+            }
+            _ => None,
+        };
+
+        let agy = match self.agy_quota(false) {
+            Ok(snapshot) if snapshot.status == "ready" || snapshot.status == "stale" => {
+                // Must NOT display Claude/GPT: only keep non-Claude, non-GPT buckets (e.g. Gemini Models)
+                let buckets: Vec<AgyQuotaBucket> = if !snapshot.groups.is_empty() {
+                    snapshot
+                        .groups
+                        .into_iter()
+                        .filter(|g| {
+                            let lower = g.name.to_lowercase();
+                            !lower.contains("claude")
+                                && !lower.contains("gpt")
+                                && !lower.contains("3p")
+                        })
+                        .flat_map(|g| g.buckets)
+                        .collect()
+                } else {
+                    snapshot.windows
+                };
+
+                let mut windows: Vec<StatusBarWindow> = buckets
+                    .into_iter()
+                    .filter(|b| {
+                        let lower_id = b.id.to_lowercase();
+                        let lower_name = b.name.to_lowercase();
+                        !lower_id.contains("claude")
+                            && !lower_id.contains("gpt")
+                            && !lower_name.contains("claude")
+                            && !lower_name.contains("gpt")
+                    })
+                    .map(|b| {
+                        let window_label = match b.window_duration_mins {
+                            Some(300) => "5h".to_string(),
+                            Some(10080) => "7d".to_string(),
+                            Some(m) if m % 1440 == 0 => format!("{}d", m / 1440),
+                            Some(m) if m % 60 == 0 => format!("{}h", m / 60),
+                            Some(m) => format!("{}m", m),
+                            None => {
+                                if b.id.contains("5h") || b.window.contains("5h") {
+                                    "5h".to_string()
+                                } else if b.id.contains("weekly") || b.window.contains("weekly") {
+                                    "7d".to_string()
+                                } else {
+                                    b.window
+                                }
+                            }
+                        };
+                        let remaining_percent = (b.remaining_fraction * 100.0).round().clamp(0.0, 100.0) as u32;
+                        let used_percent = 100_u32.saturating_sub(remaining_percent);
+                        StatusBarWindow {
+                            window: window_label,
+                            window_duration_mins: b.window_duration_mins,
+                            used_percent,
+                            remaining_percent,
+                            resets_at: b.resets_at,
+                        }
+                    })
+                    .collect();
+                windows.sort_by_key(|w| w.window_duration_mins.unwrap_or(i64::MAX));
+                windows.dedup_by(|a, b| a.window == b.window && a.resets_at == b.resets_at);
+                if windows.is_empty() {
+                    None
+                } else {
+                    Some(StatusBarQuota {
+                        name: "AGY".to_string(),
+                        plan_type: snapshot.plan_type,
+                        windows,
+                        balance: None,
+                        reset_cards: None,
+                    })
+                }
+            }
+            _ => None,
+        };
+
+        Ok(StatusBarSummary { today, codex, agy })
     }
 
     pub fn refresh_status(&self) -> RefreshStatus {
@@ -622,4 +755,144 @@ mod tests {
         drop(engine);
         let _ = std::fs::remove_file(path);
     }
+
+    #[test]
+    fn status_bar_summary_extracts_today_codex_and_agy_gemini_only() {
+        use crate::model::{
+            CodexQuotaCredits, CodexQuotaWindow, CodexResetCreditsSummary,
+        };
+        let path = std::env::temp_dir().join(format!(
+            "digiworld-status-bar-test-{}-{}.db",
+            std::process::id(),
+            chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+        ));
+        let engine = UsageEngine::open(&path).unwrap();
+
+        // Populate Codex quota cache
+        *engine.quota_cache.lock().unwrap() = Some(CachedCodexQuota {
+            snapshot: CodexQuotaSnapshot {
+                status: "ready".into(),
+                source_id: Some("local".into()),
+                source_label: Some("本机".into()),
+                fetched_at: Some("2026-09-14T08:00:00Z".into()),
+                plan_type: Some("plus".into()),
+                windows: vec![
+                    CodexQuotaWindow {
+                        used_percent: 20,
+                        window_duration_mins: Some(300),
+                        resets_at: Some(1788500000),
+                    },
+                    CodexQuotaWindow {
+                        used_percent: 55,
+                        window_duration_mins: Some(10080),
+                        resets_at: Some(1788900000),
+                    },
+                ],
+                credits: Some(CodexQuotaCredits {
+                    balance: Some("$12.5".into()),
+                    has_credits: true,
+                    unlimited: false,
+                }),
+                reset_credits: Some(CodexResetCreditsSummary {
+                    available_count: 2,
+                    credits: None,
+                }),
+                error: None,
+            },
+            cached_at: Instant::now(),
+        });
+
+        // Populate AGY quota cache with Gemini Models and Claude/GPT models
+        *engine.agy_quota_cache.lock().unwrap() = Some(CachedAgyQuota {
+            snapshot: AgyQuotaSnapshot {
+                status: "ready".into(),
+                source_id: Some("local".into()),
+                source_label: Some("本机".into()),
+                fetched_at: Some("2026-09-14T08:00:00Z".into()),
+                plan_type: Some("AI Pro".into()),
+                description: None,
+                groups: vec![
+                    crate::model::AgyQuotaGroup {
+                        name: "Gemini Models".into(),
+                        description: None,
+                        buckets: vec![
+                            AgyQuotaBucket {
+                                id: "gemini-5h".into(),
+                                name: "Five Hour Limit Remaining".into(),
+                                description: None,
+                                window: "5h".into(),
+                                window_duration_mins: Some(300),
+                                used_percent: 14,
+                                remaining_percent: 86,
+                                remaining_fraction: 0.86,
+                                reset_time: Some("2026-09-14T15:52:25Z".into()),
+                                resets_at: Some(1788501000),
+                            },
+                            AgyQuotaBucket {
+                                id: "gemini-weekly".into(),
+                                name: "Weekly Limit Remaining".into(),
+                                description: None,
+                                window: "weekly".into(),
+                                window_duration_mins: Some(10080),
+                                used_percent: 62,
+                                remaining_percent: 38,
+                                remaining_fraction: 0.38,
+                                reset_time: Some("2026-09-18T04:56:07Z".into()),
+                                resets_at: Some(1788902000),
+                            },
+                        ],
+                    },
+                    crate::model::AgyQuotaGroup {
+                        name: "Claude and GPT models".into(),
+                        description: None,
+                        buckets: vec![
+                            AgyQuotaBucket {
+                                id: "claude-5h".into(),
+                                name: "Five Hour Limit Remaining".into(),
+                                description: None,
+                                window: "5h".into(),
+                                window_duration_mins: Some(300),
+                                used_percent: 0,
+                                remaining_percent: 100,
+                                remaining_fraction: 1.0,
+                                reset_time: None,
+                                resets_at: None,
+                            },
+                        ],
+                    },
+                ],
+                windows: vec![],
+                error: None,
+            },
+            cached_at: Instant::now(),
+        });
+
+        let summary = engine.status_bar_summary().unwrap();
+
+        // Codex verification
+        let codex = summary.codex.unwrap();
+        assert_eq!(codex.name, "Codex");
+        assert_eq!(codex.balance.as_deref(), Some("$12.5"));
+        assert_eq!(codex.reset_cards, Some(2));
+        assert_eq!(codex.windows.len(), 2);
+        assert_eq!(codex.windows[0].window, "5h");
+        assert_eq!(codex.windows[0].remaining_percent, 80);
+        assert_eq!(codex.windows[1].window, "7d");
+        assert_eq!(codex.windows[1].remaining_percent, 45);
+
+        // AGY verification: must NOT include Claude or GPT
+        let agy = summary.agy.unwrap();
+        assert_eq!(agy.name, "AGY");
+        assert_eq!(agy.windows.len(), 2);
+        assert_eq!(agy.windows[0].window, "5h");
+        assert_eq!(agy.windows[0].remaining_percent, 86);
+        assert_eq!(agy.windows[1].window, "7d");
+        assert_eq!(agy.windows[1].remaining_percent, 38);
+        assert_eq!(agy.balance, None);
+        assert_eq!(agy.reset_cards, None);
+
+        drop(engine);
+        let _ = std::fs::remove_file(path);
+    }
 }
+
