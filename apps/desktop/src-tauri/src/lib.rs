@@ -483,6 +483,10 @@ fn create_tray(app: &tauri::App) -> anyhow::Result<()> {
     if let Some(icon) = app.default_window_icon() {
         builder = builder.icon(icon.clone());
     }
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder.icon_as_template(true);
+    }
     builder.build(app)?;
     Ok(())
 }
@@ -534,8 +538,8 @@ pub fn run() {
             create_tray(app)?;
 
             let background = std::env::args().any(|argument| argument == "--background");
-            if background && let Some(window) = app.get_webview_window("main") {
-                let _ = window.hide();
+            if !background {
+                open_main(app.handle());
             }
             let startup_manager = manager.clone();
             let startup_app = app.handle().clone();
@@ -555,27 +559,12 @@ pub fn run() {
             });
 
             if let Some(window) = app.get_webview_window("main") {
-                let close_manager = manager.clone();
                 let handle = app.handle().clone();
                 window.on_window_event(move |event| {
                     if let WindowEvent::CloseRequested { api, .. } = event {
-                        if close_manager
-                            .store()
-                            .has_enabled_background()
-                            .unwrap_or(false)
-                        {
-                            api.prevent_close();
-                            if let Some(window) = handle.get_webview_window("main") {
-                                let _ = window.hide();
-                            }
-                        } else {
-                            api.prevent_close();
-                            let manager = close_manager.clone();
-                            let exit_handle = handle.clone();
-                            tauri::async_runtime::spawn(async move {
-                                manager.stop_all().await;
-                                exit_handle.exit(0);
-                            });
+                        api.prevent_close();
+                        if let Some(window) = handle.get_webview_window("main") {
+                            let _ = window.hide();
                         }
                     }
                 });

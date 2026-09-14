@@ -173,6 +173,7 @@ jobs:
       - name: Ad-hoc sign plugin backends
         run: |
           for binary in \
+            target/release/digiworld-keyboard-heatmap \
             target/release/digiworld-agent-token-heatmap \
             target/release/digiworld-mail-assistant \
             target/release/digiworld-github-actions \
@@ -188,6 +189,7 @@ jobs:
           DIGIWORLD_TARGET: ${{ matrix.target }}
           DIGIWORLD_RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
         run: |
+          pnpm package:keyboard
           pnpm package:agent-tokens
           pnpm package:mail
           pnpm package:github-actions

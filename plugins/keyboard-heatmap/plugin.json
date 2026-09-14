@@ -1,10 +1,10 @@
 {
   "id": "io.github.jesmonx.digiworld.keyboard-heatmap",
-  "version": "0.1.18",
+  "version": "0.1.19",
   "uiDesignVersion": 1,
   "name": "键盘热力图",
   "localizedNames": { "zh": "键盘热力图", "en": "Keyboard Heatmap" },
-  "description": "支持全尺寸、紧凑与 Mac 配列的实体键位热力图，只保存每日聚合次数。",
+  "description": "支持 Windows 与 macOS（Apple Silicon / Intel）的实体键位热力图，只保存每日聚合次数。",
   "icon": "keyboard",
   "author": "JesmonX",
   "license": "MIT",

@@ -1038,6 +1038,8 @@ version = "0.1.12"
 dependencies = [
  "anyhow",
  "chrono",
+ "core-foundation 0.10.1",
+ "core-graphics",
  "rusqlite",
  "serde",
  "serde_json",

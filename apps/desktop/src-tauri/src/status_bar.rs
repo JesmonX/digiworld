@@ -126,6 +126,55 @@ pub fn format_window_line(w: &StatusBarWindow) -> String {
     }
 }
 
+pub fn format_macos_today_line(today: &StatusBarToday) -> String {
+    let cache_rate = today
+        .cache_rate
+        .map(|rate| format!("{:.1}%", rate * 100.0))
+        .unwrap_or_else(|| "--".into());
+    format!(
+        "今日  {} Token  ·  缓存 {}",
+        format_tokens(today.total_tokens),
+        cache_rate
+    )
+}
+
+pub fn format_macos_window_line(window: &StatusBarWindow) -> String {
+    let reset = window.resets_at.map(format_reset_time).unwrap_or_default();
+    if reset.is_empty() {
+        format!("{}  剩余 {}%", window.window, window.remaining_percent)
+    } else {
+        format!(
+            "{}  剩余 {}%  ·  {}",
+            window.window, window.remaining_percent, reset
+        )
+    }
+}
+
+fn format_macos_quota_lines(quota: &StatusBarQuota, codex: bool) -> Vec<String> {
+    if quota.windows.is_empty()
+        && (!codex || (quota.balance.is_none() && quota.reset_cards.is_none()))
+    {
+        return Vec::new();
+    }
+    let mut heading = quota.name.clone();
+    if let Some(plan) = quota
+        .plan_type
+        .as_deref()
+        .filter(|plan| !plan.trim().is_empty())
+    {
+        heading.push_str("  ·  ");
+        heading.push_str(plan);
+    }
+    let mut lines = vec![heading];
+    lines.extend(quota.windows.iter().map(format_macos_window_line));
+    if codex {
+        if let Some(extra) = format_codex_extra_line(quota) {
+            lines.push(extra.trim().to_string());
+        }
+    }
+    lines
+}
+
 pub fn format_codex_extra_line(codex: &StatusBarQuota) -> Option<String> {
     let mut parts = Vec::new();
     if let Some(balance) = &codex.balance {
@@ -190,17 +239,25 @@ pub fn build_tray_menu(
     let mut items: Vec<TrayItem> = Vec::new();
 
     if let Some(summary) = summary {
-        let today_text = format_today_line(&summary.today);
+        let today_text = if cfg!(target_os = "macos") {
+            format_macos_today_line(&summary.today)
+        } else {
+            format_today_line(&summary.today)
+        };
         items.push(TrayItem::Item(MenuItem::with_id(
             app,
             "status_today",
             &today_text,
-            true,
+            !cfg!(target_os = "macos"),
             None::<&str>,
         )?));
 
         if let Some(codex) = &summary.codex {
-            let codex_lines = format_codex_lines(codex);
+            let codex_lines = if cfg!(target_os = "macos") {
+                format_macos_quota_lines(codex, true)
+            } else {
+                format_codex_lines(codex)
+            };
             if !codex_lines.is_empty() {
                 items.push(TrayItem::Sep(PredefinedMenuItem::separator(app)?));
                 for (idx, line) in codex_lines.into_iter().enumerate() {
@@ -209,7 +266,7 @@ pub fn build_tray_menu(
                         app,
                         &id,
                         &line,
-                        true,
+                        !cfg!(target_os = "macos"),
                         None::<&str>,
                     )?));
                 }
@@ -217,7 +274,11 @@ pub fn build_tray_menu(
         }
 
         if let Some(agy) = &summary.agy {
-            let agy_lines = format_agy_lines(agy);
+            let agy_lines = if cfg!(target_os = "macos") {
+                format_macos_quota_lines(agy, false)
+            } else {
+                format_agy_lines(agy)
+            };
             if !agy_lines.is_empty() {
                 items.push(TrayItem::Sep(PredefinedMenuItem::separator(app)?));
                 for (idx, line) in agy_lines.into_iter().enumerate() {
@@ -226,7 +287,7 @@ pub fn build_tray_menu(
                         app,
                         &id,
                         &line,
-                        true,
+                        !cfg!(target_os = "macos"),
                         None::<&str>,
                     )?));
                 }
@@ -238,9 +299,22 @@ pub fn build_tray_menu(
         items.push(TrayItem::Sep(PredefinedMenuItem::separator(app)?));
     }
 
-    let open = MenuItem::with_id(app, "open", "打开 Digiworld", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+    let open_label = if cfg!(target_os = "macos") {
+        "打开 Digiworld…"
+    } else {
+        "打开 Digiworld"
+    };
+    let quit_label = if cfg!(target_os = "macos") {
+        "退出 Digiworld"
+    } else {
+        "退出"
+    };
+    let open = MenuItem::with_id(app, "open", open_label, true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", quit_label, true, None::<&str>)?;
     items.push(TrayItem::Item(open));
+    if cfg!(target_os = "macos") {
+        items.push(TrayItem::Sep(PredefinedMenuItem::separator(app)?));
+    }
     items.push(TrayItem::Item(quit));
 
     let refs: Vec<&dyn IsMenuItem<tauri::Wry>> = items.iter().map(|it| it.as_menu_item()).collect();
@@ -363,6 +437,27 @@ mod tests {
             format_window_line(&win_with_reset),
             "  5h 剩余: ████████░░ 80%"
         );
+    }
+
+    #[test]
+    fn formats_native_macos_status_without_text_progress_blocks() {
+        let today = StatusBarToday {
+            total_tokens: 125_400,
+            cache_rate: Some(0.852),
+            ..StatusBarToday::default()
+        };
+        assert_eq!(
+            format_macos_today_line(&today),
+            "今日  125K Token  ·  缓存 85.2%"
+        );
+        let window = StatusBarWindow {
+            window: "5h".into(),
+            window_duration_mins: Some(300),
+            used_percent: 20,
+            remaining_percent: 80,
+            resets_at: None,
+        };
+        assert_eq!(format_macos_window_line(&window), "5h  剩余 80%");
     }
 
     #[test]
