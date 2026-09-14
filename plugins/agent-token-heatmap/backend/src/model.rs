@@ -509,4 +509,3 @@ pub struct StatusBarQuota {
     pub balance: Option<String>,
     pub reset_cards: Option<i64>,
 }
-

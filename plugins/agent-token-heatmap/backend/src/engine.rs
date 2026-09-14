@@ -3,8 +3,7 @@ use crate::database::Database;
 use crate::model::AgentKind;
 use crate::model::{
     AgyQuotaBucket, AgyQuotaSnapshot, CodexQuotaSnapshot, RefreshStatus, SnapshotRequest,
-    SshSource, StatusBarQuota, StatusBarSummary, StatusBarWindow, UsageSettings,
-    UsageSnapshot,
+    SshSource, StatusBarQuota, StatusBarSummary, StatusBarWindow, UsageSettings, UsageSnapshot,
 };
 use crate::{agy_quota, quota, remote, scanner};
 use anyhow::{Result, bail};
@@ -342,7 +341,8 @@ impl UsageEngine {
                                 }
                             }
                         };
-                        let remaining_percent = (b.remaining_fraction * 100.0).round().clamp(0.0, 100.0) as u32;
+                        let remaining_percent =
+                            (b.remaining_fraction * 100.0).round().clamp(0.0, 100.0) as u32;
                         let used_percent = 100_u32.saturating_sub(remaining_percent);
                         StatusBarWindow {
                             window: window_label,
@@ -758,9 +758,7 @@ mod tests {
 
     #[test]
     fn status_bar_summary_extracts_today_codex_and_agy_gemini_only() {
-        use crate::model::{
-            CodexQuotaCredits, CodexQuotaWindow, CodexResetCreditsSummary,
-        };
+        use crate::model::{CodexQuotaCredits, CodexQuotaWindow, CodexResetCreditsSummary};
         let path = std::env::temp_dir().join(format!(
             "digiworld-status-bar-test-{}-{}.db",
             std::process::id(),
@@ -845,20 +843,18 @@ mod tests {
                     crate::model::AgyQuotaGroup {
                         name: "Claude and GPT models".into(),
                         description: None,
-                        buckets: vec![
-                            AgyQuotaBucket {
-                                id: "claude-5h".into(),
-                                name: "Five Hour Limit Remaining".into(),
-                                description: None,
-                                window: "5h".into(),
-                                window_duration_mins: Some(300),
-                                used_percent: 0,
-                                remaining_percent: 100,
-                                remaining_fraction: 1.0,
-                                reset_time: None,
-                                resets_at: None,
-                            },
-                        ],
+                        buckets: vec![AgyQuotaBucket {
+                            id: "claude-5h".into(),
+                            name: "Five Hour Limit Remaining".into(),
+                            description: None,
+                            window: "5h".into(),
+                            window_duration_mins: Some(300),
+                            used_percent: 0,
+                            remaining_percent: 100,
+                            remaining_fraction: 1.0,
+                            reset_time: None,
+                            resets_at: None,
+                        }],
                     },
                 ],
                 windows: vec![],
@@ -895,4 +891,3 @@ mod tests {
         let _ = std::fs::remove_file(path);
     }
 }
-

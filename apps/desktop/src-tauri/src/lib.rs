@@ -17,8 +17,8 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 use tauri_plugin_autostart::ManagerExt as AutostartManagerExt;
 use tauri_plugin_dialog::DialogExt;
@@ -449,17 +449,17 @@ fn create_tray(app: &tauri::App) -> anyhow::Result<()> {
         .tooltip("Digiworld")
         .show_menu_on_left_click(true)
         .menu(&menu)
-        .on_menu_event(|app, event| match event.id.as_ref() {
-            "open" | "status_today" | "status_codex" | "status_agy" => open_main(app),
-            "quit" => {
+        .on_menu_event(|app, event| {
+            if event.id.as_ref() == "quit" {
                 let manager = app.state::<Arc<PluginManager>>().inner().clone();
                 let handle = app.clone();
                 tauri::async_runtime::spawn(async move {
                     manager.stop_all().await;
                     handle.exit(0);
                 });
+            } else {
+                open_main(app);
             }
-            _ => {}
         })
         .on_tray_icon_event(|tray, event| {
             if let TrayIconEvent::Click {

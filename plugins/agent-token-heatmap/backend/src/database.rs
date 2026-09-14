@@ -727,4 +727,3 @@ mod tests {
         assert_eq!(today.cache_rate, Some(0.8));
     }
 }
-
